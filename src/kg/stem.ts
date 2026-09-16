@@ -9,7 +9,7 @@ const PUNCT_SET = new Set(PUNCT.split(""));
 
 // word.lower().strip(punctuation) — strip leading/trailing punct.
 function cleanWord(word: string): string {
-	let s = word.toLowerCase();
+	let s = normalizeForMatch(word);
 	let start = 0;
 	let end = s.length;
 	while (start < end && PUNCT_SET.has(s[start])) start++;
@@ -26,7 +26,7 @@ export function stemWord(word: string): string {
 // defaults to exact). Conservative: leaves non-plurals alone. Spoken S-plurals
 // ("term stores") still find the singular label ("term-store").
 export function depluralize(word: string): string {
-	const w = word.toLowerCase();
+	const w = normalizeForMatch(word);
 	if (w.length > 4 && w.endsWith("ies")) return `${w.slice(0, -3)}y`;
 	if (
 		w.length > 4 &&
@@ -39,15 +39,24 @@ export function depluralize(word: string): string {
 	return w;
 }
 
-// Tokenize on word boundaries: lowercase, then runs of Unicode letters/digits
-// plus `_`. Unicode-aware so accented/non-ASCII single-word terms (café, São)
-// survive as whole tokens rather than being split on the accent.
+// Fold case and diacritics before extracting Unicode letters/digits plus `_`.
 export function tokenize(text: string): string[] {
-	return text.toLowerCase().match(/[\p{L}\p{N}_]+/gu) ?? [];
+	return normalizeForMatch(text).match(/[\p{L}\p{N}_]+/gu) ?? [];
 }
 
 export function stemText(text: string): string {
 	return tokenize(text)
 		.map((tok) => stemmer(tok))
 		.join(" ");
+}
+
+/** Canonical Unicode decomposition makes typed and spoken accent variants agree. */
+export function normalizeForMatch(text: string): string {
+	return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+}
+
+/** Keep both plausible suffix readings (databases -> database, buses -> bus). */
+export function stripPluralS(word: string): string {
+	const w = normalizeForMatch(word);
+	return w.length > 3 && w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w;
 }

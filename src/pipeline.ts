@@ -19,8 +19,11 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { runAgentLoop } from "@earendil-works/pi-agent-core";
 import type { Model } from "@earendil-works/pi-ai";
-import { defaultConvertToLlm } from "./pi-web-ui/index.js";
+
+import type { MemorySnapshot } from "./memory-storage.js";
+import { validatePipelineState } from "./memory-state.js";
 import { dbg, dbgError } from "./debug.js";
+import type { StorageTransaction } from "./pi-web-ui/storage/types.js";
 import type { Graph } from "./kg/graph.js";
 import type { EmbedFn } from "./kg/embed.js";
 import { makeCompletion } from "./kg/ingest.js";
@@ -63,7 +66,19 @@ export type PipelineAgentName = "audit" | "memory" | "summary";
 // The messages snapshot + sessionKey are frozen when the turn ends so a tick that runs
 // after a New Chat / loadSession still summarizes ITS OWN conversation and writes under
 // ITS OWN running-context key — not whatever conversation happens to be live when it runs.
+export interface VoiceEvidence {
+	utteranceId: string;
+	rawText: string;
+	correctedText: string;
+}
+
 interface TickInput {
+	generation: number;
+	model: Model<"openai-completions">;
+	baseUrl: string;
+	modelId: string;
+	auth: string;
+	voiceEvidence?: VoiceEvidence;
 	messages: AgentMessage[];
 	isVoiceTurn: boolean;
 	sessionKey: string;
@@ -77,7 +92,6 @@ interface TickInput {
 const PIPELINE_THINKING = "max" as const;
 
 const BUFFER_MAX_ENTRIES = 30; // per agent, rolling
-const FLAGS_MAX_ENTRIES = 100; // review-flags store, rolling (was unbounded → grew forever)
 const RUNNING_CONTEXT_MAX_WORDS = 8000; // rolling cap across entries
 const ACTIVITY_MAX_ITEMS = 100; // in-memory feed cap
 const AGENT_MAX_TURNS = 12; // runaway-loop backstop per tooled agent
@@ -85,6 +99,7 @@ const AGENT_TIMEOUT_MS = 180_000; // hard wall per agent per tick
 
 // One IndexedDB store, keyed slots.
 export const PIPELINE_STORE = "pipeline";
+export const PIPELINE_STATE_KEY = "state";
 const KEY_BUFFERS = "buffers";
 const KEY_STT = "stt-lexicon";
 const KEY_FLAGS = "flags";
@@ -93,25 +108,30 @@ const KEY_RUNNING_CONTEXT = "running-context";
 interface StorageLike {
 	get<T>(store: string, key: string): Promise<T | null | undefined>;
 	set(store: string, key: string, value: unknown): Promise<void>;
+	transaction<T>(stores: string[], mode: "readonly" | "readwrite", fn: (tx: StorageTransaction) => Promise<T>): Promise<T>;
 }
 
 export interface PipelineDeps {
 	backend: StorageLike;
 	getGraph: () => Graph;
 	saveGraph: () => Promise<void>;
+	saveMemory?: (snapshot: ReturnType<PipelineRuntime["snapshot"]>) => Promise<void>;
+	savePipeline?: (snapshot: ReturnType<PipelineRuntime["snapshot"]>) => Promise<void>;
+	onError?: (error: unknown) => void;
 	embed: EmbedFn;
 	getModel: () => Model<"openai-completions">;
 	getBaseUrl: () => string;
 	getModelId: () => string;
 	getAuth: () => string;
 	// Fold a background call's tokens into the visible session stats.
-	addCost: (promptTokens: number, completionTokens: number) => void;
+	addCost: (promptTokens: number, completionTokens: number, sessionKey: string) => void;
+	runLoop?: typeof runAgentLoop;
+	completion?: typeof makeCompletion;
 	// Brain icon: any pipeline agent in flight?
 	onStateChange: (state: "running" | "idle") => void;
 	// Right-gutter activity feed repaint.
 	onActivity: () => void;
-	// Current memory-consent state, re-checked right before persisting so a consent
-	// revoked mid-tick is honored. Absent/undefined is treated as granted.
+	// Memory access requires explicit consent at admission and every mutation boundary.
 	getConsent?: () => string;
 }
 
@@ -144,7 +164,10 @@ export function formatTranscript(messages: AgentMessage[]): string {
 		} else if (role === "compactionSummary") {
 			parts.push(`[EARLIER CONVERSATION, SUMMARIZED]\n${(m as { summary: string }).summary}`);
 		}
-		// voice-pending / system-notification / toolResult: dropped.
+		if (role === "toolResult") {
+			const result = m as { toolName: string; content: Array<{ type: string; text?: string }> };
+			parts.push(`[TOOL ${result.toolName}]\n${result.content.filter((b) => b.type === "text").map((b) => b.text ?? "").join("\n")}`);
+		}
 	}
 	return parts.join("\n\n");
 }
@@ -161,12 +184,16 @@ export class PipelineRuntime {
 	private sttLexicon: SttLexicon = emptySttLexicon();
 	private flags: ReviewFlag[] = [];
 	private runningContext: RunningContextEntry[] = [];
-	private sessionKey = crypto.randomUUID();
+	private sessionKey: string = crypto.randomUUID();
 
 	readonly activity: ActivityItem[] = [];
 
 	private running = false;
-	private queued: TickInput | null = null;
+	private queued: TickInput[] = [];
+	private generation = 0;
+	private controllers = new Set<AbortController>();
+	private loaded = false;
+	private pending: Promise<void> = Promise.resolve();
 
 	constructor(deps: PipelineDeps) {
 		this.deps = deps;
@@ -191,18 +218,37 @@ export class PipelineRuntime {
 			this.sttLexicon = (await b.get(PIPELINE_STORE, KEY_STT)) ?? emptySttLexicon();
 			this.flags = (await b.get(PIPELINE_STORE, KEY_FLAGS)) ?? [];
 			this.runningContext = (await b.get(PIPELINE_STORE, KEY_RUNNING_CONTEXT)) ?? [];
+			const snapshot = await b.get<ReturnType<PipelineRuntime["snapshot"]>>(PIPELINE_STORE, PIPELINE_STATE_KEY);
+			if (snapshot) this.restore(snapshot);
+			else validatePipelineState(this.snapshot());
+			this.loaded = true;
 		} catch (err) {
-			dbgError("pipeline state load failed (starting fresh):", err);
+			dbgError("pipeline state load failed; memory processing disabled:", err);
+			throw err;
 		}
 		// The activity feed starts empty every session — it's a live view of this
 		// session's pipeline work, not a persisted log. (The action buffers above
 		// still load; they're the agents' cross-turn memory, not the gutter feed.)
 	}
 
+	loadSnapshot(snapshot: MemorySnapshot): void {
+		if (snapshot.pipeline.present) {
+			this.restore(snapshot.pipeline.value as ReturnType<PipelineRuntime["snapshot"]>);
+			return;
+		}
+		const read = (key: keyof MemorySnapshot["legacyPipeline"], fallback: unknown) => {
+			const row = snapshot.legacyPipeline[key];
+			return row.present ? row.value : fallback;
+		};
+		const buffers = read("buffers", { audit: [], memory: [], summary: [] });
+		this.restore({ buffers, sttLexicon: read("stt-lexicon", emptySttLexicon()),
+			flags: read("flags", []), runningContext: read("running-context", []) } as ReturnType<PipelineRuntime["snapshot"]>);
+	}
+
 	/** A new conversation began (createAgent). The summary agent keys its
 	 *  running-context entry off this. */
-	startSession(): void {
-		this.sessionKey = crypto.randomUUID();
+	startSession(sessionKey: string): void {
+		this.sessionKey = sessionKey;
 	}
 
 	/** Wipe the pipeline's conversation-derived state: the per-agent action buffers,
@@ -211,19 +257,19 @@ export class PipelineRuntime {
 	 *  conversation content in IndexedDB — the buffers + flags both hold verbatim
 	 *  transcript-derived text and are re-injected into future pipeline prompts. */
 	async reset(): Promise<void> {
+		await this.cancel();
 		this.buffers = { audit: [], memory: [], summary: [] };
 		this.flags = [];
+		this.sttLexicon = emptySttLexicon();
+		this.runningContext = [];
 		this.activity.length = 0;
 		await this.persist();
 		this.deps.onActivity();
 	}
 
-	/** Append a review flag, rolling-capped so the store can't grow without bound. */
+	/** Unresolved review flags remain until explicitly resolved. */
 	private addFlag(f: ReviewFlag): void {
 		this.flags.push(f);
-		if (this.flags.length > FLAGS_MAX_ENTRIES) {
-			this.flags = this.flags.slice(-FLAGS_MAX_ENTRIES);
-		}
 	}
 
 	/** The human-review flags the audit agent raised, newest first — surfaced in the
@@ -243,6 +289,7 @@ export class PipelineRuntime {
 	/** The band-1 block injected into the MAIN agent's system prompt: entries
 	 *  from prior conversations, newest first. Empty string when none. */
 	runningContextBlock(): string {
+		if (!this.allowed()) return "";
 		const prior = this.runningContext.filter((e) => e.sessionKey !== this.sessionKey);
 		if (!prior.length) return "";
 		const lines = prior.map((e) => `### ${e.ts.slice(0, 10)}\n${e.text}`);
@@ -257,37 +304,80 @@ export class PipelineRuntime {
 		this.sttLexicon = lex;
 	}
 
+	get isLoaded(): boolean { return this.loaded; }
+
 	get isRunning(): boolean {
 		return this.running;
 	}
 
-	/** The per-turn trigger. Coalesces: a turn ending mid-tick queues exactly one
-	 *  follow-up tick (the most recent turn-end wins). The transcript + sessionKey are
-	 *  SNAPSHOTTED here, at trigger time — not re-read when the tick runs — so a tick
-	 *  can never bind to a conversation the user switched to after this turn ended. */
-	onTurnEnd(getMessages: () => AgentMessage[], isVoiceTurn: boolean): void {
+	/** Snapshot and queue every completed exchange with its original conversation identity. */
+	onTurnEnd(getMessages: () => AgentMessage[], isVoiceTurn: boolean, voiceEvidence?: VoiceEvidence): void {
+		if (!this.allowed()) return;
 		const input: TickInput = {
-			messages: [...getMessages()],
-			isVoiceTurn,
-			sessionKey: this.sessionKey,
+			messages: structuredClone(getMessages()), isVoiceTurn,
+			sessionKey: this.sessionKey, generation: this.generation, voiceEvidence: voiceEvidence && { ...voiceEvidence },
+			model: this.deps.getModel(), baseUrl: this.deps.getBaseUrl(), modelId: this.deps.getModelId(), auth: this.deps.getAuth(),
 		};
-		if (this.running) {
-			this.queued = input;
-			return;
-		}
-		this.tick(input).catch((e) => dbgError("pipeline tick failed:", e));
+		this.queued.push(input);
+		if (!this.running) this.launchNext();
+	}
+
+	private allowed(): boolean {
+		return this.loaded && this.deps.getConsent?.() === "granted";
+	}
+
+	private active(input: TickInput): boolean {
+		return input.generation === this.generation && this.allowed();
+	}
+
+	/** Revoke queued and in-flight authority synchronously; await settling writes before replacement. */
+	cancel(): Promise<void> {
+		this.generation++;
+		this.queued = [];
+		for (const controller of this.controllers) controller.abort();
+		return this.pending;
+	}
+
+	async whenIdle(): Promise<void> {
+		while (this.running || this.queued.length) await this.pending;
+	}
+
+	snapshot() {
+		return structuredClone({ buffers: this.buffers, sttLexicon: this.sttLexicon,
+			flags: this.flags, runningContext: this.runningContext });
+	}
+
+	restore(snapshot: ReturnType<PipelineRuntime["snapshot"]>): void {
+		validatePipelineState(snapshot);
+		this.loaded = true;
+		this.buffers = snapshot.buffers;
+		this.sttLexicon = snapshot.sttLexicon;
+		this.flags = snapshot.flags;
+		this.runningContext = snapshot.runningContext;
+	}
+
+	async resolveFlag(flag: ReviewFlag): Promise<void> {
+		const index = this.flags.indexOf(flag);
+		if (index < 0) return;
+		this.flags.splice(index, 1);
+		try { await this.persist(); } catch (error) { this.flags.splice(index, 0, flag); throw error; }
 	}
 
 	async persist(): Promise<void> {
-		const b = this.deps.backend;
-		try {
-			await b.set(PIPELINE_STORE, KEY_BUFFERS, this.buffers);
-			await b.set(PIPELINE_STORE, KEY_STT, this.sttLexicon);
-			await b.set(PIPELINE_STORE, KEY_FLAGS, this.flags);
-			await b.set(PIPELINE_STORE, KEY_RUNNING_CONTEXT, this.runningContext);
-		} catch (err) {
-			dbgError("pipeline state save failed:", err);
-		}
+		if (!this.loaded) throw new Error("Memory has not loaded; refusing to overwrite saved state");
+		const snapshot = this.snapshot();
+		if (this.deps.savePipeline) { await this.deps.savePipeline(snapshot); return; }
+		await this.deps.backend.transaction([PIPELINE_STORE], "readwrite", async (tx) => {
+			await tx.set(PIPELINE_STORE, PIPELINE_STATE_KEY, snapshot);
+			for (const key of [KEY_BUFFERS, KEY_STT, KEY_FLAGS, KEY_RUNNING_CONTEXT]) await tx.delete(PIPELINE_STORE, key);
+		});
+	}
+
+	private launchNext(): void {
+		const input = this.queued.shift();
+		if (!input) return;
+		this.running = true;
+		this.pending = this.tick(input).catch((e) => { dbgError("pipeline tick failed:", e); this.deps.onError?.(e); });
 	}
 
 	// -- internals --------------------------------------------------------------
@@ -326,14 +416,26 @@ export class PipelineRuntime {
 		name: PipelineAgentName,
 		transcript: string,
 		instructions: string,
+		input: TickInput,
 	): Promise<void> {
+		if (!this.active(input)) return;
+		const graph = this.deps.getGraph();
+		const stt = this.sttLexicon;
+		const abort = new AbortController();
+		this.controllers.add(abort);
+		const assertActive = () => {
+			if (!this.active(input) || abort.signal.aborted) throw new Error("Memory operation cancelled");
+		};
 		const actions: string[] = [];
 		const tools = createPipelineTools({
-			getGraph: this.deps.getGraph,
+			getGraph: () => { assertActive(); return graph; },
+			assertActive,
+			voiceEvidence: input.voiceEvidence,
 			embed: this.deps.embed,
-			getSttLexicon: () => this.sttLexicon,
-			addFlag: (f) => this.addFlag(f),
+			getSttLexicon: () => { assertActive(); return stt; },
+			addFlag: (f) => { assertActive(); this.addFlag(f); },
 			record: (line) => {
+				assertActive();
 				actions.push(line);
 				this.pushActivity(name, line);
 			},
@@ -342,20 +444,20 @@ export class PipelineRuntime {
 		const content =
 			`## Conversation transcript\n\n${transcript}\n\n---\n\n${instructions}` +
 			(name === "memory"
-				? `\n\n## Current memory\n\n${dumpExistingContext(this.deps.getGraph())}`
+				? `\n\n## Current memory\n\n${dumpExistingContext(graph)}`
 				: "");
 
-		const abort = new AbortController();
 		const timer = setTimeout(() => abort.abort(), AGENT_TIMEOUT_MS);
 		let turns = 0;
+		let note = "";
 		try {
-			const messages = await runAgentLoop(
+			const messages = await (this.deps.runLoop ?? runAgentLoop)(
 				[{ role: "user", content, timestamp: Date.now() } as AgentMessage],
 				{ systemPrompt: PIPELINE_SYSTEM_STUB, messages: [], tools },
 				{
-					model: this.deps.getModel(),
-					convertToLlm: defaultConvertToLlm,
-					apiKey: this.deps.getAuth(),
+					model: input.model,
+					convertToLlm: (messages) => messages.filter((m) => ["user", "assistant", "toolResult"].includes(m.role)) as import("@earendil-works/pi-ai").Message[],
+					apiKey: input.auth,
 					// Think, at effort — async, so latency is free (see PIPELINE_THINKING).
 					reasoning: PIPELINE_THINKING,
 					shouldStopAfterTurn: () => ++turns >= AGENT_MAX_TURNS,
@@ -368,7 +470,6 @@ export class PipelineRuntime {
 			// session cost and log the per-agent instrumentation line.
 			let pIn = 0;
 			let pOut = 0;
-			let note = "";
 			for (const m of messages) {
 				if ((m as { role: string }).role !== "assistant") continue;
 				const u = (m as { usage?: { input?: number; output?: number } }).usage;
@@ -383,27 +484,35 @@ export class PipelineRuntime {
 					if (texts.length) note = texts.join(" ").trim();
 				}
 			}
-			this.deps.addCost(pIn, pOut);
+			this.deps.addCost(pIn, pOut, input.sessionKey);
+			const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
+			if (lastAssistant && lastAssistant.role === "assistant" && lastAssistant.stopReason !== "stop") {
+				note = "";
+				throw new Error(`Memory agent did not complete: ${lastAssistant.stopReason}`);
+			}
 			dbg(`pipeline[${name}]: ${pIn}p/${pOut}c tok, ${actions.length} action(s), note="${note.slice(0, 120)}"`);
-			this.appendBuffer(name, actions, note);
 		} finally {
+			if (this.active(input)) this.appendBuffer(name, actions, note);
+			this.controllers.delete(abort);
 			clearTimeout(timer);
 		}
 	}
 
-	private async runSummaryAgent(transcript: string, sessionKey: string): Promise<void> {
+	private async runSummaryAgent(transcript: string, input: TickInput): Promise<void> {
+		if (!this.active(input)) return;
+		const { sessionKey } = input;
 		const prior = this.runningContext.filter((e) => e.sessionKey !== sessionKey);
 		const priorBlock = prior.length
 			? prior.map((e) => `### ${e.ts.slice(0, 10)}\n${e.text}`).join("\n\n")
 			: "(no prior conversations yet)";
 
-		const completion = makeCompletion({
-			baseUrl: this.deps.getBaseUrl(),
-			model: this.deps.getModelId(),
-			apiKey: this.deps.getAuth(),
+		const completion = (this.deps.completion ?? makeCompletion)({
+			baseUrl: input.baseUrl,
+			model: input.modelId,
+			apiKey: input.auth,
 			reasoningEffort: MYRIAPOD_REASONING_EFFORT, // raw wire effort (Kimi: "max"); async → think for quality
 			onUsage: ({ promptTokens, completionTokens }) => {
-				this.deps.addCost(promptTokens, completionTokens);
+				this.deps.addCost(promptTokens, completionTokens, sessionKey);
 				dbg(`pipeline[summary]: ${promptTokens}p/${completionTokens}c tok`);
 			},
 		});
@@ -411,6 +520,7 @@ export class PipelineRuntime {
 		// Same hard wall as the tooled agents: a hung completion must not wedge the
 		// pipeline (leaving this.running = true) for the rest of the session.
 		const abort = new AbortController();
+		this.controllers.add(abort);
 		const timer = setTimeout(() => abort.abort(), AGENT_TIMEOUT_MS);
 		let raw: string;
 		try {
@@ -426,19 +536,19 @@ export class PipelineRuntime {
 			);
 		} finally {
 			clearTimeout(timer);
+			this.controllers.delete(abort);
 		}
+		if (!this.active(input) || abort.signal.aborted) return;
 		const entry = raw.trim();
-		if (!entry || entry.includes(NO_ENTRY_SENTINEL)) return;
+		if (entry === NO_ENTRY_SENTINEL) return;
+		if (!entry || entry.split(/\s+/).length > RUNNING_CONTEXT_MAX_WORDS) throw new Error("Summary is empty or exceeds its storage budget");
 
 		// Rewrite-not-append: replace this session's entry, newest first.
 		const now = new Date().toISOString();
-		const existing = this.runningContext.find((e) => e.sessionKey === sessionKey);
-		if (existing) {
-			existing.text = entry;
-			existing.ts = now;
-		} else {
-			this.runningContext.unshift({ sessionKey, ts: now, text: entry });
-		}
+		this.runningContext = [
+			{ sessionKey, ts: now, text: entry },
+			...this.runningContext.filter((e) => e.sessionKey !== sessionKey),
+		];
 		// Rolling word cap: keep newest entries until the budget is spent.
 		let words = 0;
 		const kept: RunningContextEntry[] = [];
@@ -459,6 +569,7 @@ export class PipelineRuntime {
 		// can't wedge the pipeline for the rest of the session.
 		this.running = true;
 		try {
+			if (!this.active(input)) return;
 			this.deps.onStateChange("running");
 			const transcript = formatTranscript(input.messages);
 			if (!transcript.trim()) return;
@@ -466,18 +577,21 @@ export class PipelineRuntime {
 			// Summary runs in parallel with the serial audit → memory pair. It writes under
 			// the tick's captured sessionKey (not the live one) so a New Chat mid-tick can't
 			// misattribute this conversation's summary.
-			const summaryP = this.runSummaryAgent(transcript, input.sessionKey).catch((err) =>
-				dbgError("pipeline[summary] failed (non-fatal):", err),
-			);
+			const summaryP = this.runSummaryAgent(transcript, input).catch((err) => {
+				dbgError("pipeline[summary] failed (non-fatal):", err);
+				if (this.active(input)) this.pushActivity("summary", "Summary update failed; previous summary retained.");
+			});
 
 			try {
 				await this.runTooledAgent(
 					"audit",
 					transcript,
-					buildAuditInstructions({ bufferBlock: this.renderBuffer("audit"), isVoiceTurn }),
+					buildAuditInstructions({ bufferBlock: this.renderBuffer("audit"), isVoiceTurn, voiceEvidence: input.voiceEvidence }),
+					input,
 				);
 			} catch (err) {
 				dbgError("pipeline[audit] failed (non-fatal):", err);
+				if (this.active(input)) this.pushActivity("audit", "Memory audit did not finish; completed actions were retained.");
 			}
 
 			try {
@@ -488,39 +602,35 @@ export class PipelineRuntime {
 						bufferBlock: this.renderBuffer("memory"),
 						isVoiceTurn,
 					}),
+					input,
 				);
 			} catch (err) {
 				dbgError("pipeline[memory] failed (non-fatal):", err);
+				if (this.active(input)) this.pushActivity("memory", "Memory update did not finish; completed actions were retained.");
 			}
 
 			await summaryP;
 
 			// Consent can be revoked mid-tick (it's only checked at the trigger). Re-check
 			// right before persisting so an opt-out isn't followed seconds later by a write.
-			// Absent dep → undefined → treat as granted (don't break if wiring order differs).
-			const consent = this.deps.getConsent?.();
-			if (consent === undefined || consent === "granted") {
-				await this.deps.saveGraph();
-				await this.persist();
+			// The captured generation prevents stale writes after replacement.
+			if (this.active(input)) {
+				if (this.deps.saveMemory) await this.deps.saveMemory(this.snapshot());
+				else { await this.deps.saveGraph(); if (this.active(input)) await this.persist(); }
 			} else {
 				dbg("pipeline: consent revoked mid-tick — skipping memory writes");
 			}
 			dbg(`pipeline tick done in ${Math.round(performance.now() - tickStart)}ms`);
 		} finally {
 			this.running = false;
-			// Drain the coalesced follow-up FIRST, then repaint: a throw from the idle
-			// repaint must not strand a queued turn's memory update. The idle callback is
-			// itself guarded so it can't take down the tick.
-			const q = this.queued;
-			this.queued = null;
+			// A failed idle repaint must not strand queued exchanges.
+
 			try {
 				this.deps.onStateChange("idle");
 			} catch (err) {
 				dbgError("pipeline onStateChange(idle) failed:", err);
 			}
-			if (q) {
-				this.tick(q).catch((e) => dbgError("pipeline tick failed:", e));
-			}
+			this.launchNext();
 		}
 	}
 }

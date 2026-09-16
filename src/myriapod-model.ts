@@ -55,7 +55,7 @@ export const MYRIAPOD_THINKING_LEVEL = "max" as const;
 // The owner-funded serving paths (anonymous + family) route chat AND ingestion through
 // our Bun proxy instead of calling OpenRouter directly; the own-key path bypasses it.
 // Override the URL at build time via VITE_PROXY_BASE.
-const ENV = import.meta.env as Record<string, string | undefined>;
+const ENV = (import.meta.env ?? {}) as Record<string, string | undefined>;
 export const MYRIAPOD_PROXY_BASE = ENV.VITE_PROXY_BASE ?? "http://127.0.0.1:8790/v1";
 
 // A provider id distinct from "openrouter" so the own-key path's stored OpenRouter key

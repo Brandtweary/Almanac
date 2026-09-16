@@ -61,8 +61,8 @@ function check(name: string, cond: boolean): void {
 // -- STT lexicon: count + auto-replace --------------------------------------
 {
 	const lex = emptySttLexicon();
-	lex.mistranscriptions.push({ spoken: "swarm", transcribed: "storm", kind: "phonetic", ts: "t" });
-	lex.mistranscriptions.push({ spoken: "swarm", transcribed: "storm", kind: "phonetic", ts: "t2" });
+	lex.mistranscriptions.push({ spoken: "swarm", transcribed: "storm", kind: "phonetic", utteranceId: "utterance-1", ts: "t" });
+	lex.mistranscriptions.push({ spoken: "swarm", transcribed: "storm", kind: "phonetic", utteranceId: "utterance-2", ts: "t2" });
 	check("mistranscription count tallies repeats", mistranscriptionCount(lex, "swarm", "storm") === 2);
 
 	const rules = [{ from: "kuber netties", to: "Kubernetes", ts: "t" }];

@@ -7,12 +7,13 @@ export interface Thought {
 	description: string | null;
 	entity_type: string | null;
 	// Alternative surface forms that route to this term (spoken variants,
-	// abbreviations, persistent mistranscriptions). Matched exactly (lowercased).
+	// abbreviations, persistent mistranscriptions). ASCII uppercase acronyms
+	// retain case; other surfaces share the label normalization.
 	aliases: string[];
-	// 384-dim MiniLM embedding of the description, computed server-side on
-	// write (mint / description change). Null until embedded; rides the
-	// lexicon export so imports don't recompute.
+	// Encoder-tagged embedding of label plus description. Legacy untagged
+	// vectors are discarded on load; the description remains available.
 	embedding?: number[] | null;
+	embedding_encoder?: string | null;
 	hit_count: number;
 	created_at?: string;
 	updated_at?: string;
@@ -32,7 +33,20 @@ export interface GraphAsset {
 
 // term_match result (left gutter).
 export interface TermMatch {
+	// Original indexed surface, not a claim about the literal transcript span.
+	matched_surface: string;
+	matched_via: "label" | "alias";
 	label: string;
 	description: string;
 	hit_count: number;
+}
+
+/** A vector is comparable only within an explicitly identified encoder space. */
+export interface Embedding {
+	vector: number[];
+	encoder: string;
+}
+
+export function validVector(value: unknown): value is number[] {
+	return Array.isArray(value) && value.length > 0 && value.every(n => typeof n === "number" && Number.isFinite(n)) && value.some(n => n !== 0);
 }

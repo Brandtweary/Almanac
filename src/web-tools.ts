@@ -34,18 +34,24 @@ export async function webSearch(
 	bearer: string,
 	query: string,
 	limit = 8,
-): Promise<WebSearchResult[]> {
+	signal?: AbortSignal,
+): Promise<{ results: WebSearchResult[]; degraded: boolean }> {
 	const url = `${endpoint}?q=${encodeURIComponent(query)}&limit=${encodeURIComponent(String(limit))}`;
 	const res = await fetch(url, {
 		// Only attach Authorization when we actually hold a bearer (anon/family). Own-key
 		// visitors pass "" — sending an empty/garbage bearer would leak nothing useful and
 		// the endpoint is open anyway.
 		headers: bearer ? { Authorization: `Bearer ${bearer}` } : {},
-		signal: AbortSignal.timeout(15000),
+		signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),
 	});
 	if (!res.ok) throw new Error(`web search failed: HTTP ${res.status}`);
-	const data = (await res.json()) as { results?: WebSearchResult[] };
-	return data.results ?? [];
+	const data = await res.json();
+	if (!data || !Array.isArray(data.results) || data.results.some((r: unknown) =>
+		!r || typeof r !== "object" || ["title", "url", "snippet"].some((key) =>
+			typeof (r as Record<string, unknown>)[key] !== "string"))) {
+		throw new Error("web search returned an invalid response");
+	}
+	return { results: data.results, degraded: data.degraded === true };
 }
 
 const webSearchSchema = Type.Object({
@@ -62,9 +68,9 @@ export function createWebSearchTool(opts: { endpoint: string; getBearer: () => s
 			"specific facts, anything that needs a live lookup. Returns a short list of titled results " +
 			"with links and snippets.",
 		parameters: webSearchSchema,
-		execute: async (_id, params: Static<typeof webSearchSchema>) => {
+		execute: async (_id, params: Static<typeof webSearchSchema>, signal) => {
 			const limit = Math.min(Math.max(params.limit ?? 8, 1), 8);
-			const results = await webSearch(opts.endpoint, opts.getBearer(), params.query, limit);
+			const { results, degraded } = await webSearch(opts.endpoint, opts.getBearer(), params.query, limit, signal);
 			const text = results.length
 				? results
 						.slice(0, limit)
@@ -72,8 +78,8 @@ export function createWebSearchTool(opts: { endpoint: string; getBearer: () => s
 						.join("\n\n")
 				: `No web results for "${params.query}".`;
 			return {
-				content: [{ type: "text", text }],
-				details: { results: results.map((r) => ({ title: r.title, url: r.url })) },
+				content: [{ type: "text", text: degraded ? `Some search engines failed; these results are incomplete.\n\n${text}` : text }],
+				details: { degraded, results: results.map((r) => ({ title: r.title, url: r.url })) },
 			};
 		},
 	};

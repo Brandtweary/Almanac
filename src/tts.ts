@@ -168,6 +168,8 @@ export interface TtsConfig {
 	// i.e. the text rendered but nothing spoke (TTS unreachable/failing all turn).
 	// The orchestrator wires this to a user-facing notice; unset = silent (default).
 	onVoiceUnavailable?: () => void;
+	// Release resources owned by the caller when this synth is permanently discarded.
+	onDispose?: () => void;
 }
 
 // =============================================================================
@@ -229,6 +231,7 @@ type TtsServerMessage =
 
 export class KyutaiTtsSynthesizer implements SpeechSynthesizer {
 	private ws?: WebSocket;
+	private disposed = false;
 	// Per-connection readiness flag (reset on each new socket).
 	private ready = false;
 	// Resolvers for in-flight waitForReady() sleeps, fired early when Ready lands.
@@ -304,13 +307,17 @@ export class KyutaiTtsSynthesizer implements SpeechSynthesizer {
 	// swappable interface). stop() already clears the pacing timer + WS — there is
 	// no decoder worker to terminate.
 	dispose(): void {
+		if (this.disposed) return;
+		this.disposed = true;
 		this.stop();
+		this.config.onDispose?.();
 	}
 
 	// Open a fresh WS, wait for Ready, stream the chunks as {type:"Text"} frames,
 	// signal end-of-input with a null byte, then resolve once the server closes
 	// (all audio has been sent — playback may still be draining in the worklet).
 	private async run(chunks: AsyncIterable<string>): Promise<void> {
+		if (this.disposed) throw new Error("tts: synthesizer is disposed");
 		// A new utterance supersedes any in-flight one: bump the epoch so every prior
 		// session is now stale (its frames/Ready are dropped by the gen guard), and
 		// capture our gen so the loop below can notice if a still-newer utterance
@@ -335,6 +342,7 @@ export class KyutaiTtsSynthesizer implements SpeechSynthesizer {
 				// A newer utterance (or stop()) bumped the epoch — abandon this stale
 				// loop so it stops spinning up sessions for a superseded utterance.
 				if (this.aborted || myGen !== this.gen) break;
+				attempted = true;
 				// openSession() returns null on abort/supersede OR a transient socket
 				// failure. Distinguish: a bumped epoch or a barge-in ends the loop; a
 				// transient failure only loses THIS sentence, so try one re-open, then
@@ -351,7 +359,6 @@ export class KyutaiTtsSynthesizer implements SpeechSynthesizer {
 				}
 				if (this.aborted || myGen !== this.gen || session.ws.readyState !== WebSocket.OPEN) break;
 				session.ws.send(encode({ type: "Text", text: chunk }));
-				attempted = true;
 				dbg(`[tts] -> Text (${chunk.length} chars)`);
 				await this.endSession(session);
 			}
@@ -359,7 +366,7 @@ export class KyutaiTtsSynthesizer implements SpeechSynthesizer {
 			dbgError(`[tts] text stream error: ${String(err)}`);
 		}
 
-		// If we sent at least one sentence but not a single Audio frame ever came back,
+		// If speech was requested but not a single Audio frame ever came back,
 		// the text rendered silently (TTS unreachable/failing all turn) — surface a
 		// one-shot signal so the failure isn't invisible. Suppressed on abort/supersede.
 		if (

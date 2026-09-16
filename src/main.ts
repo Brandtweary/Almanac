@@ -60,8 +60,10 @@ import { retrieve } from "./kg/retrieve.js";
 import { makeCompletion } from "./kg/ingest.js";
 import { makeEmbedClient } from "./kg/embed.js";
 import type { GraphAsset, TermMatch } from "./kg/types.js";
-import { PIPELINE_STORE, PipelineRuntime, type RunningContextEntry } from "./pipeline.js";
-import { applyAutoReplace, emptySttLexicon, type SttLexicon } from "./stt-lexicon.js";
+import { PIPELINE_STORE, PipelineRuntime, type VoiceEvidence, type RunningContextEntry } from "./pipeline.js";
+import { MemoryStorage, type MemorySnapshot, type MemoryUpdate } from "./memory-storage.js";
+import { validateSttLexicon, validateRunningContext, withoutPersonalMemory } from "./memory-state.js";
+import { applyAutoReplace, emptySttLexicon, validateAutoReplace, type SttLexicon } from "./stt-lexicon.js";
 import { installVoiceCapture } from "./voice.js";
 import { PcmRecorder, WhisperClient } from "./stt.js";
 import { KyutaiTtsSynthesizer, TTS_SAMPLE_RATE } from "./tts.js";
@@ -94,12 +96,10 @@ setTranslations({
 // — action buffers, running context, speech-adaptation data, review flags —
 // lives in the PIPELINE_STORE, keyed slots.)
 const LEXICON_STORE = "lexicon";
-const LEXICON_TERMS_KEY = "terms";
 
 // Memory-consent persistence: the visitor's opt-in choice, remembered per browser
 // so the consent modal asks only once.
 const CONSENT_STORE = "memory-consent";
-const CONSENT_KEY = "choice";
 
 // Create stores
 const settings = new SettingsStore();
@@ -126,6 +126,9 @@ const backend = new IndexedDBStorageBackend({
 	// personal-graph store is abandoned — pre-launch clean wipe, no migration)
 	stores: configs,
 });
+
+const memoryStorage = new MemoryStorage(backend);
+let memorySnapshot: MemorySnapshot | undefined;
 
 // Wire backend to stores
 settings.setBackend(backend);
@@ -377,6 +380,7 @@ const openSettings = async () => {
 			onImport: importLexiconFromFile,
 			onDelete: deleteLexicon,
 			getFlags: () => pipeline?.getFlags() ?? [],
+			resolveFlag: (flag) => pipeline.resolveFlag(flag),
 		}),
 	]);
 };
@@ -387,6 +391,15 @@ let currentTitle = "";
 let isEditingTitle = false;
 let currentView: "chat" | "about" = "chat";
 let agent: Agent;
+let memoryEpoch = 0;
+let memoryReplacing = false;
+let agentCreation = 0;
+let sessionSelection = 0;
+const sessionSaves = new Map<string, Promise<void>>();
+let graphLoaded = false;
+let pendingVoiceEvidence: VoiceEvidence | undefined;
+let inFlightVoiceEvidence: VoiceEvidence | undefined;
+const sessionAgents = new Map<string, { agent: Agent; title: string }>();
 let chatPanel: ChatPanel;
 let headerHost: HTMLDivElement;
 let aboutHost: HTMLDivElement;
@@ -400,10 +413,7 @@ let updateCount = 0;
 
 // --- Browser-local term memory (no server; retrieval runs in-page) ---
 // Per-conversation injected-ledger (cross-turn dedup). Reset on each createAgent.
-// NOTE: a RESTORED session starts with an empty ledger even though its saved
-// memory breadcrumbs are in the transcript — so the first turns after a
-// reload may re-inject already-present context (minor token waste, self-corrects
-// as the conversation continues). Acceptable for V1.
+// Restored conversations drop hidden recall and start with a fresh ledger.
 let ledger = new InjectedLedger();
 // The user's term memory — mutable, in-page. Written by the pipeline agents
 // after every turn, retrieved by the keyword router before every send.
@@ -629,23 +639,24 @@ const shouldSaveSession = (messages: AgentMessage[]): boolean => {
 	return hasUserMsg && hasAssistantMsg;
 };
 
-const saveSession = async () => {
-	if (!storage.sessions || !currentSessionId || !agent || !currentTitle) return;
+const saveSession = async (owner = agent, sessionId = currentSessionId, title = currentTitle) => {
+	if (!storage.sessions || !sessionId || !owner || !title) return;
 
-	const state = agent.state;
+	const state = { ...owner.state, messages: structuredClone(owner.state.messages) };
 	if (!shouldSaveSession(state.messages)) return;
-
+	const pending = (sessionSaves.get(sessionId) ?? Promise.resolve()).then(async () => {
 	try {
+		const savedTitle = sessionAgents.get(sessionId)?.title || title;
 		// Preserve the original createdAt across re-saves — saveSession runs on every
 		// terminal event, so stamping a fresh createdAt each time would keep resetting the
 		// session's birth time (breaking chat-list ordering). First save → mint it.
-		const existingMeta = await storage.sessions.getMetadata(currentSessionId).catch(() => null);
+		const existingMeta = await storage.sessions.getMetadata(sessionId);
 		const createdAt = existingMeta?.createdAt ?? new Date().toISOString();
 
 		// Create session data
 		const sessionData = {
-			id: currentSessionId,
-			title: currentTitle,
+			id: sessionId,
+			title: savedTitle,
 			model: state.model!,
 			thinkingLevel: state.thinkingLevel,
 			messages: state.messages,
@@ -655,8 +666,8 @@ const saveSession = async () => {
 
 		// Create session metadata
 		const metadata = {
-			id: currentSessionId,
-			title: currentTitle,
+			id: sessionId,
+			title: savedTitle,
 			createdAt: sessionData.createdAt,
 			lastModified: sessionData.lastModified,
 			messageCount: state.messages.length,
@@ -680,11 +691,32 @@ const saveSession = async () => {
 		};
 
 		await storage.sessions.save(sessionData, metadata);
-		dbg(`saveSession OK — id=${currentSessionId}, ${summarizeMessages(state.messages)}`);
+		dbg(`saveSession OK — id=${sessionId}, ${summarizeMessages(state.messages)}`);
 	} catch (err) {
-		dbgWarn(`saveSession FAILED — id=${currentSessionId}:`, err);
+		dbgWarn(`saveSession FAILED — id=${sessionId}:`, err);
 	}
+	});
+	sessionSaves.set(sessionId, pending);
+	await pending;
+	if (sessionSaves.get(sessionId) === pending) sessionSaves.delete(sessionId);
 };
+
+async function renameSessionTitle(newTitle: string): Promise<void> {
+	const sessionId = currentSessionId;
+	if (!sessionId || !newTitle || newTitle === currentTitle) { isEditingTitle = false; renderHeader(); return; }
+	const pending = (sessionSaves.get(sessionId) ?? Promise.resolve()).then(async () => {
+		await storage.sessions.updateTitle(sessionId, newTitle);
+		const owner = sessionAgents.get(sessionId);
+		if (owner) owner.title = newTitle;
+		if (currentSessionId === sessionId) currentTitle = newTitle;
+	});
+	const settled = pending.catch(() => undefined);
+	sessionSaves.set(sessionId, settled);
+	try { await pending; }
+	catch (error) { dbgError("Chat title could not be saved:", error); alert("Chat title could not be saved. Please retry."); }
+	if (sessionSaves.get(sessionId) === settled) sessionSaves.delete(sessionId);
+	if (currentSessionId === sessionId) { isEditingTitle = false; renderHeader(); }
+}
 
 const updateUrl = (sessionId: string) => {
 	const url = new URL(window.location.href);
@@ -694,30 +726,44 @@ const updateUrl = (sessionId: string) => {
 
 
 // --- Memory consent --------------------------------------------------------
-// Memory writes are opt-in: the pipeline never fires until the visitor agrees.
+// Personal-memory access and background processing require explicit consent.
 // "undecided" = the consent modal hasn't been answered yet in this browser.
 let memoryConsent: ConsentChoice | "undecided" = "undecided";
 // Assigned in initApp once the memory button exists, so the pipeline can repaint it.
 let refreshMemoryUi: () => void = () => {};
+let consentChange = 0;
 let consentPrompted = false; // guards against opening a second modal while one is up
 
 async function loadMemoryConsent(): Promise<void> {
 	try {
-		const v = await backend.get<ConsentChoice>(CONSENT_STORE, CONSENT_KEY);
-		if (v === "granted" || v === "declined") memoryConsent = v;
+		memorySnapshot = await memoryStorage.load();
+		if (memorySnapshot.consent.present) {
+			const v = memorySnapshot.consent.value;
+			if (v !== "granted" && v !== "declined") throw new Error("Invalid saved memory consent");
+			memoryConsent = v;
+		}
 	} catch (err) {
-		dbgError("memory-consent load failed (defaulting undecided):", err);
+		memoryConsent = "declined";
+		memorySnapshot = undefined;
+		reportMemoryFailure(err);
 	}
 }
 
 async function setMemoryConsent(choice: ConsentChoice): Promise<void> {
-	memoryConsent = choice;
-	refreshMemoryUi();
-	try {
-		await backend.set(CONSENT_STORE, CONSENT_KEY, choice);
-	} catch (err) {
-		dbgError("memory-consent save failed:", err);
+	const change = ++consentChange;
+	if (choice === "granted" && pipeline && (!graphLoaded || !pipeline.isLoaded)) throw new Error("Saved memory could not be loaded. Reload before enabling memory.");
+	if (choice !== "granted") {
+		memoryConsent = choice;
+		pipeline?.cancel();
+		invalidateMemoryContext();
+		refreshAgentMemory();
+		refreshMemoryUi();
 	}
+	await writeMemory({ consent: choice });
+	if (change !== consentChange) return;
+	memoryConsent = choice;
+	refreshAgentMemory();
+	refreshMemoryUi();
 }
 
 // Show the consent modal once, on the first interaction (send OR mic toggle), if
@@ -736,7 +782,9 @@ async function ensureMemoryConsent(): Promise<void> {
 // session cost (chat + every background call the chat triggered) — no override of
 // framework UI. (The proxy meters the real cost separately; this is purely the
 // on-screen readout.)
-function addIngestionCostToSession(promptTokens: number, completionTokens: number): void {
+function addIngestionCostToSession(promptTokens: number, completionTokens: number, sessionKey: string): void {
+	const owner = sessionAgents.get(sessionKey);
+	if (!owner) return;
 	const c = MYRIAPOD_MODEL.cost;
 	const inCost = (promptTokens / 1_000_000) * c.input;
 	const outCost = (completionTokens / 1_000_000) * c.output;
@@ -745,7 +793,7 @@ function addIngestionCostToSession(promptTokens: number, completionTokens: numbe
 		output: number;
 		cost?: { input?: number; output?: number; total?: number };
 	};
-	const msgs = agent.state.messages as unknown as Array<{ role: string; usage?: Usage }>;
+	const msgs = owner.agent.state.messages as unknown as Array<{ role: string; usage?: Usage }>;
 	for (let i = msgs.length - 1; i >= 0; i--) {
 		const m = msgs[i];
 		if (m.role === "assistant" && m.usage) {
@@ -759,7 +807,8 @@ function addIngestionCostToSession(promptTokens: number, completionTokens: numbe
 			break;
 		}
 	}
-	chatPanel.agentInterface?.requestUpdate?.();
+	void saveSession(owner.agent, sessionKey, owner.agent === agent ? currentTitle : owner.title);
+	if (owner.agent === agent) chatPanel.agentInterface?.requestUpdate?.();
 	dbg(`pipeline cost folded into session: +${promptTokens}in/${completionTokens}out tok, +$${(inCost + outCost).toFixed(6)}`);
 }
 
@@ -768,22 +817,79 @@ function addIngestionCostToSession(promptTokens: number, completionTokens: numbe
 // One term memory per browser. Loaded at boot, saved after each pipeline tick.
 async function loadUserGraph(): Promise<void> {
 	try {
-		const asset = await backend.get<GraphAsset>(LEXICON_STORE, LEXICON_TERMS_KEY);
-		if (asset) {
-			userGraph = new Graph(asset);
-			dbg(`term memory loaded: ${asset.meta.node_count} terms`);
+		if (!memorySnapshot) throw new Error("Saved memory could not be loaded");
+		if (memorySnapshot.graph.present) {
+			userGraph = new Graph(memorySnapshot.graph.value as GraphAsset);
+			dbg(`term memory loaded: ${userGraph.thoughts.size} terms`);
 		}
+		graphLoaded = true;
 	} catch (err) {
-		dbgError("term memory load failed (starting empty):", err);
+		dbgError("term memory load failed; saved data retained:", err);
+		throw err;
 	}
 }
 
-async function saveUserGraph(): Promise<void> {
-	try {
-		await backend.set(LEXICON_STORE, LEXICON_TERMS_KEY, userGraph.serialize());
-	} catch (err) {
-		dbgError("term memory save failed:", err);
+function reportMemoryFailure(error: unknown): void {
+	dbgError("Personal memory operation failed:", error);
+	if (memoryStorage.invalidated) {
+		memoryConsent = "declined";
+		pipeline?.cancel();
+		invalidateMemoryContext();
+		refreshAgentMemory();
+		refreshMemoryUi();
 	}
+	let notice = document.getElementById("memory-storage-error");
+	if (!notice) {
+		notice = document.createElement("div");
+		notice.id = "memory-storage-error";
+		notice.setAttribute("role", "alert");
+		notice.className = "p-3 border border-red-400 text-sm";
+		document.body.appendChild(notice);
+	}
+	notice.textContent = memoryStorage.invalidated
+		? "Personal memory changed in another tab. Memory is disabled here. Reload to use the saved state; it has not been overwritten."
+		: "Personal memory could not be loaded or saved. Your last saved data is retained. Export any unsaved memory before reloading to retry.";
+}
+
+async function writeMemory(update: MemoryUpdate): Promise<void> {
+	try { await memoryStorage.save(update); }
+	catch (error) { reportMemoryFailure(error); throw error; }
+}
+
+async function saveUserGraph(): Promise<void> {
+	if (!graphLoaded) throw new Error("Memory has not loaded; saved data will not be overwritten");
+	await writeMemory({ graph: userGraph.serialize() });
+}
+
+
+function invalidateMemoryContext(): void {
+	memoryEpoch++;
+	ledger = new InjectedLedger();
+	pendingVoiceEvidence = undefined;
+	inFlightVoiceEvidence = undefined;
+	if (agent) {
+		agent.abort();
+		agent.state.messages = withoutPersonalMemory(agent.state.messages);
+		repaintChatAfterExternalEdit();
+	}
+	updateGutters({ terms: [] });
+}
+
+function refreshAgentMemory(): void {
+	if (!agent) return;
+	agent.state.systemPrompt = VOICE_SYSTEM_PROMPT + ARCHITECTURE_DOC +
+		(memoryConsent === "granted" ? pipeline?.runningContextBlock() ?? "" : "");
+	const epoch = memoryEpoch;
+	const graph = userGraph;
+	const memoryGraph = () => {
+		if (memoryConsent !== "granted" || memoryReplacing || memoryStorage.invalidated || epoch !== memoryEpoch) throw new Error("Personal memory is off or has changed");
+		return graph;
+	};
+	agent.state.tools = [
+		...(memoryConsent === "granted" && !memoryReplacing ? [createMemorySearchTool(memoryGraph), createMemoryDumpTool(memoryGraph)] : []),
+		createWebSearchTool({ endpoint: WEB_SEARCH_ENDPOINT,
+			getBearer: () => (servingPath.mode === "own" ? "" : servingPath.auth) }),
+	];
 }
 
 // The exportable lexicon: the term glossary PLUS the speech-adaptation data and
@@ -828,29 +934,40 @@ async function importLexiconFromFile(file: File): Promise<void> {
 	if (!asset || typeof asset !== "object" || typeof asset.terms?.thoughts !== "object") {
 		throw new Error("not a Myriapod lexicon export");
 	}
-	userGraph = new Graph(asset.terms);
-	pipeline.setSttLexicon(asset.stt ?? emptySttLexicon());
-	pipeline.setRunningContext(asset.running_context ?? []);
-	await saveUserGraph();
-	await pipeline.persist();
+	const graph = new Graph(asset.terms);
+	const stt = asset.stt ?? emptySttLexicon();
+	const entries = asset.running_context ?? [];
+	if (asset.lexicon_version !== 1) throw new Error("Unsupported lexicon version");
+	validateSttLexicon(stt);
+	validateRunningContext(entries);
+	for (const rule of stt.autoReplace) await validateAutoReplace(rule.from, rule.to);
+	await replaceLexicon(graph, stt, entries);
 	dbg(`lexicon imported: ${userGraph.thoughts.size} terms`);
 }
 
-// Wipe the memory (Settings → delete). The privacy assurance: the visitor can
-// remove everything Myriapod remembered — terms, speech data, summaries — not
-// just trust that it's local.
+async function replaceLexicon(graph: Graph, sttLexicon: SttLexicon, runningContext: RunningContextEntry[]): Promise<void> {
+	if (memoryReplacing) throw new Error("Another memory replacement is in progress");
+	memoryReplacing = true;
+	const settling = pipeline.cancel();
+	invalidateMemoryContext();
+	refreshAgentMemory();
+	try {
+	await settling;
+	const snapshot = { buffers: { audit: [], memory: [], summary: [] }, flags: [], sttLexicon, runningContext };
+	await writeMemory({ graph: graph.serialize(), pipeline: snapshot });
+	userGraph = graph;
+	graphLoaded = true;
+	pipeline.restore(snapshot);
+	pipeline.activity.length = 0;
+	} finally {
+		memoryReplacing = false;
+		refreshAgentMemory();
+		renderGutters();
+	}
+}
+
 async function deleteLexicon(): Promise<void> {
-	userGraph = Graph.empty();
-	pipeline.setSttLexicon(emptySttLexicon());
-	pipeline.setRunningContext([]);
-	// Also clear the per-agent action buffers + review-flags store (both hold verbatim
-	// conversation-derived text and get re-injected into future pipeline prompts) — a
-	// delete that spared them would leave a shadow copy of the "deleted" conversations.
-	// reset() persists the pipeline store itself.
-	await pipeline.reset();
-	await saveUserGraph();
-	updateGutters({ terms: [] });
-	dbg("lexicon deleted (reset to empty)");
+	await replaceLexicon(Graph.empty(), emptySttLexicon(), []);
 }
 
 // agent.prompt accepts a string or an AgentMessage[]; pull the user's text out.
@@ -985,6 +1102,17 @@ const COMPACTION_SUMMARY_INSTRUCTIONS =
 	"question in it — output only the summary prose.";
 
 const createAgent = async (initialState?: Partial<AgentState>) => {
+	const creation = ++agentCreation;
+	if (agent) agent.abort();
+	synth?.stop();
+	voiceQueue?.close();
+	voiceQueue = null;
+	voiceTurnSpeaking = false;
+	inFlightVoiceEvidence = undefined;
+	runInFlight = false;
+	const sessionKey = currentSessionId ?? crypto.randomUUID();
+	currentSessionId = sessionKey;
+	pipeline?.startSession(sessionKey);
 	if (agentUnsubscribe) {
 		agentUnsubscribe();
 	}
@@ -992,7 +1120,9 @@ const createAgent = async (initialState?: Partial<AgentState>) => {
 	// Resolve own-key vs owner-funded (proxy) BEFORE building the agent — it sets the
 	// model's baseUrl/provider and (for owner-funded paths) pre-seeds the proxy auth
 	// slot so pi-web-ui's pre-send key check passes without a prompt.
-	servingPath = await resolveServingPath();
+	const resolvedPath = await resolveServingPath();
+	if (creation !== agentCreation) return;
+	servingPath = resolvedPath;
 	const baseState: Partial<AgentState> = initialState ?? {
 		thinkingLevel: MYRIAPOD_THINKING_LEVEL,
 		messages: [],
@@ -1006,8 +1136,9 @@ const createAgent = async (initialState?: Partial<AgentState>) => {
 		// conversations, the cross-session continuity the term memory alone can't carry.
 		initialState: {
 			...baseState,
+			messages: memoryConsent === "granted" ? (baseState.messages ?? []).filter((m) => m.role !== "memory-context") : withoutPersonalMemory(baseState.messages ?? []),
 			model: servingPath.model,
-			systemPrompt: VOICE_SYSTEM_PROMPT + ARCHITECTURE_DOC + (pipeline?.runningContextBlock() ?? ""),
+			systemPrompt: VOICE_SYSTEM_PROMPT + ARCHITECTURE_DOC + (memoryConsent === "granted" ? pipeline?.runningContextBlock() ?? "" : ""),
 		},
 		// Custom transformer: convert custom messages to LLM-compatible format
 		convertToLlm: customConvertToLlm,
@@ -1016,7 +1147,10 @@ const createAgent = async (initialState?: Partial<AgentState>) => {
 	// Fresh per-conversation dedup ledger + a fresh running-context session key
 	// (the summary agent rewrites THIS conversation's entry under it).
 	ledger = new InjectedLedger();
-	pipeline?.startSession();
+	const owner = agent;
+	sessionAgents.set(sessionKey, { agent: owner, title: currentTitle });
+	const isCurrent = () => owner === agent && creation === agentCreation;
+	if (memoryConsent !== "granted") invalidateMemoryContext();
 
 	// DESIGN 2 INJECTION. Wrap the send path so that, BEFORE the run's context
 	// snapshot is taken, we: (1) run browser-local retrieval, (2) update the
@@ -1037,6 +1171,7 @@ const createAgent = async (initialState?: Partial<AgentState>) => {
 		// breadcrumb + ledger entries or stamp inFlightVoiceTurn. Throw (not return) so the
 		// caller's .catch runs — a losing VOICE send resets its speak gate there, so it can't
 		// leave voiceTurnSpeaking stuck true and get the next typed run spoken aloud.
+		if (!isCurrent()) throw new Error("Conversation has changed");
 		if (runInFlight) {
 			dbgWarn("prompt() re-entered while a run is already in flight — dropping the racing send");
 			throw new Error("a run is already in flight");
@@ -1046,7 +1181,13 @@ const createAgent = async (initialState?: Partial<AgentState>) => {
 		// bumped voiceTurnSeq before calling us) so agent_end retires the right turn. Cleared
 		// at agent_end.
 		runInFlight = true;
+		try { await ensureAnonGrant(); }
+		catch (error) { if (isCurrent()) runInFlight = false; throw error; }
+		if (!isCurrent()) throw new Error("Conversation changed before send");
 		inFlightVoiceTurn = voiceTurnSpeaking ? voiceTurnSeq : null;
+		inFlightVoiceEvidence = voiceTurnSpeaking ? pendingVoiceEvidence : undefined;
+		pendingVoiceEvidence = undefined;
+		const promptEpoch = memoryEpoch;
 
 		// HISTORY BOUNDING (Pi message-level compaction). Runs before retrieval + the
 		// memory-context append. At ~1M context this rarely fires, but it keeps a very long
@@ -1076,6 +1217,8 @@ const createAgent = async (initialState?: Partial<AgentState>) => {
 				}
 				if (cut > 0 && cut < msgs.length) {
 					const toSummarize = msgs.slice(0, cut);
+					const compactionAbort = new AbortController();
+					let compactionTimer: ReturnType<typeof setTimeout> | undefined;
 					const COMPACTION_TIMEOUT = Symbol("compaction-timeout");
 					const summaryCompletion = makeCompletion({
 							baseUrl: servingPath.baseUrl,
@@ -1090,13 +1233,15 @@ const createAgent = async (initialState?: Partial<AgentState>) => {
 						summaryCompletion([
 								{ role: "system", content: COMPACTION_SUMMARY_INSTRUCTIONS },
 								{ role: "user", content: conversationText },
-							])
+							], compactionAbort.signal)
 								.then((value) => ({ ok: true as const, value }))
 								.catch((error) => ({ ok: false as const, error })),
 						new Promise<typeof COMPACTION_TIMEOUT>((resolve) =>
-							setTimeout(() => resolve(COMPACTION_TIMEOUT), COMPACTION_SUMMARY_TIMEOUT_MS),
+							{ compactionTimer = setTimeout(() => { compactionAbort.abort(); resolve(COMPACTION_TIMEOUT); }, COMPACTION_SUMMARY_TIMEOUT_MS); },
 						),
 					]);
+					clearTimeout(compactionTimer);
+					if (!isCurrent() || promptEpoch !== memoryEpoch) throw new Error("Conversation changed during compaction");
 					if (summaryRes === COMPACTION_TIMEOUT) {
 						dbgError("compaction summary timed out (turn proceeds uncompacted)");
 					} else if (summaryRes.ok && summaryRes.value.trim()) {
@@ -1109,6 +1254,7 @@ const createAgent = async (initialState?: Partial<AgentState>) => {
 							createCompactionSummaryMessage(summaryRes.value, est.tokens, new Date().toISOString()),
 							...liveKept,
 						];
+						ledger = new InjectedLedger();
 						repaintChatAfterExternalEdit();
 						dbg(`compaction: summarized ${toSummarize.length} msgs, kept ${liveKept.length} (~${est.tokens} ctx tok)`);
 					} else if (!summaryRes.ok) {
@@ -1127,11 +1273,12 @@ const createAgent = async (initialState?: Partial<AgentState>) => {
 				// (free credits + the own-key / family alternatives), collect the honeypot
 				// + time-trap, mint the grant via /anon-init, and switch the proxy bearer to
 				// the real token. No-op once a token exists or on the own-key / family paths.
-				await ensureAnonGrant();
+				if (!isCurrent() || promptEpoch !== memoryEpoch) throw new Error("Conversation changed before send");
 				// Memory consent: a no-op on the anon path (the welcome modal already settled it
 				// inline) — this only fires the standalone consent modal for own-key/family users
 				// who never saw the welcome modal.
 				void ensureMemoryConsent();
+				if (memoryConsent === "granted" && !memoryReplacing) {
 				const agentText = lastAssistantText(agent.state.messages);
 				// Retrieval runs over the per-browser term memory (the user's own).
 				const userR = retrieve(userGraph, ledger, userText, agentText);
@@ -1139,7 +1286,7 @@ const createAgent = async (initialState?: Partial<AgentState>) => {
 				// Retrieval fired hit_count/last_fired on the matched terms (see retrieveVacuum);
 				// persist so the bumped counts survive a reload. Fire-and-forget — the send
 				// must not wait on the IndexedDB write.
-				if (userR.vacuum.terms.length) void saveUserGraph();
+				if (userR.vacuum.terms.length) void saveUserGraph().catch((e) => dbgError("Memory save failed:", e));
 				if (userR.injectionBlock) {
 					agent.state.messages = [...agent.state.messages, createMemoryContextMessage(userR.injectionBlock)];
 				}
@@ -1147,14 +1294,18 @@ const createAgent = async (initialState?: Partial<AgentState>) => {
 					`memory retrieve: ${userR.vacuum.terms.length} term(s), ` +
 						`injected=${userR.injectionBlock ? "yes" : "no (deduped)"}`,
 				);
+				}
 			}
 		} catch (err) {
 			dbgError("memory retrieval failed (send proceeds without injection):", err);
 		}
-		return origPrompt(input as AgentMessage | AgentMessage[], ...(rest as []));
+		if (!isCurrent() || promptEpoch !== memoryEpoch) { if (isCurrent()) runInFlight = false; throw new Error("Conversation or memory changed before send"); }
+		try { return await origPrompt(input as AgentMessage | AgentMessage[], ...(rest as [])); }
+		finally { if (isCurrent()) runInFlight = false; }
 	};
 
 	agentUnsubscribe = agent.subscribe((event: any) => {
+		if (!isCurrent()) return;
 		// pi-agent-core emits raw lifecycle events (message_start,
 		// message_update, message_end, turn_end, agent_end, tool_execution_*) —
 		// NOT a synthetic "state-update" with an attached `event.state`. The
@@ -1226,6 +1377,7 @@ const createAgent = async (initialState?: Partial<AgentState>) => {
 			if (!currentTitle && shouldSaveSession(messages)) {
 				currentTitle = generateTitle(messages);
 				headerChanged = true;
+				sessionAgents.get(sessionKey)!.title = currentTitle;
 			}
 
 			// Mint the session id as soon as there's something worth saving, so
@@ -1238,6 +1390,7 @@ const createAgent = async (initialState?: Partial<AgentState>) => {
 
 			// Persist on terminal events (not once per streamed token).
 			if (currentSessionId && isTerminal) {
+				if (shouldSaveSession(messages)) updateUrl(currentSessionId);
 				saveSession();
 			}
 
@@ -1266,9 +1419,10 @@ const createAgent = async (initialState?: Partial<AgentState>) => {
 					voiceTurnCut = false; // reset the barge-in guard for the next turn
 				}
 				// The turn is over → one pipeline tick (consent-gated; fire-and-forget;
-				// a turn ending mid-tick coalesces into exactly one follow-up).
+				// every completed exchange retains its own queued tick).
 				if (memoryConsent === "granted") {
-					pipeline.onTurnEnd(() => agent.state.messages, wasVoiceTurn);
+					pipeline.onTurnEnd(() => owner.state.messages, wasVoiceTurn, inFlightVoiceEvidence);
+					inFlightVoiceEvidence = undefined;
 				}
 			}
 
@@ -1296,6 +1450,7 @@ const createAgent = async (initialState?: Partial<AgentState>) => {
 		toolsFactory: () => [],
 	});
 
+	if (creation !== agentCreation) return;
 	// The model and reasoning level are hardcoded (Kimi K3, always-on reasoning). Hide
 	// both the model picker and the thinking-level selector — this is a single-model
 	// demo, not a configurable Pi client.
@@ -1311,30 +1466,25 @@ const createAgent = async (initialState?: Partial<AgentState>) => {
 	// endpoint is open (per-IP rate-limited, not principal-gated): owner-funded paths send
 	// their proxy bearer; own-key sends NO bearer, so its OpenRouter key never touches the
 	// proxy.
-	const tools = [
-		createMemorySearchTool(() => userGraph),
-		createMemoryDumpTool(() => userGraph),
-		createWebSearchTool({
-			endpoint: WEB_SEARCH_ENDPOINT,
-			getBearer: () => (servingPath.mode === "own" ? "" : servingPath.auth),
-		}),
-	];
-	agent.state.tools = tools;
+	refreshAgentMemory();
 };
 
 const loadSession = async (sessionId: string): Promise<boolean> => {
+	const selection = ++sessionSelection;
 	if (!storage.sessions) return false;
 
 	const sessionData = await storage.sessions.get(sessionId);
+	if (selection !== sessionSelection) return false;
 	if (!sessionData) {
 		dbgWarn(`loadSession: session not found in storage: ${sessionId}`);
 		return false;
 	}
 	dbg(`loadSession OK: ${sessionId} — ${summarizeMessages(sessionData.messages ?? [])}`);
 
+	const metadata = await storage.sessions.getMetadata(sessionId);
+	if (selection !== sessionSelection) return false;
 	currentSessionId = sessionId;
 	currentView = "chat";
-	const metadata = await storage.sessions.getMetadata(sessionId);
 	currentTitle = metadata?.title || "";
 
 	await createAgent({
@@ -1346,6 +1496,7 @@ const loadSession = async (sessionId: string): Promise<boolean> => {
 		tools: [],
 	});
 
+	if (selection !== sessionSelection) return false;
 	updateUrl(sessionId);
 	updateBodyVisibility();
 	renderHeader();
@@ -1353,6 +1504,8 @@ const loadSession = async (sessionId: string): Promise<boolean> => {
 };
 
 const newSession = async () => {
+	const selection = ++sessionSelection;
+	agentCreation++;
 	dbg("newSession() — resetting to a fresh chat (no page reload)");
 	currentSessionId = undefined;
 	currentTitle = "";
@@ -1364,6 +1517,7 @@ const newSession = async () => {
 	url.search = "";
 	window.history.replaceState({}, "", url);
 	await createAgent();
+	if (selection !== sessionSelection) return;
 	updateBodyVisibility();
 	renderHeader();
 };
@@ -1498,22 +1652,12 @@ const renderHeader = () => {
 										className: "text-sm w-64",
 										onChange: async (e: Event) => {
 											const newTitle = (e.target as HTMLInputElement).value.trim();
-											if (newTitle && newTitle !== currentTitle && storage.sessions && currentSessionId) {
-												await storage.sessions.updateTitle(currentSessionId, newTitle);
-												currentTitle = newTitle;
-											}
-											isEditingTitle = false;
-											renderHeader();
+											await renameSessionTitle(newTitle);
 										},
 										onKeyDown: async (e: KeyboardEvent) => {
 											if (e.key === "Enter") {
 												const newTitle = (e.target as HTMLInputElement).value.trim();
-												if (newTitle && newTitle !== currentTitle && storage.sessions && currentSessionId) {
-													await storage.sessions.updateTitle(currentSessionId, newTitle);
-													currentTitle = newTitle;
-												}
-												isEditingTitle = false;
-												renderHeader();
+												await renameSessionTitle(newTitle);
 											} else if (e.key === "Escape") {
 												isEditingTitle = false;
 												renderHeader();
@@ -1612,14 +1756,21 @@ async function initApp() {
 	// null and no-op, then onStart would resume and start a recorder nothing ever stops.
 	// onStop flips this true; onStart checks it after each await and bails, so no orphaned
 	// recorder is created (the mic stream itself is released by the VoiceController's stop()).
-	let startCancelled = false;
+	let recordingEpoch = 0;
+	let recordingOwner: Agent | null = null;
+	let recordingSelection = 0;
+	let recordingPlaceholder: AgentMessage | null = null;
 
 	// Lazily build the shared TTS synth: an AudioContext + the audio-output-processor
 	// worklet, reused for every voice turn. The context runs at the TTS wire's 24 kHz PCM
 	// rate so frames play with no resampling — there is no decoder in the path.
+	let synthPending: Promise<KyutaiTtsSynthesizer> | null = null;
 	const ensureSynth = async (): Promise<KyutaiTtsSynthesizer> => {
 		if (synth) return synth;
+		if (synthPending) return synthPending;
+		synthPending = (async () => {
 		const ctx = new AudioContext({ sampleRate: TTS_SAMPLE_RATE });
+		try {
 		const outputWorklet = await getAudioWorkletNode(ctx, "audio-output-processor");
 		outputWorklet.connect(ctx.destination);
 		await ctx.resume();
@@ -1630,9 +1781,12 @@ async function initApp() {
 		// voiceLease is null on the default (broker-off) path → the synth falls back to
 		// VITE_TTS_BASE, exactly as before.
 		synth = voiceLease
-			? new KyutaiTtsSynthesizer(outputWorklet, { baseUrl: voiceLease.ttsUrl, onVoiceUnavailable })
-			: new KyutaiTtsSynthesizer(outputWorklet, { onVoiceUnavailable });
+			? new KyutaiTtsSynthesizer(outputWorklet, { baseUrl: voiceLease.ttsUrl, onVoiceUnavailable, onDispose: () => { outputWorklet.disconnect(); void ctx.close(); } })
+			: new KyutaiTtsSynthesizer(outputWorklet, { onVoiceUnavailable, onDispose: () => { outputWorklet.disconnect(); void ctx.close(); } });
 		return synth;
+		} catch (error) { await ctx.close().catch(() => {}); throw error; }
+		})();
+		try { return await synthPending; } finally { synthPending = null; }
 	};
 
 	// Lazily build + connect the shared STT client. connect() is a no-op when already
@@ -1779,13 +1933,18 @@ async function initApp() {
 
 	const voiceController = installVoiceCapture({
 		onStart: async (stream) => {
-			startCancelled = false;
+			const epoch = ++recordingEpoch;
+			const owner = agent;
+			const selection = sessionSelection;
+			recordingSelection = selection;
+			const isActive = () => epoch === recordingEpoch && owner === agent && selection === sessionSelection;
+			recordingOwner = owner;
 			cutVoiceAudio(); // barge-in: toggling the mic on cuts any in-progress reply's audio
 			// First launch (or a stale grant token): settle the credit grant + memory opt-in
 			// up front, before the recorder starts, so the modals never interrupt mid-utterance.
 			// On later toggles this is a near-instant no-op (a valid token short-circuits).
 			await ensureAnonGrant();
-			if (startCancelled) return; // toggled off during the modal → no recorder was built
+			if (!isActive()) return; // toggled off during the modal → no recorder was built
 			// Memory consent: a no-op on the anon path (the welcome modal settled it inline) —
 			// only fires the standalone consent modal for own-key/family users.
 			void ensureMemoryConsent();
@@ -1793,7 +1952,7 @@ async function initApp() {
 			// every TTS endpoint is full → refuse the mic-on and steer the user to typed
 			// chat (which shares the same agent and needs no voice slot).
 			const leaseStatus = await acquireVoiceLease();
-			if (startCancelled) return; // toggled off during the lease await
+			if (!isActive()) return; // toggled off during the lease await
 			if (leaseStatus === "busy") {
 				voiceController.cancel(); // back to idle, release the mic stream, no onStop
 				showVoiceToast("Voice is busy right now — type your message instead.");
@@ -1802,7 +1961,9 @@ async function initApp() {
 			// Recording-in-progress cue: show a user-side placeholder bubble (undulating
 			// ellipsis) right away, removed in onStop when the real transcript lands. This
 			// is an external edit (no agent event), so poke the view to re-clone.
-			agent.state.messages = [...agent.state.messages, createVoicePendingMessage()];
+			const placeholder = createVoicePendingMessage();
+			recordingPlaceholder = placeholder;
+			owner.state.messages = [...owner.state.messages, placeholder];
 			repaintChatAfterExternalEdit();
 			try {
 				await ensureSynth(); // warm the synth up front so the TTS tap can lazily open a speaker mid-stream
@@ -1810,20 +1971,25 @@ async function initApp() {
 			} catch (err) {
 				dbgError("voice setup failed:", err);
 			}
-			if (startCancelled) {
+			if (!isActive()) {
 				// Toggled off during setup — drop the placeholder and start no recorder.
-				agent.state.messages = agent.state.messages.filter((m) => m.role !== "voice-pending");
-				repaintChatAfterExternalEdit();
+				owner.state.messages = owner.state.messages.filter((m) => m !== placeholder);
+				if (owner === agent) repaintChatAfterExternalEdit();
 				return;
 			}
 			const rec = new PcmRecorder({ stream });
 			recorder = rec;
-			await rec.start();
+			try { await rec.start(); } catch (error) {
+				if (recorder === rec) recorder = null;
+				owner.state.messages = owner.state.messages.filter((m) => m !== placeholder);
+				if (owner === agent) repaintChatAfterExternalEdit();
+				throw error;
+			}
 			// Toggled off during recorder.start(): if onStop already claimed this recorder
 			// (recorder !== rec — it nulled it to transcribe a complete quick turn), it owns
 			// teardown; otherwise the toggle landed in this window with no recorder to stop, so
 			// tear the just-started one down here rather than leak it.
-			if (startCancelled && recorder === rec) {
+			if (!isActive() && recorder === rec) {
 				await rec.stop().catch(() => {});
 				recorder = null;
 			}
@@ -1834,7 +2000,13 @@ async function initApp() {
 		// agent.prompt adds the user message and streams the assistant reply; ChatPanel
 		// renders both — no manual message append.
 		onStop: async () => {
-			startCancelled = true; // if an onStart is still mid-await, tell it to bail (no leaked recorder)
+			const epoch = ++recordingEpoch;
+			const owner = recordingOwner;
+			const selection = recordingSelection;
+			const placeholder = recordingPlaceholder;
+			recordingOwner = null;
+			recordingPlaceholder = null;
+			const isActive = () => epoch === recordingEpoch && owner === agent && selection === sessionSelection; // // if an onStart is still mid-await, tell it to bail (no leaked recorder)
 			// Keep the recording-in-progress placeholder visible THROUGH the STT round-trip:
 			// batch transcription takes multiple seconds, and dropping the cue up front would
 			// leave dead air with no feedback during exactly that wait. The same ellipsis
@@ -1846,8 +2018,8 @@ async function initApp() {
 			const dropPlaceholder = () => {
 				if (!placeholderShown) return;
 				placeholderShown = false;
-				agent.state.messages = agent.state.messages.filter((m) => m.role !== "voice-pending");
-				repaintChatAfterExternalEdit();
+				if (owner) owner.state.messages = owner.state.messages.filter((m) => m !== placeholder);
+				if (owner === agent) repaintChatAfterExternalEdit();
 			};
 			try {
 				const rec = recorder;
@@ -1862,15 +2034,18 @@ async function initApp() {
 				}
 				if (!pcm.length || !sttClient) return;
 				let transcript = "";
-				try {
-					transcript = await sttClient.transcribe(pcm);
-				} catch (err) {
-					dbgError("voice transcription failed:", err);
-					return;
+				while (isActive()) {
+					try { transcript = await sttClient.transcribe(pcm); break; }
+					catch (err) {
+						dbgError("voice transcription failed:", err);
+						if (!isActive() || !confirm("Transcription failed. Retry this recording? Cancel discards it.")) return;
+					}
 				}
+				if (!isActive()) return;
 				// Speech-adaptation pass: the lexicon's auto-replace rules rewrite known
 				// mistranscriptions before the transcript reaches the display or the model.
-				const rules = pipeline.getSttLexicon().autoReplace;
+				const rawTranscript = transcript;
+				const rules = memoryConsent === "granted" ? pipeline.getSttLexicon().autoReplace : [];
 				if (rules.length) {
 					const fixed = applyAutoReplace(transcript, rules);
 					if (fixed !== transcript) {
@@ -1878,6 +2053,7 @@ async function initApp() {
 						transcript = fixed;
 					}
 				}
+				pendingVoiceEvidence = memoryConsent === "granted" ? { utteranceId: crypto.randomUUID(), rawText: rawTranscript, correctedText: transcript } : undefined;
 				// Real transcript is in hand — drop the cue right before the user bubble lands
 				// (avoids a flash) and hand the transcript to the agent.
 				dropPlaceholder();
@@ -1900,7 +2076,7 @@ async function initApp() {
 					voiceTurnSeq++; // stamp this turn so its agent_end retires the right speak state
 					voiceTurnSpeaking = true; // gate: this turn's reply speaks, incl. the post-tool final answer (see TTS tap)
 					voiceTurnCut = false; // fresh turn — clear any prior barge-in guard
-					void agent.prompt(transcript).catch((err) => {
+					void owner!.prompt(transcript).catch((err) => {
 						dbgError("voice agent.prompt failed:", err);
 						// A voice send that errors before reaching agent_end (e.g. the re-entrancy
 						// guard threw) never retires its speak gate the normal way. Reset it here so
@@ -1967,7 +2143,10 @@ async function initApp() {
 		isMuted: () => ttsMuted,
 	});
 
-	await loadUserGraph();
+	try { await loadUserGraph(); } catch {
+		memoryConsent = "declined";
+		alert("Saved memory could not be loaded. Memory is disabled; existing data has been retained. Reload to retry.");
+	}
 
 	// The per-turn memory pipeline. Constructed after the graph loads; its state
 	// (action buffers, running context, speech data, flags) loads in init().
@@ -1975,6 +2154,12 @@ async function initApp() {
 		backend,
 		getGraph: () => userGraph,
 		saveGraph: saveUserGraph,
+		saveMemory: async (snapshot) => {
+			if (!graphLoaded) throw new Error("Memory has not loaded");
+			await writeMemory({ graph: userGraph.serialize(), pipeline: snapshot });
+		},
+		savePipeline: (snapshot) => writeMemory({ pipeline: snapshot }),
+		onError: reportMemoryFailure,
 		embed: makeEmbedClient({
 			endpoint: EMBED_ENDPOINT,
 			getBearer: () => (servingPath.mode === "own" ? "" : servingPath.auth),
@@ -1985,12 +2170,18 @@ async function initApp() {
 		getAuth: () => servingPath.auth,
 		// The current memory-consent state, so the pipeline agent can re-check before it
 		// persists (consent can be revoked between a turn ending and its tick running).
-		getConsent: () => memoryConsent,
+		getConsent: () => graphLoaded && !memoryReplacing && !memoryStorage.invalidated ? memoryConsent : "declined",
 		addCost: addIngestionCostToSession,
 		onStateChange: () => refreshMemoryUi(),
 		onActivity: () => renderGutters(),
 	});
-	await pipeline.init();
+	try {
+		if (!memorySnapshot) throw new Error("Saved memory snapshot unavailable");
+		pipeline.loadSnapshot(memorySnapshot);
+	} catch {
+		memoryConsent = "declined";
+		alert("Saved memory could not be loaded. Memory is disabled; existing data has been retained. Reload to retry.");
+	}
 	renderGutters(); // re-render with the seeded activity feed
 
 	// PersistentStorageDialog is broken upstream — export/import (Memory settings

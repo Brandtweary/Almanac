@@ -26,7 +26,8 @@ export function assembleMemoryContext(terms: TermMatch[]): string | null {
 	if (!terms.length) return null;
 	const p: string[] = ["<memory>", "## Term Descriptions"];
 	for (const m of [...terms].sort((a, b) => (a.label < b.label ? -1 : a.label > b.label ? 1 : 0))) {
-		p.push(`**${m.label}**: ${m.description}`);
+		const route = m.matched_via === "alias" ? ` (indexed alias ${JSON.stringify(m.matched_surface)}; normalized matching)` : "";
+		p.push(`**${m.label}**${route}: ${m.description}`);
 	}
 	p.push("</memory>");
 	return p.join("\n");
@@ -66,7 +67,7 @@ export function retrieve(
 	const vacuum = { terms: termMatches };
 
 	// Injection: dedup against the per-session ledger.
-	let freshTerms = termMatches.filter((m) => !ledger.hasTerm(`desc:${m.label}`));
+	let freshTerms = termMatches.filter((m) => !ledger.hasTerm(`desc:${m.label}`, m.description));
 
 	// Term cap (top-N by hit_count). Overflow is NOT committed to the ledger, so
 	// a still-salient concept re-ships on a later turn.
@@ -77,7 +78,7 @@ export function retrieve(
 	}
 
 	// Commit survivors so they won't ship again this session.
-	for (const m of freshTerms) ledger.addTerm(`desc:${m.label}`);
+	for (const m of freshTerms) ledger.addTerm(`desc:${m.label}`, m.description);
 
 	return { vacuum, injectionBlock: assembleMemoryContext(freshTerms) };
 }

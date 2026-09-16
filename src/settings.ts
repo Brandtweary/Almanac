@@ -10,16 +10,16 @@ export interface MemoryTabCallbacks {
 	onExport: () => void;
 	onImport: (file: File) => Promise<void>;
 	onDelete: () => Promise<void>;
-	// The audit agent's human-review flags (newest first), surfaced read-only so the
-	// store isn't write-only. Empty array when there's nothing flagged.
+	// Unresolved review flags, newest first; resolution removes a handled item.
 	getFlags: () => ReviewFlag[];
+	resolveFlag: (flag: ReviewFlag) => Promise<void>;
 }
 
 // The Memory tab: the single home for memory in Settings — turn it on or off after
 // the initial consent prompt, and export / import / delete the stored lexicon (the
 // whole memory artifact — the term glossary plus speech-adaptation data and
-// conversation summaries; there is nothing else to export). Off means the pipeline
-// never fires; existing memory is untouched. Browser storage can be evicted, so the
+// conversation summaries; there is nothing else to export). Off disables personal
+// memory access and background processing; saved memory is retained. Browser storage can be evicted, so the
 // file export is the real durability story (the framework's PersistentStorageDialog
 // is broken upstream). main.ts supplies the callbacks since the live stores live there.
 export class MemoryTab extends SettingsTab {
@@ -37,8 +37,8 @@ export class MemoryTab extends SettingsTab {
 	render(): TemplateResult {
 		const toggle = async () => {
 			const next = !this.enabled;
-			await this.cbs.setEnabled(next);
-			this.enabled = next;
+			try { await this.cbs.setEnabled(next); this.enabled = next; }
+			catch (error) { this.enabled = this.cbs.isEnabled(); alert(`Memory setting failed: ${error}`); }
 		};
 		const onFile = async (e: Event) => {
 			const input = e.target as HTMLInputElement;
@@ -53,8 +53,8 @@ export class MemoryTab extends SettingsTab {
 		};
 		const onDelete = async () => {
 			if (!confirm("Delete your memory? This can't be undone.")) return;
-			await this.cbs.onDelete();
-			alert("Your memory has been deleted.");
+			try { await this.cbs.onDelete(); alert("Your memory has been deleted."); }
+			catch (error) { alert(`Delete failed: ${error}`); }
 		};
 		return html`
 			<div class="flex flex-col gap-4 p-1">
@@ -101,8 +101,7 @@ export class MemoryTab extends SettingsTab {
 		`;
 	}
 
-	// Read-only view of the audit agent's human-review flags (lexicon colonization, an
-	// LLM misspelling habit, a split too tangled to automate). Hidden when there are none.
+	// Human-review flags remain visible until resolved.
 	private renderFlags(): TemplateResult | null {
 		const flags = this.cbs.getFlags();
 		if (!flags.length) return null;
@@ -115,6 +114,10 @@ export class MemoryTab extends SettingsTab {
 				${flags.map(
 					(f) => html`<li class="text-xs text-muted-foreground">
 						<span class="text-primary">${f.kind}</span>${f.label ? html` · ${f.label}` : ""}: ${f.description}
+						<button class="ml-2 underline" @click=${async () => {
+							try { await this.cbs.resolveFlag(f); this.requestUpdate(); }
+							catch (error) { alert(`Could not resolve flag: ${error}`); }
+						}}>Resolve</button>
 					</li>`,
 				)}
 			</ul>

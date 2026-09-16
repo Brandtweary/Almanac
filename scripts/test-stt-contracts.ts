@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import { createServer } from 'vite';
+const server = await createServer({ optimizeDeps: { noDiscovery: true, include: [] }, server: { middlewareMode: true }, appType: 'custom' });
+try {
+ const {applyAutoReplace, emptySttLexicon, mistranscriptionCount, validateAutoReplace} = await server.ssrLoadModule('/src/stt-lexicon.ts');
+ const {createPipelineTools} = await server.ssrLoadModule('/src/pipeline-tools.ts');
+ const {Graph} = await server.ssrLoadModule('/src/kg/graph.ts');
+ for (const word of ['storm', 'arms', "don't", 'mother-in-law']) await assert.rejects(validateAutoReplace(word, 'different'), /real English word/);
+ await assert.rejects(validateAutoReplace('kuber netties', 'the Kubernetes'), /articles/);
+ await assert.rejects(validateAutoReplace('one two three four five', 'replacement'), /four words/);
+ await validateAutoReplace('kuber netties', 'Kubernetes');
+ assert.equal(applyAutoReplace('éfoo foo fooé', [{from:'foo',to:'$&$1',ts:''}]), 'éfoo $&$1 fooé');
+ assert.equal(applyAutoReplace('x(foo) (foo).', [{from:'(foo)',to:'yes',ts:''}]), 'x(foo) yes.');
+ const lex = emptySttLexicon(); let active = true;
+ const graph = new Graph({meta:{version:2,node_count:0,last_modified:new Date().toISOString()},thoughts:{}}); const flags: any[] = []; graph.getOrCreate("kubernetes", "A container orchestration platform."); graph.addAlias("kubernetes", "kuber netties");
+ const tools = createPipelineTools({getGraph:()=>graph, getSttLexicon:()=>lex, embed:async()=>null, record:()=>{}, addFlag:(flag:any)=>flags.push(flag), assertActive:()=>{if(!active)throw Error('cancelled')}, voiceEvidence:{utteranceId:'u1',rawText:'kuber netties',correctedText:'Kubernetes'}});
+ const call=(name:string,p:unknown)=>tools.find((t:any)=>t.name===name).execute('test',p);
+ const pair={spoken:'Kubernetes',transcribed:'kuber netties',kind:'phonetic'};
+ await call('log_mistranscription',pair); await call('log_mistranscription',pair);
+ assert.equal(mistranscriptionCount(lex,pair.spoken,pair.transcribed),1);
+ await assert.rejects(call('log_mistranscription',{...pair,transcribed:'invented text'}), /raw transcript/);
+ await call('add_auto_replace_rule',{from:pair.transcribed,to:pair.spoken});
+ await call('reject_mistranscription',pair);
+ assert.equal(flags[0]?.kind, 'stt-alias-review');
+ assert.ok(graph.get('kubernetes').aliases.includes('kuber netties'));
+ await assert.rejects(call('add_alias',{term:'kubernetes',alias:'kuber netties'}), /rejected STT pairing/);
+ assert.equal(lex.autoReplace.length,0); assert.equal(mistranscriptionCount(lex,pair.spoken,pair.transcribed),0);
+ await assert.rejects(call('log_mistranscription',pair), /rejected/);
+ await call('correct_mistranscription',{utterance_id:'u1',...pair});
+ assert.equal(mistranscriptionCount(lex,pair.spoken,pair.transcribed),1);
+ active=false; await assert.rejects(call('remove_auto_replace_rule',{from:pair.transcribed}), /cancelled/);
+ console.log('STT contract regressions passed');
+} finally { await server.close(); }

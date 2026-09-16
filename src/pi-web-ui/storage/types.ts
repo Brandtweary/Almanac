@@ -5,6 +5,9 @@ import type { Model } from "@earendil-works/pi-ai";
  * Transaction interface for atomic operations across stores.
  */
 export interface StorageTransaction {
+	/** Distinguish an absent key from a stored null or undefined value. */
+	has(storeName: string, key: string): Promise<boolean>;
+
 	/**
 	 * Get a value by key from a specific store.
 	 */
@@ -66,7 +69,10 @@ export interface StorageBackend {
 	has(storeName: string, key: string): Promise<boolean>;
 
 	/**
-	 * Execute atomic operations across multiple stores.
+	 * Execute atomic operations across multiple stores. Resolves only after commit;
+	 * callback failure aborts all writes. Await operations on the supplied transaction,
+	 * not separate backend calls that would wait for its locks. Keep callbacks short:
+	 * IndexedDB retains its transaction while the callback is pending.
 	 */
 	transaction<T>(
 		storeNames: string[],

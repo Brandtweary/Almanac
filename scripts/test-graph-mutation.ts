@@ -158,5 +158,51 @@ const termCount = (g: Graph) => g.thoughts.size;
 	);
 }
 
+// -- retrieval and mutation invariants --------------------------------------
+{
+	const g = Graph.empty();
+	const hits = (text: string, label: string) => g.termMatch(text).some(m => m.label === label);
+	for (const label of ["c++", "c#", ".net", "cafés", "vector-databases", "café au lait", "naïve"]) g.getOrCreate(label, "Reference description.");
+	for (const label of ["c++", "c#", ".net"]) {
+		check(`punctuation term ${label} retrieves`, hits(`using ${label} today`, label));
+		check(`punctuation term ${label} rejects embedded token`, !hits(`x${label}x`, label));
+	}
+	check("punctuation terms do not collapse to bare letter", !hits("c", "c++"));
+	check("plural stored label matches singular query", hits("cafe", "cafés"));
+	check("plural phrase matches singular query", hits("vector database", "vector-databases"));
+	check("diacritics fold on phrase and input", hits("CAFE AU LAIT", "café au lait") && hits("naïve", "naïve"));
+	check("Unicode word boundary refuses embedded phrase", !hits("écafe au lait", "café au lait"));
+	g.getOrCreate("attention-disorder", "An attention condition.");
+	check("acronym alias is accepted", g.addAlias("attention-disorder", "ADS"));
+	check("acronym alias retains case", g.get("attention-disorder")!.aliases.includes("ADS"));
+	check("acronym routes only original case", hits("ADS", "attention-disorder") && !hits("ads", "attention-disorder"));
+	check("mechanical alias is refused", !g.addAlias("attention-disorder", "Attention Disorder"));
+	g.getOrCreate("stub");
+	check("undescribed alias target is refused", !g.addAlias("stub", "other-name"));
+	const before = JSON.stringify(g.serialize().thoughts);
+	check("merge cannot discard only description", !g.merge("attention-disorder", "stub"));
+	check("rejected merge is atomic", JSON.stringify(g.serialize().thoughts) === before);
+	g.getOrCreate("stub-two");
+	check("bare stubs can merge", g.merge("stub-two", "stub"));
+	g.get("naïve")!.embedding = [1, 0];
+	check("rename succeeds", g.rename("naïve", "inexperienced"));
+	check("rename invalidates old label embedding", g.get("inexperienced")!.embedding === null);
+	check("case-insensitive acronym removal", g.removeAlias("attention-disorder", "ads"));
+}
+
+{
+	const g = Graph.empty();
+	g.getOrCreate("tractor", "A farm vehicle.");
+	g.addAlias("tractor", "farm-machine");
+	let threw = false;
+	try { g.getOrCreate("Farm Machine", "Other meaning."); } catch { threw = true; }
+	check("mint cannot steal an alias route", threw && g.get("Farm Machine") === null);
+	g.getOrCreate("truck", "A road vehicle.");
+	check("rename cannot steal an alias route", !g.rename("truck", "farm-machine") && g.get("truck") !== null);
+	threw = false;
+	try { g.getOrCreate("tractor", " "); } catch { threw = true; }
+	check("description upsert cannot strand aliases", threw && g.get("tractor")!.description === "A farm vehicle.");
+}
+
 console.log(failures === 0 ? "\nAll term-store tests passed." : `\n${failures} test(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

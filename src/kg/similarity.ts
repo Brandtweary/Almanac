@@ -4,7 +4,7 @@
 // candidate scheme the string+semantic dedup precompute used).
 
 import type { Graph } from "./graph";
-import type { Thought } from "./types";
+import { validVector, type Embedding, type Thought } from "./types";
 
 export function jaroWinkler(s1: string, s2: string): number {
 	if (s1 === s2) return 1;
@@ -51,7 +51,7 @@ export function jaroWinkler(s1: string, s2: string): number {
 }
 
 export function cosineSimilarity(a: number[], b: number[]): number {
-	if (a.length !== b.length || !a.length) return 0;
+	if (a.length !== b.length || !validVector(a) || !validVector(b)) return 0;
 	let dot = 0;
 	let na = 0;
 	let nb = 0;
@@ -75,13 +75,13 @@ const COSINE_THRESHOLD = 0.6;
 const MAX_CANDIDATES = 8;
 
 /** Union of string-similar and semantically-similar terms for a candidate
- *  label/description. `queryEmbedding` null → string-only (embed endpoint
- *  unreachable or the text hasn't been embedded). Excludes an exact label match
- *  (that's an upsert, not a duplicate). */
+	*  label/description. `queryEmbedding` null → string-only (embed endpoint
+	*  unreachable or the text hasn't been embedded). Excludes an exact label match
+	*  (that's an upsert, not a duplicate). */
 export function findSimilarTerms(
 	graph: Graph,
 	label: string,
-	queryEmbedding: number[] | null,
+	queryEmbedding: Embedding | null,
 ): SimilarCandidate[] {
 	const q = label.trim().toLowerCase();
 	const out = new Map<string, SimilarCandidate>();
@@ -90,11 +90,12 @@ export function findSimilarTerms(
 		if (t.label.toLowerCase() === q) continue;
 		let stringScore = jaroWinkler(q, t.label.toLowerCase());
 		for (const a of t.aliases) {
-			stringScore = Math.max(stringScore, jaroWinkler(q, a));
+			stringScore = Math.max(stringScore, jaroWinkler(q, a.toLowerCase()));
 		}
 		const semanticScore =
-			queryEmbedding && t.embedding && t.embedding.length
-				? cosineSimilarity(queryEmbedding, t.embedding)
+			queryEmbedding && t.embedding_encoder === queryEmbedding.encoder &&
+			validVector(queryEmbedding.vector) && validVector(t.embedding) && t.embedding.length === queryEmbedding.vector.length
+				? cosineSimilarity(queryEmbedding.vector, t.embedding)
 				: null;
 		if (stringScore >= JW_THRESHOLD || (semanticScore !== null && semanticScore >= COSINE_THRESHOLD)) {
 			out.set(t.id, { term: t, stringScore, semanticScore });

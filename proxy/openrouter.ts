@@ -25,13 +25,14 @@ export interface ForwardResult {
 }
 
 function usageFromObj(obj: unknown): Usage | null {
-	const u = (obj as { usage?: Record<string, number> })?.usage;
-	if (!u) return null;
-	return {
-		promptTokens: u.prompt_tokens ?? 0,
-		completionTokens: u.completion_tokens ?? 0,
-		cost: u.cost ?? 0,
-	};
+	const u = (obj as { usage?: Record<string, unknown> })?.usage;
+	if (!u || typeof u.cost !== "number" || !Number.isFinite(u.cost) || u.cost < 0) return null;
+	const tokens = (value: unknown): number | null => value === undefined ? 0 :
+		typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+	const promptTokens = tokens(u.prompt_tokens);
+	const completionTokens = tokens(u.completion_tokens);
+	if (promptTokens === null || completionTokens === null) return null;
+	return { promptTokens, completionTokens, cost: u.cost };
 }
 
 export async function forwardCompletion(opts: {
@@ -160,6 +161,7 @@ export async function mintSubKey(opts: {
 			Authorization: `Bearer ${opts.provisioningKey}`,
 		},
 		body: JSON.stringify({ name: opts.name, limit: opts.limit, limit_reset: null }),
+		signal: AbortSignal.timeout(15000),
 	});
 	if (!res.ok) {
 		throw new Error(`provisioning failed: ${res.status} ${await res.text()}`);

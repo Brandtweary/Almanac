@@ -61,6 +61,7 @@ export class VoiceController {
 	private state: State = "idle";
 	private stream?: MediaStream;
 	private observer?: MutationObserver;
+	private generation = 0;
 
 	constructor(private seam: VoiceCaptureSeam) {
 		ensureStyles();
@@ -116,13 +117,20 @@ export class VoiceController {
 	};
 
 	private async start(): Promise<void> {
+		const generation = ++this.generation;
 		this.setState("requesting");
 		try {
 			// This is where the mic stream is actually acquired (PcmRecorder reuses it via
 			// the onStart seam), so the capture constraints must be applied HERE — a bare
 			// {audio:true} would silently ignore PcmRecorder's own constraint object.
-			this.stream = await navigator.mediaDevices.getUserMedia({ audio: MIC_AUDIO_CONSTRAINTS, video: false });
+			const stream = await navigator.mediaDevices.getUserMedia({ audio: MIC_AUDIO_CONSTRAINTS, video: false });
+			if (generation !== this.generation) {
+				stream.getTracks().forEach((track) => track.stop());
+				return;
+			}
+			this.stream = stream;
 		} catch {
+			if (generation !== this.generation) return;
 			this.setState("denied");
 			window.setTimeout(() => {
 				if (this.state === "denied") this.setState("idle");
@@ -134,10 +142,12 @@ export class VoiceController {
 			await this.seam.onStart?.(this.stream);
 		} catch (err) {
 			console.error("[myriapod] voice onStart seam threw", err);
+			if (generation === this.generation) this.cancel();
 		}
 	}
 
 	private stop(): void {
+		this.generation++;
 		this.stream?.getTracks().forEach((t) => t.stop());
 		this.stream = undefined;
 		this.setState("idle");
@@ -148,6 +158,7 @@ export class VoiceController {
 	// transport refuses the turn after recording started (e.g. no voice slot is free),
 	// so the mic stream is released but no empty turn is sent.
 	cancel(): void {
+		this.generation++;
 		this.stream?.getTracks().forEach((t) => t.stop());
 		this.stream = undefined;
 		this.setState("idle");

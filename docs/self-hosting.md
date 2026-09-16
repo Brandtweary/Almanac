@@ -156,7 +156,7 @@ and `orpheus-bridge` services in [`docker-compose.yml`](./templates/docker-compo
 An HF `text-embeddings-inference` container (MiniLM-class, 384-dim, CPU-only) backs the memory
 pipeline's mint-time dedup via the proxy's `EMBED_BASE`. It's **fail-soft**: if it's absent or
 unreachable, dedup degrades to string similarity and everything else keeps working. See the `embed`
-service in the compose template.
+service in the compose template. The template pins a full HF commit with `--revision` so `/info.model_sha` identifies the weights; verify that field before enabling the proxy (the separate `/info.sha` identifies the serving binary). The proxy returns `{encoder, embeddings}`, rejects missing or mutable model revisions, and disables tokenizer truncation; configure `EMBED_BASE` to the template's published port, `http://127.0.0.1:8082`.
 
 ## Web search (optional)
 

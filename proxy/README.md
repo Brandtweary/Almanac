@@ -23,6 +23,8 @@ directory and running it; it shares nothing with the frontend build.
     (global daily) and the token's `$FREE_GRANT_USD` lifetime balance.
   - **Family:** the `/redeem` token → a dedicated OpenRouter sub-key with a hard
     `$FAMILY_LIMIT` lifetime cap.
+- **`GET /v1/web-search`** — returns `{results, degraded}`; backend failures and inconclusive empty searches return errors.
+- **`POST /v1/embed`** — accepts `{inputs: string[]}` and returns `{encoder, embeddings}` with checked batch cardinality, finite vectors, and stable encoder metadata; oversized tokenizer inputs fail instead of being truncated. The TEI backend must use `--revision <full HF model commit>`: `/info.model_sha` reflects that argument, and an unpinned branch or missing revision is rejected.
 - **`POST /redeem`** `{ code }` → provisions a family sub-key and returns `{ token }`.
 - **`GET /health`**, **`GET /balance`** (bearer → remaining credit).
 

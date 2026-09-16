@@ -1,3 +1,4 @@
+import "./test-env";
 // Integration tests for the anonymous free-tier grant flow (/anon-init) and the
 // spend-only guard on /v1/chat/completions. Runs the Hono app in-process via
 // app.request() against an in-memory SQLite DB — no port, no network. The forward
@@ -6,14 +7,10 @@
 
 import { test, expect, beforeAll } from "bun:test";
 
-process.env.DB_PATH = ":memory:";
-process.env.OWNER_OPENROUTER_KEY = "sk-test-owner";
 // Trust XFF from any peer so the in-process test harness (no real socket peer) can
 // drive distinct client IPs via the header — mirrors running behind a trusted proxy.
-process.env.TRUSTED_PROXY = "*";
 // A truthy provisioning key so /redeem gets past the "family tier not configured" 503
 // and reaches the rate-limit path (no sub-key is minted for the unknown codes tested).
-process.env.OPENROUTER_PROVISIONING_KEY = "sk-test-prov";
 
 let app: { request: (path: string, init?: RequestInit) => Promise<Response> };
 let db: { newIpGrantsToday(): number };

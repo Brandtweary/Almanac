@@ -38,8 +38,8 @@ real work: speech-to-text, the language model, and text-to-speech, each running 
 browser handles the hand-offs: it captures your voice, sends it off to be transcribed, passes the
 transcript to the language model, streams the reply out to be spoken, and plays the audio back.
 
-The memory is the one part that lives on your machine. Your browser stores it in its own local
-storage, on your computer, and sends it nowhere. A small backend sits in front of the language model
+Your browser stores personal memory locally; enabled memory sends recalled context and pipeline
+inputs to the configured inference services. A small backend sits in front of the language model
 to hold its key, so your browser never has to; bring your own key and your browser talks to the model
 directly.
 

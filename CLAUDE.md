@@ -96,10 +96,10 @@ external services:
   the LLM generates; raw 24 kHz PCM frames (`PcmMessagePack`) stream back and are paced to ~1x realtime
   before posting to the audio-output-processor worklet — no Opus decoder. `src/tts.ts`. Configured
   via `VITE_TTS_BASE`.
-- **Embeddings** — the pipeline's mint-time dedup embeds each term (description) via the proxy's
+- **Embeddings** — the pipeline's mint-time dedup embeds each term (label and description) via the proxy's
   `/v1/embed`, a passthrough to a self-hosted embedding-inference container (HF text-embeddings-
-  inference, MiniLM-class). The 384-dim vector is stored on the term and rides the lexicon export;
-  cosine similarity runs client-side. Fail-soft: if the endpoint is unreachable, dedup degrades to
+  inference, MiniLM-class). The validated vector and encoder identity ride the lexicon export;
+  cosine similarity runs client-side only within one encoder space. Fail-soft: if the endpoint is unreachable, dedup degrades to
   string similarity. Configured via `EMBED_BASE` on the proxy.
 
 **Per-turn voice loop:** mic toggle-off → PCM → **batch STT** → (lexicon auto-replace rules rewrite
@@ -122,7 +122,7 @@ string-only). Run it with `bun run server.ts`; it binds `HOST`/`PORT`, defaultin
 - **One hardcoded model** (`src/myriapod-model.ts`) — reasoning always on (Kimi K3). No model picker.
   The cost field is approximate (the stats line); the proxy meters the *true* per-call cost.
 - **One term memory** — mutable, per-browser, persisted to IndexedDB. Starts empty; grows via the
-  pipeline. Writes are **opt-in** (a one-time consent gate).
+  pipeline. Personal memory reads and writes are **opt-in** (a one-time consent gate).
 - **`src/kg/` is the memory implementation** — pure TypeScript, running entirely in-page over
   IndexedDB; there is no server-side retrieval. (The `kg/` directory name is a misnomer — the contents
   are a term store, not a graph.)
@@ -138,24 +138,28 @@ string-only). Run it with `bun run server.ts`; it binds `HOST`/`PORT`, defaultin
     management. Constructs the `PipelineRuntime` and appends its running-context band to the agent's
     system prompt.
   - **pipeline.ts** — `PipelineRuntime`: the per-turn tick orchestrator. Fires audit → memory agent
-    serially (both write the store; audit first) with the summary agent in parallel; coalesces a turn
-    that ends mid-tick into one follow-up. Owns the per-agent action buffers, the running-context
+    serially (both write the store; audit first) with the summary agent in parallel; queues each turn
+    with its captured conversation identity. Owns the per-agent action buffers, the running-context
     buffer, the STT lexicon, and the review-flags store (all in the `pipeline` IndexedDB store), and
     the in-memory activity feed. Tooled agents run on `runAgentLoop`; the summary agent is a bare
     completion. Instruments per-agent token cost.
   - **pipeline-prompts.ts** — the three agents' prompts (shared system stub + transcript-first
     assembly). Encodes the salience gate, the buffer-gated destructive-op policy, the STT auto-vs-manual
     rules, and the flag-only items.
+  - **memory-storage.ts** — atomic personal-memory snapshots and revision-checked writes across graph, pipeline and consent; stale tabs fail with reload guidance instead of overwriting newer state.
+  - **memory-state.ts** — validates nested pipeline/import data and removes paired personal-memory tool history when access is disabled.
   - **pipeline-tools.ts** — the shared tool set the tooled agents wield over the memory: add/update/
     rename/merge/remove terms, aliases, no-stem, `similar_terms` (dedup candidates), STT logging +
-    auto-replace, and `flag_for_review`. Every tool records a one-line action (that stream *is* the
+    `inspect_term`, `inspect_stt`, `correct_mistranscription`, `reject_mistranscription`,
+    `remove_auto_replace_rule`, auto-replace, and `flag_for_review`. Every tool records a one-line action (that stream *is* the
     action buffer and the activity feed).
   - **stt.ts** — batch speech-to-text (`PcmRecorder` + stateless `WhisperClient`).
   - **tts.ts** — streaming text-to-speech (`SentenceChunker` + `KyutaiTtsSynthesizer` over a
     Kyutai-protocol msgpack WS; ~1x-realtime pacing so the worklet buffer doesn't overflow).
   - **stt-lexicon.ts** — the speech-adaptation half of the lexicon: the mistranscription log + the
     auto-replace rules (`applyAutoReplace`, applied client-side to voice transcripts before display),
-    and `mistranscriptionCount` (the recurrence signal for the persistent-miss → alias escalation).
+    and `mistranscriptionCount` (distinct raw-utterance identities establish recurrence; unpinned legacy
+    entries remain inspectable but do not count toward persistent-miss alias escalation).
   - **myriapod-model.ts** — the single hardcoded chat model + `proxyChatModel()` + the proxy
     base/provider constants. Carries the load-bearing **reasoning note** (Kimi K3 is always-on;
     thinking level `"max"` — pi-ai 0.80's native value — is the only wire effort Kimi accepts).
@@ -169,7 +173,7 @@ string-only). Run it with `bun run server.ts`; it binds `HOST`/`PORT`, defaultin
     click toggles a persistent TTS mute.
   - **consent-modal.ts** — the standalone one-time memory opt-in (own-key/family path + Settings
     re-prompt; the anon path folds it into grant-modal).
-  - **settings.ts** — `MemoryTab` (consent toggle, a read-only readout of the audit agent's
+  - **settings.ts** — `MemoryTab` (consent toggle, review and resolution of the audit agent's
     human-review flags, and lexicon export/import — the real durability story since IndexedDB can
     be evicted) and `OpenRouterKeyTab` (the **Access** tab: own key + family-code redemption +
     hosted-balance readout).
@@ -254,8 +258,8 @@ string-only). Run it with `bun run server.ts`; it binds `HOST`/`PORT`, defaultin
   breadcrumb to `agent.state.messages`. The breadcrumb accumulates across turns, so a per-session
   **ledger** dedup is correct rather than lossy. The gutter deliberately shows the pre-dedup vacuum.
 - **The pipeline tick.** On `agent_end` (consent-gated), `PipelineRuntime.onTurnEnd` fires one tick,
-  fire-and-forget. A tick that's still running when the next turn ends coalesces into exactly one
-  follow-up (reads the latest transcript when it runs). The pipeline agents' transcript KEEPS the
+  fire-and-forget. Turns arriving during a tick queue their captured transcripts in order.
+  The pipeline agents' transcript KEEPS source tool results and the
   `<memory>` breadcrumbs — retrieval visibility is the audit agent's subject matter. Per-agent token
   cost is folded into the visible session total via `addIngestionCostToSession`.
 - **Action buffers come nearly free.** Each tool records its own one-line action; the runtime collects
@@ -283,8 +287,8 @@ string-only). Run it with `bun run server.ts`; it binds `HOST`/`PORT`, defaultin
   agents, web-search, and embed all ride the same path, so the proxy meters spend against one principal
   (web-search and embed are not metered — self-hosted). **Self-heal:** `ensureAnonGrant()` probes a
   stored token against `/balance`; a forgotten token is cleared and re-minted.
-- **Opt-in memory.** Nothing is ingested until the visitor consents (pre-checked in the anon welcome
-  modal; standalone for own-key/family). The pipeline never fires while consent is ungranted.
+- **Opt-in memory.** Personal retrieval, memory tools, context injection, speech adaptation and
+  pipeline writes require consent; revocation cancels queued and in-flight memory work.
 - **STT auto-replace.** The lexicon's auto-replace rules rewrite known mistranscriptions in the voice
   transcript before it reaches the display or the model — client-side, voice turns only. The audit
   agent adds those rules conservatively (a real dictionary word is never bare-word auto-replaced).

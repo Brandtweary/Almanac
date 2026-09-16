@@ -24,12 +24,12 @@ import { dbg, dbgWarn } from "./debug.js";
 
 // The Whisper ASR HTTP endpoint. Override via VITE_STT_BASE for deploy.
 const DEFAULT_STT_URL =
-	import.meta.env.VITE_STT_BASE ?? "http://localhost:8123/api/asr-http";
+	import.meta.env?.VITE_STT_BASE ?? "http://localhost:8123/api/asr-http";
 
 // Optional bearer token for an auth-gated Whisper endpoint. Our faster-whisper has
 // none (undefined ⇒ no Authorization header); a self-hoster fronting Whisper with
 // auth sets VITE_STT_AUTH.
-const DEFAULT_STT_AUTH: string | undefined = import.meta.env.VITE_STT_AUTH;
+const DEFAULT_STT_AUTH: string | undefined = import.meta.env?.VITE_STT_AUTH;
 
 // Mic capture constraints — mono, echo-cancelled (this drives a speaker-based
 // conversation), no noise suppression, with AGC. The stream is actually acquired in
@@ -108,8 +108,11 @@ export class WhisperClient {
 		if (!res.ok) {
 			throw new Error(`stt: server returned ${res.status} ${res.statusText}`);
 		}
-		const data = (await res.json()) as { text?: string };
-		const text = (data.text ?? "").trim();
+		const data: unknown = await res.json();
+		if (!data || typeof data !== "object" || !("text" in data) || typeof data.text !== "string") {
+			throw new Error("stt: invalid response (expected a string text field)");
+		}
+		const text = data.text.trim();
 		dbg(`[stt] transcript: "${text}"`);
 		return text;
 	}
@@ -189,59 +192,59 @@ export class PcmRecorder {
 	private chunks: Float32Array[] = [];
 	private nativeRate = 0;
 	private running = false;
+	private generation = 0;
+	private starting = false;
 
 	constructor(private opts: PcmRecorderOptions = {}) {}
 
 	/** Acquire the mic (if needed), build the capture graph, and start accumulating. */
 	async start(): Promise<void> {
-		if (this.running) return;
+		if (this.running || this.starting) return;
+		const generation = ++this.generation;
+		this.starting = true;
 		this.chunks = [];
-
-		// Mono capture with echo cancellation — same constraints as the Unmute
-		// opus path, since this drives a speaker-based conversation.
-		if (this.opts.stream) {
-			this.stream = this.opts.stream;
-			this.ownsStream = false;
-		} else {
-			this.stream = await navigator.mediaDevices.getUserMedia({
-				audio: MIC_AUDIO_CONSTRAINTS,
-				video: false,
-			});
-			this.ownsStream = true;
-		}
-
-		// Build the capture graph inside a guard: addModule() can throw (CSP/offline/404)
-		// AFTER the AudioContext (and, if we opened it, the mic stream) already exist, so
-		// on any failure tear everything down before rethrowing — otherwise the context
-		// and the owned mic leak.
+		let stream: MediaStream | undefined;
+		let context: AudioContext | undefined;
+		let source: MediaStreamAudioSourceNode | undefined;
+		let worklet: AudioWorkletNode | undefined;
+		const ownsStream = !this.opts.stream;
+		const cleanup = () => {
+			source?.disconnect();
+			worklet?.disconnect();
+			if (worklet) worklet.port.onmessage = null;
+			if (ownsStream) stream?.getTracks().forEach((track) => track.stop());
+			if (context && context.state !== "closed") void context.close();
+		};
 		try {
-			const audioContext = new AudioContext();
-			this.audioContext = audioContext;
-			this.nativeRate = audioContext.sampleRate; // typically 48000
-			dbg(`[stt] recorder start: native rate ${this.nativeRate}Hz`);
-
-			const worklet = await getAudioWorkletNode(audioContext, "pcm-recorder-processor");
-			worklet.port.onmessage = (ev: MessageEvent) => {
-				if (!this.running) return;
-				const samples = (ev.data as { samples?: Float32Array }).samples;
-				if (samples) this.chunks.push(samples);
-			};
-
-			const source = audioContext.createMediaStreamSource(this.stream);
+			stream = this.opts.stream ?? await navigator.mediaDevices.getUserMedia({
+				audio: MIC_AUDIO_CONSTRAINTS, video: false,
+			});
+			if (generation !== this.generation) { cleanup(); return; }
+			context = new AudioContext();
+			worklet = await getAudioWorkletNode(context, "pcm-recorder-processor");
+			if (generation !== this.generation) { cleanup(); return; }
+			source = context.createMediaStreamSource(stream);
 			source.connect(worklet);
-			// The recorder worklet writes nothing to its outputs, so connecting it to the
-			// destination pulls the graph (the engine only renders nodes on a path to the
-			// destination) while playing pure silence — no mic echo.
-			worklet.connect(audioContext.destination);
-
+			worklet.connect(context.destination);
+			await context.resume();
+			if (generation !== this.generation) { cleanup(); return; }
+			this.stream = stream;
+			this.ownsStream = ownsStream;
+			this.audioContext = context;
+			this.nativeRate = context.sampleRate;
 			this.source = source;
 			this.worklet = worklet;
 			this.running = true;
-			await audioContext.resume();
-		} catch (e) {
-			this.running = false;
-			this.teardown();
-			throw e;
+			worklet.port.onmessage = (ev: MessageEvent) => {
+				if (!this.running || generation !== this.generation) return;
+				const samples = (ev.data as { samples?: Float32Array }).samples;
+				if (samples) this.chunks.push(samples);
+			};
+		} catch (error) {
+			cleanup();
+			if (generation === this.generation) throw error;
+		} finally {
+			if (generation === this.generation) this.starting = false;
 		}
 	}
 
@@ -251,6 +254,8 @@ export class PcmRecorder {
 	 */
 	async stop(): Promise<Float32Array> {
 		if (!this.running) {
+			this.generation++;
+			this.starting = false;
 			// Not recording, but start() may have partially built the audio graph (a
 			// fast mic double-toggle can land stop() mid-start()). Always tear down so a
 			// half-built AudioContext/worklet is never orphaned — browsers cap live

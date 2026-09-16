@@ -85,7 +85,7 @@ services:
   # The proxy's EMBED_BASE points here. Absent → dedup falls back to strings.
   embed:
     image: ghcr.io/huggingface/text-embeddings-inference:cpu-latest
-    command: ["--model-id", "sentence-transformers/all-MiniLM-L6-v2"]
+    command: ["--model-id", "sentence-transformers/all-MiniLM-L6-v2", "--revision", "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"]
     ports:
       - "8082:80"   # container serves /embed on 80
 

@@ -1,14 +1,12 @@
+import "./test-env";
 // Integration tests for the feature-alert email capture (POST /subscribe). Runs the
 // Hono app in-process via app.request() against an in-memory SQLite DB — no port, no
 // network. Covers the validate / store / idempotent / rate-limit branches.
 
 import { test, expect, beforeAll } from "bun:test";
 
-process.env.DB_PATH = ":memory:";
-process.env.OWNER_OPENROUTER_KEY = "sk-test-owner";
 // Trust XFF from any peer so the in-process harness can drive distinct client IPs
 // via the header — mirrors running behind a trusted proxy.
-process.env.TRUSTED_PROXY = "*";
 
 let app: { request: (path: string, init?: RequestInit) => Promise<Response> };
 

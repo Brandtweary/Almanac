@@ -8,13 +8,13 @@
 // reset.
 
 export class InjectedLedger {
-	private terms = new Set<string>();
+	private terms = new Map<string, string | undefined>();
 
-	hasTerm(key: string): boolean {
-		return this.terms.has(key);
+	hasTerm(key: string, description?: string): boolean {
+		return this.terms.has(key) && (description === undefined || this.terms.get(key) === description);
 	}
-	addTerm(key: string): void {
-		this.terms.add(key);
+	addTerm(key: string, description?: string): void {
+		this.terms.set(key, description);
 	}
 
 	get sizes(): { terms: number } {

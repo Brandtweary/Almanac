@@ -163,6 +163,11 @@ export class AssistantMessage extends LitElement {
 						: ""
 				}
 				${
+					this.message.stopReason === "length"
+						? html`<span class="text-sm text-destructive">Response incomplete: the model reached its output limit.</span>`
+						: ""
+				}
+				${
 					this.message.stopReason === "aborted"
 						? html`<span class="text-sm text-destructive italic">${i18n("Request aborted")}</span>`
 						: ""

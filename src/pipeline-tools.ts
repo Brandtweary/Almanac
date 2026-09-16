@@ -12,7 +12,7 @@ import type { EmbedFn } from "./kg/embed.js";
 import { findSimilarTerms } from "./kg/similarity.js";
 import {
 	type SttLexicon,
-	mistranscriptionCount,
+	mistranscriptionCount, validateAutoReplace, phrasePattern, type VoiceEvidence,
 } from "./stt-lexicon.js";
 
 // Rolling cap on the mistranscription log: it appends per voice turn and rides the
@@ -28,6 +28,8 @@ export interface ReviewFlag {
 
 export interface PipelineToolDeps {
 	getGraph: () => Graph;
+	assertActive?: () => void;
+	voiceEvidence?: VoiceEvidence;
 	embed: EmbedFn;
 	getSttLexicon: () => SttLexicon;
 	addFlag: (flag: ReviewFlag) => void;
@@ -42,14 +44,29 @@ const tool = <S extends TSchema>(t: AgentTool<S>): AgentTool<any> => t as AgentT
 
 export function createPipelineTools(deps: PipelineToolDeps): AgentTool<any>[] {
 	const { getGraph, embed, getSttLexicon, addFlag, record } = deps;
+	const aliasKey = (value: string) => value.trim().toLowerCase().replace(/[-\s]+/g, " ");
+	const flagExistingSttAliases = (transcribed: string, spoken: string): string => {
+		const terms = Object.values(getGraph().serialize().thoughts).filter(term =>
+			aliasKey(term.label) === aliasKey(spoken) && term.aliases.some(alias => aliasKey(alias) === aliasKey(transcribed)));
+		if (!terms.length) return "";
+		const description = `Rejected STT pair still routes through an alias: ${transcribed} → ${terms.map(t => t.label).join(", ")}. Alias origin is unavailable; inspect_term and remove_alias only if it came from this mistaken pairing, preserving deliberate aliases.`;
+		addFlag({kind: "stt-alias-review", description, ts: new Date().toISOString()});
+		return ` ${description}`;
+	};
 
 	// Embed a term's description and store the vector. Awaited inside the write
 	// tools so the vector lands before the tick's save; fail-soft (null keeps
 	// similar_terms string-only for this term).
 	const embedTerm = async (label: string): Promise<void> => {
-		const t = getGraph().get(label);
+		const graph = getGraph();
+		const t = graph.get(label);
 		if (!t || !t.description) return;
-		t.embedding = await embed(`${t.label}: ${t.description}`);
+		const input = `${t.label}: ${t.description}`;
+		const result = await embed(input);
+		deps.assertActive?.();
+		if (getGraph() !== graph || graph.get(label) !== t || `${t.label}: ${t.description}` !== input) return;
+		t.embedding = result?.vector ?? null;
+		t.embedding_encoder = result?.encoder ?? null;
 	};
 
 	const addTermSchema = Type.Object({
@@ -128,7 +145,7 @@ export function createPipelineTools(deps: PipelineToolDeps): AgentTool<any>[] {
 		description: Type.String({ description: "One-line description for human review." }),
 	});
 
-	return [
+	const tools = [
 		tool({
 			name: "add_term",
 			label: "Add term",
@@ -150,8 +167,8 @@ export function createPipelineTools(deps: PipelineToolDeps): AgentTool<any>[] {
 					}
 					throw e;
 				}
-				await embedTerm(label);
 				record(existed ? `updated ${label}` : `minted ${label}`);
+				await embedTerm(label);
 				return text(existed ? `Updated existing term '${label}'.` : `Minted new term '${label}'.`);
 			},
 		}),
@@ -174,8 +191,8 @@ export function createPipelineTools(deps: PipelineToolDeps): AgentTool<any>[] {
 					}
 					throw e;
 				}
-				await embedTerm(p.label);
 				record(`updated ${p.label}`);
+				await embedTerm(p.label);
 				return text(`Description of '${p.label}' updated.`);
 			},
 		}),
@@ -187,9 +204,12 @@ export function createPipelineTools(deps: PipelineToolDeps): AgentTool<any>[] {
 				"mistranscription) that routes to an existing term.",
 			parameters: aliasSchema,
 			execute: async (_id, p: Static<typeof aliasSchema>) => {
+				if (getSttLexicon().mistranscriptions.some(m => m.status === "rejected" && aliasKey(m.transcribed) === aliasKey(p.alias) && aliasKey(m.spoken) === aliasKey(p.term))) {
+					throw new Error("This alias reproduces a rejected STT pairing. Inspect the rejection; flag for human review if a deliberate alias has an independent justification.");
+				}
 				if (!getGraph().addAlias(p.term, p.alias)) {
 					throw new Error(
-						`could not add alias '${p.alias}' to '${p.term}' (missing term, or the alias collides with an existing label/alias)`,
+						`could not add alias '${p.alias}' to '${p.term}' (missing or undescribed target, blank or mechanically equivalent alias, or another term owns this label/alias); inspect_term and correct the conflicting input`,
 					);
 				}
 				record(`aliased ${p.alias} → ${p.term}`);
@@ -218,10 +238,10 @@ export function createPipelineTools(deps: PipelineToolDeps): AgentTool<any>[] {
 			parameters: renameSchema,
 			execute: async (_id, p: Static<typeof renameSchema>) => {
 				if (!getGraph().rename(p.from, p.to)) {
-					throw new Error(`rename failed (missing '${p.from}' or '${p.to}' already exists)`);
+					throw new Error(`rename failed (missing source, blank target, or target owned by an existing label/alias); inspect the terms before retrying`);
 				}
-				await embedTerm(p.to);
 				record(`renamed ${p.from} → ${p.to}`);
+				await embedTerm(p.to);
 				return text(`Renamed '${p.from}' → '${p.to}'.`);
 			},
 		}),
@@ -235,7 +255,7 @@ export function createPipelineTools(deps: PipelineToolDeps): AgentTool<any>[] {
 			parameters: mergeSchema,
 			execute: async (_id, p: Static<typeof mergeSchema>) => {
 				if (!getGraph().merge(p.loser, p.survivor)) {
-					throw new Error(`merge failed (missing term, or same term twice)`);
+					throw new Error(`merge failed (missing term, same term twice, or described loser into undescribed survivor); inspect both terms, then describe the survivor or reverse the merge`);
 				}
 				record(`merged ${p.loser} → ${p.survivor}`);
 				return text(`Merged '${p.loser}' into '${p.survivor}'.`);
@@ -301,7 +321,14 @@ export function createPipelineTools(deps: PipelineToolDeps): AgentTool<any>[] {
 			parameters: mistranscriptionSchema,
 			execute: async (_id, p: Static<typeof mistranscriptionSchema>) => {
 				const lex = getSttLexicon();
+				const evidence = deps.voiceEvidence;
+				if (!evidence || !p.transcribed.trim() || !phrasePattern(p.transcribed).test(evidence.rawText)) throw new Error("Log requires a matching span in this voice turn's raw transcript. Typed text and corrected output are not STT evidence.");
+				if (lex.mistranscriptions.some(m => m.status === "rejected" && m.transcribed.toLowerCase() === p.transcribed.toLowerCase() && m.spoken.toLowerCase() === p.spoken.toLowerCase())) throw new Error("This pair was rejected. Do not reinterpret an intentional word or nickname as an STT error.");
+				const prior = lex.mistranscriptions.find(m => m.utteranceId === evidence.utteranceId && m.transcribed.toLowerCase() === p.transcribed.toLowerCase());
+				if (prior && prior.spoken.toLowerCase() !== p.spoken.toLowerCase()) throw new Error("This utterance already has a different proposed correction. Inspect it and use correct_mistranscription.");
+				if (prior) return text(`Already logged this utterance; independent occurrences: ${mistranscriptionCount(lex, p.spoken, p.transcribed)}.`);
 				lex.mistranscriptions.push({
+					utteranceId: evidence.utteranceId, rawText: evidence.rawText, status: "accepted",
 					spoken: p.spoken,
 					transcribed: p.transcribed,
 					kind: p.kind,
@@ -309,7 +336,8 @@ export function createPipelineTools(deps: PipelineToolDeps): AgentTool<any>[] {
 					ts: new Date().toISOString(),
 				});
 				if (lex.mistranscriptions.length > MISTRANSCRIPTION_LOG_MAX) {
-					lex.mistranscriptions = lex.mistranscriptions.slice(-MISTRANSCRIPTION_LOG_MAX);
+					const rejected = lex.mistranscriptions.filter(m => m.status === "rejected");
+					lex.mistranscriptions = [...rejected, ...lex.mistranscriptions.filter(m => m.status !== "rejected").slice(-MISTRANSCRIPTION_LOG_MAX)];
 				}
 				const count = mistranscriptionCount(lex, p.spoken, p.transcribed);
 				record(`logged STT: ${p.transcribed} → ${p.spoken} (${p.kind}, seen ${count}×)`);
@@ -327,7 +355,10 @@ export function createPipelineTools(deps: PipelineToolDeps): AgentTool<any>[] {
 				"your auto-vs-manual policy before using.",
 			parameters: autoReplaceSchema,
 			execute: async (_id, p: Static<typeof autoReplaceSchema>) => {
+				await validateAutoReplace(p.from, p.to);
+				deps.assertActive?.();
 				const lex = getSttLexicon();
+				if (!lex.mistranscriptions.some(m => m.status !== "rejected" && m.utteranceId && m.transcribed.toLowerCase() === p.from.toLowerCase() && m.spoken.toLowerCase() === p.to.toLowerCase())) throw new Error("Log a supported raw-utterance correction first. A dictionary lookup alone does not establish what was spoken.");
 				if (lex.autoReplace.some((r) => r.from.toLowerCase() === p.from.toLowerCase())) {
 					throw new Error(`a rule for '${p.from}' already exists`);
 				}
@@ -335,6 +366,26 @@ export function createPipelineTools(deps: PipelineToolDeps): AgentTool<any>[] {
 				record(`auto-replace: "${p.from}" → "${p.to}"`);
 				return text(`Auto-replace rule added: "${p.from}" → "${p.to}".`);
 			},
+		}),
+		tool({
+			name: "inspect_term", label: "Inspect term", description: "Read an existing term's full description, aliases and matching settings before modifying it.", parameters: labelSchema,
+			execute: async (_id, p) => { const term = getGraph().get(p.label); return text(term ? JSON.stringify(term) : `No term '${p.label}'.`); },
+		}),
+		tool({
+			name: "inspect_stt", label: "Inspect STT", description: "Read logged corrections and replacement rules for a transcribed phrase, including evidence and rejected entries.", parameters: Type.Object({transcribed: Type.String()}),
+			execute: async (_id, p) => text(JSON.stringify({entries: getSttLexicon().mistranscriptions.filter(m => m.transcribed.toLowerCase() === p.transcribed.toLowerCase()), rules: getSttLexicon().autoReplace.filter(r => r.from.toLowerCase() === p.transcribed.toLowerCase())})),
+		}),
+		tool({
+			name: "remove_auto_replace_rule", label: "Remove STT rule", description: "Disable a replacement without deleting its speech evidence.", parameters: Type.Object({from: Type.String()}),
+			execute: async (_id, p) => { const lex = getSttLexicon(); lex.autoReplace = lex.autoReplace.filter(r => r.from.toLowerCase() !== p.from.toLowerCase()); record(`removed STT rule: ${p.from}`); return text("Rule removed (or already absent)."); },
+		}),
+		tool({
+			name: "correct_mistranscription", label: "Correct STT log", description: "Correct the proposed spoken form for a logged utterance. Removes its old auto rule; a corrected rule must pass add_auto_replace_rule separately.", parameters: Type.Object({utterance_id: Type.String(), transcribed: Type.String(), spoken: Type.String()}),
+			execute: async (_id, p) => { const lex = getSttLexicon(); const row = lex.mistranscriptions.find(m => m.utteranceId === p.utterance_id && m.transcribed.toLowerCase() === p.transcribed.toLowerCase()); if (!row) throw new Error("No matching utterance. Use inspect_stt to obtain its identity."); if (!p.spoken.trim()) throw new Error("Spoken form must be nonempty."); row.spoken = p.spoken.trim(); row.notes = undefined; row.status = "accepted"; lex.autoReplace = lex.autoReplace.filter(r => r.from.toLowerCase() !== p.transcribed.toLowerCase()); record(`corrected STT log: ${p.transcribed}`); return text("Log corrected; replacement disabled pending validation."); },
+		}),
+		tool({
+			name: "reject_mistranscription", label: "Reject STT pair", description: "Reject a mistaken pairing, preserving its evidence and disabling its auto rule. Use for intentional words, nicknames or unsupported semantic corrections.", parameters: Type.Object({transcribed: Type.String(), spoken: Type.String()}),
+			execute: async (_id, p) => { const lex = getSttLexicon(); const rows = lex.mistranscriptions.filter(m => m.transcribed.toLowerCase() === p.transcribed.toLowerCase() && m.spoken.toLowerCase() === p.spoken.toLowerCase()); if (!rows.length) throw new Error("No matching pair. Inspect the STT log first."); for (const row of rows) row.status = "rejected"; lex.autoReplace = lex.autoReplace.filter(r => !(r.from.toLowerCase() === p.transcribed.toLowerCase() && r.to.toLowerCase() === p.spoken.toLowerCase())); record(`rejected STT pair: ${p.transcribed}`); return text("Pair rejected; matching rule disabled." + flagExistingSttAliases(p.transcribed, p.spoken)); },
 		}),
 		tool({
 			name: "flag_for_review",
@@ -355,4 +406,8 @@ export function createPipelineTools(deps: PipelineToolDeps): AgentTool<any>[] {
 			},
 		}),
 	];
+	return tools.map(t => ({ ...t, execute: async (...args: Parameters<typeof t.execute>) => {
+		deps.assertActive?.();
+		return t.execute(...args);
+	}}));
 }

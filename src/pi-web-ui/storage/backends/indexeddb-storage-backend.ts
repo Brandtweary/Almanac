@@ -1,5 +1,7 @@
 import type { IndexedDBConfig, StorageBackend, StorageTransaction } from "../types.js";
 
+type RunRequest = <T>(operation: () => IDBRequest<T>) => Promise<T>;
+
 /**
  * IndexedDB implementation of StorageBackend.
  * Provides multi-store key-value storage with transactions and quota management.
@@ -61,23 +63,11 @@ export class IndexedDBStorageBackend implements StorageBackend {
 	}
 
 	async set<T = unknown>(storeName: string, key: string, value: T): Promise<void> {
-		const db = await this.getDB();
-		const tx = db.transaction(storeName, "readwrite");
-		const store = tx.objectStore(storeName);
-		// If store has keyPath, only pass value (in-line key)
-		// Otherwise pass both value and key (out-of-line key)
-		if (store.keyPath) {
-			await this.promisifyRequest(store.put(value));
-		} else {
-			await this.promisifyRequest(store.put(value, key));
-		}
+		await this.transaction([storeName], "readwrite", (tx) => tx.set(storeName, key, value));
 	}
 
 	async delete(storeName: string, key: string): Promise<void> {
-		const db = await this.getDB();
-		const tx = db.transaction(storeName, "readwrite");
-		const store = tx.objectStore(storeName);
-		await this.promisifyRequest(store.delete(key));
+		await this.transaction([storeName], "readwrite", (tx) => tx.delete(storeName, key));
 	}
 
 	async keys(storeName: string, prefix?: string): Promise<string[]> {
@@ -125,10 +115,9 @@ export class IndexedDBStorageBackend implements StorageBackend {
 	}
 
 	async clear(storeName: string): Promise<void> {
-		const db = await this.getDB();
-		const tx = db.transaction(storeName, "readwrite");
-		const store = tx.objectStore(storeName);
-		await this.promisifyRequest(store.clear());
+		await this.runTransaction([storeName], "readwrite", (tx, request) =>
+			request(() => tx.objectStore(storeName).clear()).then(() => undefined),
+		);
 	}
 
 	async has(storeName: string, key: string): Promise<boolean> {
@@ -144,32 +133,80 @@ export class IndexedDBStorageBackend implements StorageBackend {
 		mode: "readonly" | "readwrite",
 		operation: (tx: StorageTransaction) => Promise<T>,
 	): Promise<T> {
+		return this.runTransaction(storeNames, mode, async (idbTx, request) => {
+			const storageTx: StorageTransaction = {
+				has: async (storeName, key) =>
+					(await request(() => idbTx.objectStore(storeName).getKey(key))) !== undefined,
+				get: async <T>(storeName: string, key: string) => {
+					const store = idbTx.objectStore(storeName);
+					const result = await request(() => store.get(key));
+					return (result ?? null) as T | null;
+				},
+				set: async <T>(storeName: string, key: string, value: T) => {
+					const store = idbTx.objectStore(storeName);
+					// If store has keyPath, only pass value (in-line key)
+					// Otherwise pass both value and key (out-of-line key)
+					if (store.keyPath) {
+						await request(() => store.put(value));
+					} else {
+						await request(() => store.put(value, key));
+					}
+				},
+				delete: async (storeName: string, key: string) => {
+					const store = idbTx.objectStore(storeName);
+					await request(() => store.delete(key));
+				},
+			};
+
+			return operation(storageTx);
+		});
+	}
+
+	private async runTransaction<T>(
+		storeNames: string[],
+		mode: "readonly" | "readwrite",
+		operation: (tx: IDBTransaction, request: RunRequest) => Promise<T>,
+	): Promise<T> {
 		const db = await this.getDB();
-		const idbTx = db.transaction(storeNames, mode);
-
-		const storageTx: StorageTransaction = {
-			get: async <T>(storeName: string, key: string) => {
-				const store = idbTx.objectStore(storeName);
-				const result = await this.promisifyRequest(store.get(key));
-				return (result ?? null) as T | null;
-			},
-			set: async <T>(storeName: string, key: string, value: T) => {
-				const store = idbTx.objectStore(storeName);
-				// If store has keyPath, only pass value (in-line key)
-				// Otherwise pass both value and key (out-of-line key)
-				if (store.keyPath) {
-					await this.promisifyRequest(store.put(value));
-				} else {
-					await this.promisifyRequest(store.put(value, key));
-				}
-			},
-			delete: async (storeName: string, key: string) => {
-				const store = idbTx.objectStore(storeName);
-				await this.promisifyRequest(store.delete(key));
-			},
+		const tx = db.transaction(storeNames, mode);
+		const completion = new Promise<void>((resolve, reject) => {
+			tx.oncomplete = () => resolve();
+			tx.onabort = () => reject(tx.error ?? new DOMException("Transaction aborted", "AbortError"));
+		});
+		let pending = true;
+		const queued: Array<() => void> = [];
+		const runRequest: RunRequest = (operation) => new Promise((resolve, reject) => {
+			if (!pending) {
+				reject(new DOMException("Transaction callback has finished", "TransactionInactiveError"));
+				return;
+			}
+			queued.push(() => {
+				try { this.promisifyRequest(operation()).then(resolve, reject); }
+				catch (error) { reject(error); }
+			});
+		});
+		// IndexedDB auto-commits between tasks without a pending request. Keep the
+		// callback's writes reversible even when it awaits other asynchronous work.
+		const keepAlive = () => {
+			const request = tx.objectStore(storeNames[0]).get(0);
+			request.onsuccess = () => {
+				// Requests queued after an unrelated await must run inside an active
+				// IndexedDB event, not the callback's potentially inactive task.
+				for (const run of queued.splice(0)) run();
+				if (pending) keepAlive();
+			};
 		};
-
-		return operation(storageTx);
+		keepAlive();
+		const result = Promise.resolve().then(() => operation(tx, runRequest)).finally(() => { pending = false; });
+		try {
+			const [value] = await Promise.all([result, completion]);
+			return value;
+		} catch (error) {
+			pending = false;
+			try { tx.abort(); } catch { /* The transaction already completed or aborted. */ }
+			await completion.catch(() => undefined);
+			throw error;
+		}
 	}
 
 	async getQuotaInfo(): Promise<{ usage: number; quota: number; percent: number }> {

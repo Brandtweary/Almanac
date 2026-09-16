@@ -3,15 +3,23 @@
 // memory is built on. A keyword router over evergreen descriptions: no edges,
 // no graph traversal.
 
-import { depluralize, stemText, stemWord, tokenize } from "./stem";
+import { depluralize, normalizeForMatch, stripPluralS, stemText, stemWord, tokenize } from "./stem";
 import { DESCRIPTION_WORD_CAP } from "./config";
-import { boundaryAssertions, escapeRegExp } from "../regex-utils";
-import type { GraphAsset, TermMatch, Thought } from "./types";
+import { escapeRegExp } from "../regex-utils";
+import { validVector, type GraphAsset, type TermMatch, type Thought } from "./types";
 
 interface TermEntry {
 	node_id: string;
 	no_stem: boolean;
+	case_sensitive?: boolean;
+	surface: string;
+	via: "label" | "alias";
 }
+
+const isAcronym = (surface: string): boolean => /^[A-Z]{2,}$/.test(surface);
+const mechanicalKey = (surface: string): string => surface.trim().toLowerCase().replace(/[-\s]+/g, " ");
+const normalizeWords = (text: string, normalize: (word: string) => string): string =>
+	text.replace(/[\p{L}\p{N}_]+/gu, normalize);
 
 function nowIso(): string {
 	return new Date().toISOString();
@@ -47,14 +55,41 @@ export class Graph {
 
 	// -- load() -----------------------------------------------------------
 	private load(asset: GraphAsset): void {
-		for (const [id, t] of Object.entries(asset.thoughts)) {
-			// Defend against a malformed import bricking the whole store: skip a row
-			// with no usable label, and trust the map key as the canonical id (a
-			// key ≠ t.id would otherwise make the entry invisible to get()).
-			if (typeof t.label !== "string") continue;
-			if (!Array.isArray(t.aliases)) t.aliases = [];
-			t.id = id;
-			this.thoughts.set(id, t);
+		const record = (value: unknown): value is Record<string, unknown> =>
+			value !== null && typeof value === "object" && !Array.isArray(value);
+		if (!record(asset) || !record(asset.meta) || !record(asset.thoughts) ||
+				asset.meta.version !== 2 || !Number.isInteger(asset.meta.node_count) ||
+				asset.meta.node_count !== Object.keys(asset.thoughts).length || typeof asset.meta.last_modified !== "string") {
+			throw new Error("Invalid memory asset metadata or term collection");
+		}
+		const labels = new Set<string>();
+		const validated: Thought[] = [];
+		for (const [id, raw] of Object.entries(asset.thoughts)) {
+			if (!record(raw) || raw.id !== id || !id || typeof raw.label !== "string" || !raw.label.trim() ||
+					!(raw.description === null || typeof raw.description === "string") ||
+					!(raw.entity_type === null || typeof raw.entity_type === "string") ||
+					!Array.isArray(raw.aliases) || !raw.aliases.every(a => typeof a === "string" && a.trim()) ||
+					!Number.isSafeInteger(raw.hit_count) || raw.hit_count < 0 ||
+					!(raw.metadata === null || record(raw.metadata)) ||
+					(raw.metadata !== null && raw.metadata.no_stem !== undefined && typeof raw.metadata.no_stem !== "boolean") ||
+					[raw.created_at, raw.updated_at, raw.last_fired].some(v => v !== undefined && typeof v !== "string")) {
+				throw new Error(`Invalid memory term '${id}'`);
+			}
+			const key = raw.label.toLowerCase();
+			if (labels.has(key)) throw new Error(`Duplicate memory label '${raw.label}'`);
+			labels.add(key);
+			this.validateDescriptionLength(raw.description, raw.label);
+			const t = structuredClone(raw) as unknown as Thought;
+			// Legacy or malformed vectors cannot establish their encoder space. The
+			// description remains intact and is available to string-only dedup.
+			if (!validVector(t.embedding) || typeof t.embedding_encoder !== "string" || !t.embedding_encoder.trim()) {
+				t.embedding = null;
+				t.embedding_encoder = null;
+			}
+			validated.push(t);
+		}
+		for (const t of validated) {
+			this.thoughts.set(t.id, t);
 			this.labelIndex.set(t.label.toLowerCase(), t.id);
 			this.indexStem(t);
 		}
@@ -116,16 +151,24 @@ export class Graph {
 		this.termMulti = [];
 	}
 
+	private aliasOwner(surface: string, exceptId?: string): Thought | undefined {
+		return [...this.thoughts.values()].find(t => t.id !== exceptId &&
+			t.aliases.some(alias => mechanicalKey(alias) === mechanicalKey(surface)));
+	}
+
 	// getOrCreate — label-upsert; on collision only description / entity_type
 	// are updated. 100-word cap enforced before write. A description change
 	// nulls the stored embedding (stale until re-embedded on the write path).
 	getOrCreate(label: string, description?: string | null, entityType?: string | null): Thought {
+		if (!label.trim()) throw new Error("Term label must not be empty");
 		const existing = this.get(label);
 		if (existing) {
 			if (description != null && existing.description !== description) {
+				if (!description.trim() && existing.aliases.length) throw new Error("Cannot clear a description while aliases route to it");
 				this.validateDescriptionLength(description, label);
 				existing.description = description;
 				existing.embedding = null;
+				existing.embedding_encoder = null;
 				this.touch(existing);
 				this.invalidateTermIndex(); // null→value changes term-index membership
 			}
@@ -135,6 +178,7 @@ export class Graph {
 			}
 			return existing;
 		}
+		if (this.aliasOwner(label)) throw new Error(`Label '${label}' is already an alias of another term`);
 		this.validateDescriptionLength(description, label);
 		const now = nowIso();
 		const t: Thought = {
@@ -157,16 +201,16 @@ export class Graph {
 		return t;
 	}
 
-	/** Add an alias (alternative surface form) to a term. Returns false when the
-	 * alias is already the label or alias of some term. */
+	/** Add a distinct surface form to a described term, preserving acronym case.
+	 * Undescribed targets and mechanical/colliding routes are refused. */
 	addAlias(label: string, alias: string): boolean {
 		const t = this.get(label);
-		if (!t) return false;
-		const a = alias.trim().toLowerCase();
-		if (!a || a === t.label.toLowerCase()) return false;
-		if (this.labelIndex.has(a)) return false; // collides with another term's label
+		if (!t || !t.description?.trim()) return false;
+		const a = alias.trim();
+		if (!a || mechanicalKey(a) === mechanicalKey(t.label)) return false;
+		if ([...this.thoughts.values()].some(other => mechanicalKey(other.label) === mechanicalKey(a))) return false;
 		for (const other of this.thoughts.values()) {
-			if (other.aliases.includes(a)) return false;
+			if (other.aliases.some(value => mechanicalKey(value) === mechanicalKey(a))) return false;
 		}
 		t.aliases.push(a);
 		this.touch(t);
@@ -178,7 +222,7 @@ export class Graph {
 		const t = this.get(label);
 		if (!t) return false;
 		const a = alias.trim().toLowerCase();
-		const idx = t.aliases.indexOf(a);
+		const idx = t.aliases.findIndex(value => value.toLowerCase() === a);
 		if (idx < 0) return false;
 		t.aliases.splice(idx, 1);
 		this.touch(t);
@@ -190,9 +234,12 @@ export class Graph {
 	rename(oldLabel: string, newLabel: string): boolean {
 		const t = this.get(oldLabel);
 		if (!t) return false;
-		if (this.get(newLabel)) return false; // target label taken
+		if (!newLabel.trim() || this.get(newLabel) || this.aliasOwner(newLabel, t.id)) return false; // target route taken
 		this.unindex(t);
 		t.label = newLabel;
+		t.aliases = t.aliases.filter(alias => mechanicalKey(alias) !== mechanicalKey(newLabel));
+		t.embedding = null;
+		t.embedding_encoder = null;
 		this.touch(t);
 		this.labelIndex.set(newLabel.toLowerCase(), t.id);
 		this.indexStem(t);
@@ -202,32 +249,23 @@ export class Graph {
 
 	/** Merge the loser term into the survivor: the loser's label + aliases become
 	 * survivor aliases, hit counts sum, the loser is deleted. The survivor's
-	 * description wins (update it separately if it should absorb detail). */
+	 * description wins; a merge cannot discard the only nonempty description. */
 	merge(loserLabel: string, survivorLabel: string): boolean {
 		const loser = this.get(loserLabel);
 		const survivor = this.get(survivorLabel);
 		if (!loser || !survivor || loser.id === survivor.id) return false;
+		if (loser.description?.trim() && !survivor.description?.trim()) return false;
 		this.unindex(loser);
 		this.thoughts.delete(loser.id);
-		const taken = new Set(survivor.aliases);
-		const survivorLabelLc = survivor.label.toLowerCase();
-		for (const a of [loser.label.toLowerCase(), ...loser.aliases]) {
-			if (a === survivorLabelLc || taken.has(a)) continue;
-			// Global alias-uniqueness (matching addAlias): never absorb an alias
-			// already owned by another term as its label or alias — that would
-			// double-route the surface form.
-			if (this.labelIndex.has(a)) continue;
-			let heldByOther = false;
-			for (const other of this.thoughts.values()) {
-				if (other.id === survivor.id) continue;
-				if (other.aliases.includes(a)) {
-					heldByOther = true;
-					break;
-				}
-			}
-			if (heldByOther) continue;
-			survivor.aliases.push(a);
-			taken.add(a);
+		for (const alias of [loser.label, ...loser.aliases]) {
+			// Bare stubs carry inert aliases until a description makes them routable.
+			if (survivor.description?.trim()) this.addAlias(survivor.label, alias);
+			else if (
+				mechanicalKey(alias) !== mechanicalKey(survivor.label) &&
+				![...this.thoughts.values()].some(other =>
+					mechanicalKey(other.label) === mechanicalKey(alias) ||
+					other.aliases.some(a => mechanicalKey(a) === mechanicalKey(alias)))
+			) survivor.aliases.push(alias);
 		}
 		survivor.hit_count = (survivor.hit_count ?? 0) + (loser.hit_count ?? 0);
 		this.touch(survivor);
@@ -255,7 +293,7 @@ export class Graph {
 
 	// Serialize to the GraphAsset shape for IndexedDB persistence.
 	serialize(): GraphAsset {
-		const thoughts: Record<string, Thought> = {};
+		const thoughts: Record<string, Thought> = Object.create(null);
 		let nodeCount = 0;
 		for (const [id, t] of this.thoughts) {
 			thoughts[id] = t;
@@ -283,7 +321,7 @@ export class Graph {
 			const hit =
 				t.label.toLowerCase().includes(q) ||
 				(t.description ?? "").toLowerCase().includes(q) ||
-				t.aliases.some((a) => a.includes(q));
+				t.aliases.some((a) => a.toLowerCase().includes(q));
 			if (hit) {
 				results.push({ label: t.label, description: t.description ?? "", hit_count: t.hit_count });
 			}
@@ -298,7 +336,7 @@ export class Graph {
 		// colliding, or a later label reusing an earlier term's alias key) coexist
 		// instead of last-writer-wins silently shadowing one of them.
 		const termIndex = new Map<string, TermEntry[]>();
-		const push = (key: string, entry: TermEntry): void => {
+		const record = (key: string, entry: TermEntry): void => {
 			let list = termIndex.get(key);
 			if (!list) {
 				list = [];
@@ -307,12 +345,21 @@ export class Graph {
 			if (!list.some((e) => e.node_id === entry.node_id)) list.push(entry);
 		};
 
+		const push = (key: string, entry: TermEntry): void => {
+			record(key, entry);
+			if (!entry.case_sensitive && entry.no_stem) {
+				record(normalizeWords(key, depluralize), entry);
+				record(normalizeWords(key, stripPluralS), entry);
+			}
+		};
+
 		for (const t of this.thoughts.values()) {
-			if (!t.description) continue;
+			if (!t.description?.trim()) continue;
 
 			const noStem = t.metadata?.no_stem ?? true; // default: exact match
-			const preparedKey = noStem ? t.label.toLowerCase() : stemText(t.label);
-			push(preparedKey, { node_id: t.id, no_stem: noStem });
+			const caseSensitive = isAcronym(t.label);
+			const preparedKey = caseSensitive ? t.label : noStem ? normalizeForMatch(t.label) : stemText(t.label);
+			push(preparedKey, { node_id: t.id, no_stem: noStem || caseSensitive, case_sensitive: caseSensitive, surface: t.label, via: "label" });
 
 			// Auto-alias: labels carrying internal punctuation the tokenizer splits on
 			// (hyphens, apostrophes, …) get a space-separated variant, so a form typed
@@ -320,7 +367,7 @@ export class Graph {
 			// space-joined shape the query side rejoins to.
 			const labelJoined = tokenize(t.label).join(" ");
 			if (labelJoined.includes(" ") && labelJoined !== preparedKey) {
-				push(noStem ? labelJoined : stemText(labelJoined), { node_id: t.id, no_stem: noStem });
+				push(noStem ? labelJoined : stemText(labelJoined), { node_id: t.id, no_stem: noStem, surface: t.label, via: "label" });
 			}
 
 			// Explicit aliases (spoken variants, abbreviations, persistent
@@ -328,20 +375,21 @@ export class Graph {
 			// same space-separated variant as labels (a hyphenated/apostrophe'd key
 			// never matches the tokenizer's split words otherwise).
 			for (const alias of t.aliases) {
-				const preparedAlias = alias.toLowerCase();
-				push(preparedAlias, { node_id: t.id, no_stem: true });
+				const caseSensitive = isAcronym(alias);
+				const preparedAlias = caseSensitive ? alias : normalizeForMatch(alias);
+				push(preparedAlias, { node_id: t.id, no_stem: true, case_sensitive: caseSensitive, surface: alias, via: "alias" });
 				const aliasJoined = tokenize(alias).join(" ");
 				if (aliasJoined.includes(" ") && aliasJoined !== preparedAlias) {
-					push(aliasJoined, { node_id: t.id, no_stem: true });
+					push(aliasJoined, { node_id: t.id, no_stem: true, surface: alias, via: "alias" });
 				}
 			}
 		}
 
-		// Split into single-word (dict lookup) and multi-word (regex).
+		// Only tokenizer-compatible keys use lookup; punctuation requires literal matching.
 		this.termSingle = new Map();
 		this.termMulti = [];
 		for (const [key, entries] of termIndex) {
-			if (key.includes(" ")) {
+			if (!/^[\p{L}\p{N}_]+$/u.test(key)) {
 				for (const data of entries) this.termMulti.push([key, data]);
 			} else {
 				this.termSingle.set(key, entries);
@@ -357,30 +405,44 @@ export class Graph {
 	// -- termMatch() ------------------------------------------------------
 	termMatch(text: string): TermMatch[] {
 		this.ensureTermIndex();
-		const lowercased = text.toLowerCase();
+		const lowercased = normalizeForMatch(text);
 		const matchedIds = new Set<string>();
+		const matchedRoutes = new Map<string, TermEntry>();
+		const noteMatch = (entry: TermEntry): void => {
+			matchedIds.add(entry.node_id);
+			// One bounded route per term; a canonical label route outranks aliases.
+			if (!matchedRoutes.has(entry.node_id) || entry.via === "label") {
+				matchedRoutes.set(entry.node_id, entry);
+			}
+		};
 
 		const tokensLower = new Set(tokenize(lowercased));
 		// Depluralized variants — always applied to exact (no_stem) matching so a
 		// spoken S-plural ("graphs") still finds the singular label ("graph").
-		const tokensSingular = new Set([...tokensLower].map((t) => depluralize(t)));
+		const tokensSingular = new Set([...tokensLower].flatMap((t) => [depluralize(t), stripPluralS(t)]));
 
 		// Fast path: single-word exact (no_stem) matches.
 		for (const token of new Set([...tokensLower, ...tokensSingular])) {
 			const entries = this.termSingle.get(token);
 			if (entries) {
 				for (const data of entries) {
-					if (data.no_stem) matchedIds.add(data.node_id);
+					if (data.no_stem && !data.case_sensitive) noteMatch(data);
 				}
 			}
 		}
+		for (const token of text.match(/[\p{L}\p{N}_]+/gu) ?? []) {
+			for (const entry of this.termSingle.get(token) ?? []) {
+				if (entry.case_sensitive) noteMatch(entry);
+			}
+		}
+
 		// Single-word stemmed matches (opt-in only).
 		const tokensStemmed = new Set([...tokensLower].map((t) => stemWord(t)));
 		for (const stemmedToken of tokensStemmed) {
 			const entries = this.termSingle.get(stemmedToken);
 			if (entries) {
 				for (const data of entries) {
-					if (!data.no_stem) matchedIds.add(data.node_id);
+					if (!data.no_stem) noteMatch(data);
 				}
 			}
 		}
@@ -395,16 +457,16 @@ export class Graph {
 		// Depluralized text so a multi-word exact key ("term store") still
 		// matches an S-pluralized phrase ("term stores") in the input.
 		const singularText = tokenize(lowercased).map((t) => depluralize(t)).join(" ");
+		const simpleText = normalizeWords(lowercased, stripPluralS);
 		for (const [preparedKey, data] of this.termMulti) {
-			const [lead, trail] = boundaryAssertions(preparedKey);
-			const pattern = new RegExp(`${lead}${escapeRegExp(preparedKey)}${trail}`);
+			const pattern = new RegExp(`(?<![\\p{L}\\p{N}_])${escapeRegExp(preparedKey)}(?![\\p{L}\\p{N}_])`, "u");
 			if (data.no_stem) {
-				if (pattern.test(lowercased) || pattern.test(rejoinedText) || pattern.test(singularText)) {
-					matchedIds.add(data.node_id);
+				if (pattern.test(lowercased) || pattern.test(rejoinedText) || pattern.test(singularText) || pattern.test(simpleText)) {
+					noteMatch(data);
 				}
 			} else {
 				if (stemmedTextCache === null) stemmedTextCache = stemText(lowercased);
-				if (pattern.test(stemmedTextCache)) matchedIds.add(data.node_id);
+				if (pattern.test(stemmedTextCache)) noteMatch(data);
 			}
 		}
 
@@ -414,6 +476,8 @@ export class Graph {
 			const node = this.thoughts.get(nodeId);
 			if (!node || !node.description) continue;
 			results.push({
+				matched_surface: matchedRoutes.get(nodeId)!.surface,
+				matched_via: matchedRoutes.get(nodeId)!.via,
 				label: node.label,
 				description: node.description,
 				hit_count: node.hit_count,

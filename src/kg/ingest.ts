@@ -52,11 +52,18 @@ export function makeCompletion(opts: CompletionOpts): CompletionFn {
 			throw new Error(`completion failed: ${res.status} ${await res.text()}`);
 		}
 		const data = await res.json();
+		const choice = data?.choices?.[0];
+		if (!choice || typeof choice.message?.content !== "string") {
+			throw new Error("completion returned no text response");
+		}
+		if (choice.finish_reason !== "stop") {
+			throw new Error(`completion did not finish successfully: ${choice.finish_reason ?? "missing finish reason"}`);
+		}
 		const u = data?.usage;
 		if (u && opts.onUsage) {
 			opts.onUsage({ promptTokens: u.prompt_tokens ?? 0, completionTokens: u.completion_tokens ?? 0 });
 		}
-		return data?.choices?.[0]?.message?.content ?? "";
+		return choice.message.content;
 	};
 }
 

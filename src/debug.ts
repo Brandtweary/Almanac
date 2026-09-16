@@ -45,13 +45,11 @@ export function dbg(...args: unknown[]): void {
 }
 
 export function dbgWarn(...args: unknown[]): void {
-	if (!import.meta.env?.DEV) return;
 	ORIG.warn("%c[myriapod]", STYLE, ...args);
 	ship("WARN", args);
 }
 
 export function dbgError(...args: unknown[]): void {
-	if (!import.meta.env?.DEV) return;
 	ORIG.error("%c[myriapod]", STYLE, ...args);
 	ship("ERROR", args);
 }

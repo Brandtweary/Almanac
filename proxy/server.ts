@@ -166,13 +166,21 @@ app.get("/v1/web-search", async (c) => {
 		return c.json({ error: `searxng ${res.status}` }, 502);
 	}
 
-	const data = (await res.json()) as { results?: Array<Record<string, unknown>> };
-	const results = (data.results ?? []).slice(0, limit).map((r) => ({
+	const data = await res.json().catch(() => null);
+	if (!data || !Array.isArray(data.results) || data.results.some((r: unknown) =>
+		!r || typeof r !== "object" || typeof (r as Record<string, unknown>).url !== "string")) {
+		return c.json({ error: "invalid searxng response" }, 502);
+	}
+	const degraded = Array.isArray(data.unresponsive_engines) && data.unresponsive_engines.length > 0;
+	if (degraded && data.results.length === 0) {
+		return c.json({ error: "search engines failed; empty results are inconclusive" }, 502);
+	}
+	const results = data.results.slice(0, limit).map((r: Record<string, unknown>) => ({
 		title: (r.title as string) || "Untitled",
 		url: r.url as string,
 		snippet: (r.content as string) || (r.abstract as string) || "",
 	}));
-	return c.json({ results });
+	return c.json({ results, degraded });
 });
 
 // In-memory per-IP sliding-window rate limit for the open embed passthrough.
@@ -268,11 +276,26 @@ const rateMapSweeper = setInterval(() => {
 }, RATE_MAP_SWEEP_MS);
 rateMapSweeper.unref?.();
 
+// Identity is read around each batch so a backend restart cannot attach the
+// preceding encoder's lineage to newly generated vectors.
+async function embeddingIdentity(signal: AbortSignal): Promise<string> {
+	const response = await fetch(`${config.embedBase}/info`, { signal });
+	if (!response.ok) throw new Error(`embedding metadata HTTP ${response.status}`);
+	const info = await response.json();
+	if (!info || typeof info.model_id !== "string" || !info.model_id ||
+		typeof info.model_sha !== "string" || !/^[a-f0-9]{40}$/i.test(info.model_sha)) {
+		throw new Error("embedding backend must pin --revision to an immutable model commit");
+	}
+	return JSON.stringify({ model_id: info.model_id, model_sha: info.model_sha,
+		model_type: info.model_type, max_input_length: info.max_input_length,
+		version: info.version, serving_sha: info.sha, model_dtype: info.model_dtype, normalize: true });
+}
+
 // Open (rate-limited) embedding passthrough. Proxies text to the self-hosted
 // embedding-inference container and returns the vectors — the browser can't reach
 // the GPU-host localhost directly, and CORS forbids a cross-origin call. Mirrors
-// the HF text-embeddings-inference `/embed` contract: {inputs: string[]} in, a
-// number[][] out. NOT metered (self-hosted/free). Used by the memory pipeline's
+// the input contract is {inputs: string[]}; output adds encoder lineage to the
+// validated vectors as {encoder, embeddings}. NOT metered. Used by the memory pipeline's
 // mint-time dedup (one call per term write).
 app.post("/v1/embed", async (c) => {
 	if (embedRateLimited(clientIp(c))) {
@@ -284,7 +307,10 @@ app.post("/v1/embed", async (c) => {
 	} catch {
 		return c.json({ error: "invalid JSON body" }, 400);
 	}
-	const inputs = Array.isArray(body.inputs) ? body.inputs.filter((s) => typeof s === "string") : [];
+	if (!body || !Array.isArray(body.inputs) || body.inputs.some((s) => typeof s !== "string")) {
+		return c.json({ error: "inputs must be a string array" }, 400);
+	}
+	const inputs = body.inputs;
 	if (!inputs.length) return c.json({ error: "missing inputs (string[])" }, 400);
 	// Bound the passthrough — it's an open door to a GPU host; CORS is not access control.
 	if (inputs.length > EMBED_MAX_INPUTS) {
@@ -295,12 +321,15 @@ app.post("/v1/embed", async (c) => {
 	}
 
 	let res: Response;
+	let encoder: string;
+	const signal = AbortSignal.timeout(15000);
 	try {
+		encoder = await embeddingIdentity(signal);
 		res = await fetch(`${config.embedBase}/embed`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ inputs }),
-			signal: AbortSignal.timeout(15000),
+			body: JSON.stringify({ inputs, truncate: false, normalize: true }),
+			signal,
 		});
 	} catch (err) {
 		console.error("[proxy] embed fetch failed:", err);
@@ -309,8 +338,20 @@ app.post("/v1/embed", async (c) => {
 	if (!res.ok) {
 		return c.json({ error: `embed backend ${res.status}` }, 502);
 	}
-	// text-embeddings-inference returns number[][] directly; pass it through.
-	return c.json((await res.json()) as number[][]);
+	const vectors = await res.json().catch(() => null);
+	const dimension = Array.isArray(vectors?.[0]) ? vectors[0].length : 0;
+	if (!Array.isArray(vectors) || vectors.length !== inputs.length || !dimension ||
+		vectors.some((v: unknown) => !Array.isArray(v) || v.length !== dimension ||
+			v.some((n: unknown) => typeof n !== "number" || !Number.isFinite(n)))) {
+		return c.json({ error: "invalid embedding response" }, 502);
+	}
+	try {
+		if (await embeddingIdentity(signal) !== encoder) throw new Error("encoder changed during batch");
+	} catch (err) {
+		console.error("[proxy] embedding identity failed:", err);
+		return c.json({ error: "embedding identity unavailable or changed" }, 502);
+	}
+	return c.json({ encoder, embeddings: vectors });
 });
 
 // Feature-release email capture (About page). Open + rate-limited — a public form.
@@ -423,6 +464,14 @@ app.post("/v1/chat/completions", async (c) => {
 		body = JSON.parse(raw);
 	} catch {
 		return c.json({ error: "invalid JSON body" }, 400);
+	}
+
+	if (!body || typeof body !== "object" || Array.isArray(body)) {
+		return c.json({ error: "request must be a JSON object" }, 400);
+	}
+	if (body.max_tokens !== undefined &&
+		(typeof body.max_tokens !== "number" || !Number.isSafeInteger(body.max_tokens) || body.max_tokens <= 0)) {
+		return c.json({ error: "max_tokens must be a positive integer" }, 400);
 	}
 
 	// --- Resolve principal by bearer (spend-only — grants happen at /anon-init) ---
