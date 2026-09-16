@@ -1,6 +1,6 @@
 import "./test-env";
 import { afterEach, beforeAll, expect, test } from "bun:test";
-import { forwardCompletion } from "./openrouter";
+import { forwardCompletion, mintSubKey } from "./openrouter";
 let app: typeof import("./server").app;
 let db: typeof import("./server").db;
 const originalFetch = globalThis.fetch;
@@ -101,4 +101,36 @@ test("TEI info requires a pinned weight revision and preserves model_dtype", asy
    expect(encoder.model_sha).not.toBe(liveShape.sha);
   }
  }
+});
+
+test("public JSON handlers reject non-object roots without granting or storing", async () => {
+ const count = db.newIpGrantsToday();
+ let sequence = 1;
+ for (const endpoint of ["/subscribe", "/anon-init", "/redeem"]) {
+  for (const body of [null, [], "text", 5, false]) {
+   const response = await app.request(endpoint, { method: "POST", headers: { "Content-Type": "application/json", "x-forwarded-for": `198.51.100.${sequence++}` }, body: JSON.stringify(body) });
+   expect(response.status).toBe(400);
+  }
+ }
+ expect(db.newIpGrantsToday()).toBe(count);
+});
+
+test("provisioning rejects malformed success and preserves valid credentials", async () => {
+ const options = { base: "https://example.invalid", provisioningKey: "test", name: "test", limit: 10 };
+ for (const bad of [null, [], 1, {}, { key: 9 }, { key: " " }, { key: "valid", data: null }, { key: "valid", data: { hash: false } }]) {
+  upstream(bad);
+  await expect(mintSubKey(options)).rejects.toThrow();
+ }
+ upstream({ key: "valid", data: { hash: "hash" } });
+ expect(await mintSubKey(options)).toEqual({ key: "valid", hash: "hash" });
+});
+
+test("anon-init empty-body continuity is explicit and invalid JSON is refused", async () => {
+ db.createPrincipal({ id: "empty-body-contract", type: "token", upstreamKey: "test", credit: 10, tier: "family" });
+ const headers = { Authorization: "Bearer empty-body-contract", "x-forwarded-for": "203.0.113.190" };
+ const empty = await app.request("/anon-init", { method: "POST", headers });
+ expect(empty.status).toBe(200);
+ expect((await empty.json()).token).toBe("empty-body-contract");
+ const malformed = await app.request("/anon-init", { method: "POST", headers, body: "{" });
+ expect(malformed.status).toBe(400);
 });

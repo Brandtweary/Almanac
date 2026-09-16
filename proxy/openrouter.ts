@@ -166,7 +166,16 @@ export async function mintSubKey(opts: {
 	if (!res.ok) {
 		throw new Error(`provisioning failed: ${res.status} ${await res.text()}`);
 	}
-	const data = (await res.json()) as { key?: string; data?: { hash?: string } };
-	if (!data.key) throw new Error("provisioning response missing key");
-	return { key: data.key, hash: data.data?.hash ?? "" };
+	const data: unknown = await res.json();
+	if (!data || typeof data !== "object" || Array.isArray(data) || !("key" in data) ||
+		typeof data.key !== "string" || !data.key.trim()) throw new Error("invalid provisioning key response");
+	let hash = "";
+	if ("data" in data && data.data !== undefined) {
+		if (!data.data || typeof data.data !== "object" || Array.isArray(data.data)) throw new Error("invalid provisioning metadata");
+		if ("hash" in data.data) {
+			if (typeof data.data.hash !== "string" || !data.data.hash.trim()) throw new Error("invalid provisioning key hash");
+			hash = data.data.hash;
+		}
+	}
+	return { key: data.key, hash };
 }

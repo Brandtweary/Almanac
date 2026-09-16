@@ -367,6 +367,9 @@ app.post("/subscribe", async (c) => {
 	} catch {
 		return c.json({ error: "invalid JSON body" }, 400);
 	}
+	if (!body || typeof body !== "object" || Array.isArray(body)) {
+		return c.json({ error: "request must be a JSON object" }, 400);
+	}
 	const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
 	if (!email || email.length > EMAIL_MAX_CHARS || !EMAIL_RE.test(email)) {
 		return c.json({ error: "invalid email" }, 400);
@@ -382,9 +385,14 @@ app.post("/subscribe", async (c) => {
 app.post("/anon-init", async (c) => {
 	let body: Record<string, unknown> = {};
 	try {
-		body = (await c.req.json()) as Record<string, unknown>;
+		const raw = await c.req.text();
+		// An absent body permits token continuity, but cannot pass fresh-grant gates.
+		if (raw.trim()) body = JSON.parse(raw);
 	} catch {
-		// tolerate an empty/absent body — the gates below will fail closed
+		return c.json({ error: "invalid JSON body" }, 400);
+	}
+	if (!body || typeof body !== "object" || Array.isArray(body)) {
+		return c.json({ error: "request must be a JSON object" }, 400);
 	}
 	const presented = bearerOf(c) || (typeof body.token === "string" ? body.token : "");
 	const ip = clientIp(c);
@@ -650,6 +658,9 @@ app.post("/redeem", async (c) => {
 		body = await c.req.json();
 	} catch {
 		return c.json({ error: "invalid JSON body" }, 400);
+	}
+	if (!body || typeof body !== "object" || Array.isArray(body)) {
+		return c.json({ error: "request must be a JSON object" }, 400);
 	}
 	const code = typeof body.code === "string" ? body.code.trim() : "";
 	if (!code) return c.json({ error: "missing code" }, 400);

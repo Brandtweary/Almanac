@@ -1,3 +1,4 @@
+import { grantToken, hostedBalance, voiceLeaseResponse, serviceError } from "./service-contracts.js";
 import {
 	Agent,
 	type AgentMessage,
@@ -231,11 +232,11 @@ async function redeemFamilyCode(code: string): Promise<{ ok: boolean; error?: st
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ code }),
 		});
-		const data = (await res.json().catch(() => ({}))) as { token?: string; error?: string };
-		if (!res.ok || !data.token) {
-			return { ok: false, error: data.error ?? `HTTP ${res.status}` };
+		const data: unknown = await res.json().catch(() => null);
+		if (!res.ok) {
+			return { ok: false, error: serviceError(data, `HTTP ${res.status}`) };
 		}
-		await providerKeys.set(FAMILY_TOKEN_SLOT, data.token);
+		await providerKeys.set(FAMILY_TOKEN_SLOT, grantToken(data));
 		dbg("family code redeemed; token stored (family mode applies on the next new chat)");
 		return { ok: true };
 	} catch (err) {
@@ -260,7 +261,7 @@ async function fetchHostedBalance(): Promise<{
 		}
 		const res = await fetch(`${MYRIAPOD_PROXY_ORIGIN}/balance`, { headers });
 		if (!res.ok) return null;
-		return (await res.json()) as { tier: string; remaining: number; grant: number };
+		return hostedBalance(await res.json());
 	} catch {
 		return null;
 	}
@@ -280,12 +281,12 @@ async function initAnonGrant(signals: { honeypot: string; elapsedMs: number }): 
 			},
 			body: JSON.stringify({ ...signals, botd: botdVerdict }),
 		});
-		const data = (await res.json().catch(() => ({}))) as { token?: string; error?: string };
-		if (!res.ok || !data.token) {
-			dbg(`anon-init refused: ${data.error ?? `HTTP ${res.status}`}`);
+		const data: unknown = await res.json().catch(() => null);
+		if (!res.ok) {
+			dbg(`anon-init refused: ${serviceError(data, `HTTP ${res.status}`)}`);
 			return null;
 		}
-		return data.token;
+		return grantToken(data);
 	} catch (err) {
 		dbgError("anon-init failed", err);
 		return null;
@@ -1913,14 +1914,13 @@ async function initApp() {
 			dbgError("voice lease error status:", res.status);
 			return "skip";
 		}
-		let data: { leaseId?: string; ttsUrl?: string; heartbeatSec?: number };
+		let data: ReturnType<typeof voiceLeaseResponse>;
 		try {
-			data = await res.json();
+			data = voiceLeaseResponse(await res.json());
 		} catch (err) {
 			dbgError("voice lease parse failed:", err);
 			return "skip";
 		}
-		if (!data.leaseId || !data.ttsUrl) return "skip";
 		// A freshly-minted lease may point at a different TTS endpoint than the previous
 		// one (e.g. after a TTL-drop). Tear down the cached synth so ensureSynth rebuilds
 		// it against the leased URL.

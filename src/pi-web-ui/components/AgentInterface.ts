@@ -41,6 +41,7 @@ export class AgentInterface extends LitElement {
 	@query("streaming-message-container") private _streamingContainer!: StreamingMessageContainer;
 
 	private _autoScroll = true;
+	private _sendingSessions = new WeakSet<Agent>();
 	private _lastScrollTop = 0;
 	private _lastClientHeight = 0;
 	private _scrollContainer?: HTMLElement;
@@ -245,51 +246,52 @@ export class AgentInterface extends LitElement {
 	};
 
 	public async sendMessage(input: string, attachments?: Attachment[]) {
-		if ((!input.trim() && attachments?.length === 0) || this.session?.state.isStreaming) return;
+		const submittedAttachments = attachments ? [...attachments] : [];
+		if (!input.trim() && submittedAttachments.length === 0) return;
 		const session = this.session;
 		if (!session) throw new Error("No session set on AgentInterface");
 		if (!session.state.model) throw new Error("No model set on AgentInterface");
-
-		// Check if API key exists for the provider (only needed in direct mode)
-		const provider = session.state.model.provider;
-		const apiKey = await getAppStorage().providerKeys.get(provider);
-
-		// If no API key, prompt for it
-		if (!apiKey) {
-			if (!this.onApiKeyRequired) {
-				console.error("No API key configured and no onApiKeyRequired handler set");
-				return;
+		if (session.state.isStreaming || this._sendingSessions.has(session)) return;
+		this._sendingSessions.add(session);
+		const editor = this._messageEditor;
+		const isCurrent = () => this.session === session && !session.state.isStreaming;
+		try {
+			const provider = session.state.model.provider;
+			const apiKey = await getAppStorage().providerKeys.get(provider);
+			if (!isCurrent()) return;
+			if (!apiKey) {
+				if (!this.onApiKeyRequired) {
+					console.error("No API key configured and no onApiKeyRequired handler set");
+					return;
+				}
+				const success = await this.onApiKeyRequired(provider);
+				if (!isCurrent() || !success) return;
+			}
+			if (this.onBeforeSend) {
+				await this.onBeforeSend();
+				if (!isCurrent()) return;
 			}
 
-			const success = await this.onApiKeyRequired(provider);
-
-			// If still no API key, abort the send
-			if (!success) {
-				return;
+			// Only remove the submitted draft; edits made during preflight belong to
+			// the next send, including attachment changes on the same array instance.
+			if (editor && this._messageEditor === editor && editor.value === input &&
+				editor.attachments.length === submittedAttachments.length &&
+				editor.attachments.every((attachment, i) => attachment === submittedAttachments[i])) {
+				editor.value = "";
+				editor.attachments = [];
 			}
-		}
-
-		// Call onBeforeSend hook before sending
-		if (this.onBeforeSend) {
-			await this.onBeforeSend();
-		}
-
-		// Only clear editor after we know we can send
-		this._messageEditor.value = "";
-		this._messageEditor.attachments = [];
-		this._autoScroll = true; // Enable auto-scroll when sending a message
-
-		// Compose message with attachments if any
-		if (attachments && attachments.length > 0) {
-			const message: UserMessageWithAttachments = {
-				role: "user-with-attachments",
-				content: input,
-				attachments,
-				timestamp: Date.now(),
-			};
-			await this.session?.prompt(message);
-		} else {
-			await this.session?.prompt(input);
+			this._autoScroll = true;
+			if (submittedAttachments.length > 0) {
+				const message: UserMessageWithAttachments = {
+					role: "user-with-attachments", content: input,
+					attachments: submittedAttachments, timestamp: Date.now(),
+				};
+				await session.prompt(message);
+			} else {
+				await session.prompt(input);
+			}
+		} finally {
+			this._sendingSessions.delete(session);
 		}
 	}
 

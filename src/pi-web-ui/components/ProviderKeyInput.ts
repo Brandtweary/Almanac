@@ -42,8 +42,9 @@ export class ProviderKeyInput extends LitElement {
 
 	private async checkKeyStatus() {
 		try {
-			const key = await getAppStorage().providerKeys.get(this.provider);
-			this.hasKey = !!key;
+			const provider = this.provider;
+			const key = await getAppStorage().providerKeys.get(provider);
+			if (this.provider === provider) this.hasKey = !!key;
 		} catch (error) {
 			console.error("Failed to check key status:", error);
 		}
@@ -82,25 +83,32 @@ export class ProviderKeyInput extends LitElement {
 	}
 
 	private async saveKey() {
-		if (!this.keyInput) return;
+		if (!this.keyInput || this.testing) return;
+		const provider = this.provider;
+		const key = this.keyInput;
+		const isCurrent = () => this.provider === provider && this.keyInput === key;
 
 		this.testing = true;
 		this.failed = false;
 
-		const success = await this.testApiKey(this.provider, this.keyInput);
+		const success = await this.testApiKey(provider, key);
 
 		this.testing = false;
+		if (!isCurrent()) return;
 
 		if (success) {
 			try {
-				await getAppStorage().providerKeys.set(this.provider, this.keyInput);
+				await getAppStorage().providerKeys.set(provider, key);
+				if (!isCurrent()) return;
 				this.hasKey = true;
 				this.inputChanged = false;
 				this.requestUpdate();
 			} catch (error) {
 				console.error("Failed to save API key:", error);
+				if (!isCurrent()) return;
 				this.failed = true;
 				setTimeout(() => {
+					if (!isCurrent()) return;
 					this.failed = false;
 					this.requestUpdate();
 				}, 5000);
@@ -108,6 +116,7 @@ export class ProviderKeyInput extends LitElement {
 		} else {
 			this.failed = true;
 			setTimeout(() => {
+				if (!isCurrent()) return;
 				this.failed = false;
 				this.requestUpdate();
 			}, 5000);
