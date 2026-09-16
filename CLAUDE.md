@@ -185,7 +185,7 @@ string-only). Run it with `bun run server.ts`; it binds `HOST`/`PORT`, defaultin
     `() => Graph` accessor (the store is reassigned on import/delete).
   - **web-tools.ts** — the browser half of `web_search` (a `fetch` to the proxy's `/v1/web-search` +
     the `AgentTool` + renderer). Registered on **every** serving path — web search is universal.
-  - **debug.ts** — `[myriapod]`-prefixed instrumentation (dev-only).
+  - **debug.ts** — `[myriapod]`-prefixed warnings/errors in every build, plus dev-only log shipping and diagnostics.
   - **theme.css** / **app.css** — a black / white-text / neon-green palette over pi-web-ui's tokens.
   - **pi-web-ui/** — the vendored `@earendil-works/pi-web-ui` UI layer (the abandoned upstream, copied
     from its shipped TS source: `ChatPanel`, `components/`, `dialogs/`, `storage/`, `tools/`, `utils/`,
