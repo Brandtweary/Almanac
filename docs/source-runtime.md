@@ -123,7 +123,7 @@ docker run --detach --name almanac-content-qdrant --pull never \
   "$QDRANT_IMAGE"
 ```
 
-This local-directory TEI recipe uses the exact seven inspected snapshot files and the pinned serving image. The existing encoder deployment used the equivalent cached model-ID lookup; a fresh encoder `/model` startup is not separately claimed as a recorded smoke test. In local-directory mode, `/info` reports `/model` as runtime identity and the pinned revision as model identity. When creating the content profile, supply `--encoder-id sentence-transformers/all-MiniLM-L6-v2` so the portable model identity remains distinct from its container mount. Do not point the library at a temporary benchmark Qdrant directory.
+This local-directory TEI recipe passed a fresh CPU smoke with the exact seven verified files, the pinned image, networking disabled, one CPU and 2 GiB RAM: startup took 2.079 seconds and one finite 384-dimensional embedding took 0.158 seconds. This validates the encoder startup path, not a whole-machine offline installation. In local-directory mode, `/info` reports `/model` as runtime identity and the pinned revision as model identity. When creating the content profile, supply `--encoder-id sentence-transformers/all-MiniLM-L6-v2` so the portable model identity remains distinct from its container mount. Do not point the library at a temporary benchmark Qdrant directory.
 
 ## Start and warm transcription
 
