@@ -342,6 +342,16 @@ class NativeReader:
             # injected OR would be another required word, not an operator.
             safe = " ".join(re.findall(r"[^\W_]+", query))
             paths = await zim.search(str(self.path), safe, limit) if safe else []
+            # Full-text BM25 can bury a long article beneath pages repeating its
+            # title. The archive's title index supplies an exact navigation hit.
+            title = query.strip().replace("_", " ")
+            for candidate in dict.fromkeys((title, title[:1].upper() + title[1:])):
+                try:
+                    entry = self.archive.get_entry_by_title(candidate)
+                except KeyError:
+                    continue
+                paths = [entry.path, *(path for path in paths if path != entry.path)][:limit]
+                break
         return await asyncio.to_thread(self._localize, paths, query, limit, document_id)
 
     def _localize(self, paths, query, limit, document_id):

@@ -60,8 +60,7 @@ export class ProviderKeyInput extends LitElement {
 			if (!model) return false;
 
 			// Get proxy URL from settings (if available)
-			const proxyEnabled = await getAppStorage().settings.get<boolean>("proxy.enabled");
-			const proxyUrl = await getAppStorage().settings.get<string>("proxy.url");
+			const { enabled: proxyEnabled, url: proxyUrl } = await getAppStorage().settings.getProxyConfig();
 
 			// Apply proxy only if this provider/key combination requires it
 			model = applyProxyIfNeeded(model, apiKey, proxyEnabled ? proxyUrl || undefined : undefined);

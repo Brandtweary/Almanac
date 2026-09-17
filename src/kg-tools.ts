@@ -16,7 +16,7 @@ const memorySearchRenderer: ToolRenderer = {
 				isCustom: false,
 			};
 		}
-		return { content: renderHeader(state, Search, "Searching memory…"), isCustom: false };
+		return { content: renderHeader(state, Search, result?.isError ? "Memory search failed" : "Searching memory…"), isCustom: false };
 	},
 };
 
@@ -31,7 +31,7 @@ const memoryDumpRenderer: ToolRenderer = {
 				isCustom: false,
 			};
 		}
-		return { content: renderHeader(state, Database, "Reading memory…"), isCustom: false };
+		return { content: renderHeader(state, Database, result?.isError ? "Memory read failed" : "Reading memory…"), isCustom: false };
 	},
 };
 

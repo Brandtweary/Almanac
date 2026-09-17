@@ -6,7 +6,7 @@ Browser-local voice/text agent with optional personal memory and a mandatory bac
 - Corpus knowledge and personal memory have independent stores and lifecycles: reference tools remain available when personal memory is off.
 - The whole local runtime uses a pinned release profile with measured model, tokenizer, tool-parser, context and resource settings; candidate qualification is explicitly labelled and never reports production readiness.
 - Published repository: keep private paths, hosts, workspace notes, live memories and credentials out of tracked files; preserve upstream software and content attributions.
-- The owner authors About prose; README, installation and reference documentation describe actual capabilities.
+- About explains verified product capabilities and hosting/privacy boundaries; it contains no owner biography. README, installation and reference documentation describe actual capabilities.
 
 ## Architecture and documentation
 
@@ -52,12 +52,7 @@ vendored components, and are load-bearing, not cruft:
   covers newSession AND loadSession.
 - **Listener async-safety** — core awaits each listener; a throw or heavy work stalls the run. The
   whole listener body is try/caught and only re-renders on meaningful events.
-- **Link-href scrubbing** — mini-lit's `MarkdownBlock` renders assistant markdown via `unsafeHTML`
-  with no href-scheme check, and it bundles its own `marked` instance we can't hook. Since it renders
-  into light DOM, `sanitizeChatAnchors()` scrubs chat anchors after each commit (driven off terminal
-  lifecycle events + `repaintChatAfterExternalEdit`), stripping the href from any link whose scheme
-  isn't `http(s)`/`mailto` (the model is fed third-party web-search text, so a `javascript:` link is
-  an XSS vector).
+- **Conversation markup** — `SafeMarkdown` sanitizes parsed markdown before DOM insertion while preserving code blocks, MathML and corpus citation handles; `sanitizeChatAnchors()` resolves those handles against the evidence ledger after each commit. Document previews sanitize detached parser output before attachment, and imported attachments share live-ingress resource limits.
 
 ## Development
 

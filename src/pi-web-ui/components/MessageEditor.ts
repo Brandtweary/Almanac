@@ -1,3 +1,4 @@
+import { MAX_ATTACHMENTS, MAX_ATTACHMENT_BYTES, validAttachments } from "../../attachment-limits.js";
 import { EDITOR_READY_EVENT } from "../../editor-controls.js";
 import type { Model } from "@earendil-works/pi-ai";
 import { icon } from "@mariozechner/mini-lit";
@@ -28,6 +29,13 @@ export class MessageEditor extends LitElement {
 		this.requestUpdate("value", oldValue);
 	}
 
+	public insertSuggestion(text: string): boolean {
+		if (this.disabled || this.isStreaming || this.processingFiles || this.value !== "" || this.attachments.length) return false;
+		this.value = text;
+		this.textareaRef.value?.focus();
+		return true;
+	}
+
 	@property() isStreaming = false;
 	@property({ type: Boolean }) disabled = false;
 	@property() currentModel?: Model<any>;
@@ -42,8 +50,8 @@ export class MessageEditor extends LitElement {
 	@property() onThinkingChange?: (level: "off" | "minimal" | "low" | "medium" | "high") => void;
 	@property() onFilesChange?: (files: Attachment[]) => void;
 	@property() attachments: Attachment[] = [];
-	@property() maxFiles = 10;
-	@property() maxFileSize = 20 * 1024 * 1024; // 20MB
+	@property() maxFiles = MAX_ATTACHMENTS;
+	@property() maxFileSize = MAX_ATTACHMENT_BYTES;
 	@property() acceptedTypes =
 		"image/*,application/pdf,.docx,.pptx,.xlsx,.xls,.txt,.md,.json,.xml,.html,.css,.js,.ts,.jsx,.tsx,.yml,.yaml";
 
@@ -94,7 +102,9 @@ export class MessageEditor extends LitElement {
 						alert(`${file.name} exceeds maximum size of ${Math.round(this.maxFileSize / 1024 / 1024)}MB`);
 						continue;
 					}
-					added.push(await loadAttachment(file));
+					const attachment = await loadAttachment(file);
+					if (!validAttachments([...this.attachments, ...added, attachment])) throw new Error("Attachment content exceeds the supported limits");
+					added.push(attachment);
 				} catch (error) {
 					console.error(`Error processing ${file.name}:`, error);
 					alert(`Failed to process ${file.name}: ${String(error)}`);
@@ -170,6 +180,13 @@ export class MessageEditor extends LitElement {
 		await this.ingestFiles(Array.from(e.dataTransfer?.files ?? []));
 	};
 
+	override updated(changed: Map<string, unknown>) {
+		if (["value", "attachments", "processingFiles"].some(key => changed.has(key))) {
+			this.dispatchEvent(new CustomEvent("composer-draft-change", { bubbles: true,
+				detail: this.value !== "" || this.attachments.length > 0 || this.processingFiles }));
+		}
+	}
+
 	override firstUpdated() {
 		this.dispatchEvent(new CustomEvent(EDITOR_READY_EVENT, { bubbles: true }));
 		const textarea = this.textareaRef.value;
@@ -223,7 +240,7 @@ export class MessageEditor extends LitElement {
 				<textarea
 					?disabled=${this.disabled}
 					class="w-full bg-transparent p-4 text-foreground placeholder-muted-foreground outline-none resize-none overflow-y-auto"
-					placeholder=${i18n("Type a message...")}
+					placeholder="Ask a question…"
 					rows="1"
 					style="max-height: 200px; field-sizing: content; min-height: 1lh; height: auto;"
 					.value=${this.value}

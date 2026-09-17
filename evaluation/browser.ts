@@ -1,4 +1,5 @@
 /** Run the stock browser subset; credentials stay in the loopback developer bridge. */
+import type {PriorBudget} from "./campaign-budget.js";
 import { chromium, type Page } from "playwright";
 import {readFileSync,writeFileSync,appendFileSync,mkdirSync,existsSync,readdirSync,cpSync} from "node:fs";
 import {createHash} from "node:crypto";
@@ -22,7 +23,7 @@ async function send(page:Page,text:string){const editor=page.getByPlaceholder("T
 async function chooseConsent(page:Page,enabled:boolean){await page.getByRole("button",{name:enabled?"Yes, remember":"No thanks",exact:true}).click({timeout:15000});}
 async function closeDialog(page:Page){await page.keyboard.press("Escape");}
 function publishedJobs(state:any){return (state.pipeline??[]).find((value:any)=>value&&typeof value==="object"&&Array.isArray(value.jobs));}
-export async function runBrowserSubset(options:{candidate:BrowserCandidate;output:string;apiKey?:string;scripted?:boolean;only?:string[]}){
+export async function runBrowserSubset(options:{candidate:BrowserCandidate;output:string;priorBudget?:PriorBudget;apiKey?:string;scripted?:boolean;only?:string[]}){
  if(existsSync(options.output))throw new Error("Use a fresh browser receipt directory");mkdirSync(options.output,{recursive:true});
  const suite=JSON.parse(readFileSync(new URL("./browser-scenarios.json",import.meta.url),"utf8"));
  const fixtures=JSON.parse(readFileSync(new URL("./fixtures.json",import.meta.url),"utf8"));
@@ -30,7 +31,7 @@ export async function runBrowserSubset(options:{candidate:BrowserCandidate;outpu
  const library=new FixtureLibrary(Object.entries(fixtures.contexts).filter(([id])=>development.has(id)).map(([,c])=>c) as any[]);
  let activeCase="initialization";
  cpSync(`${root}/dist`,`${options.output}/application`,{recursive:true});
- const bridge=await startBrowserBridge({dist:`${options.output}/application`,candidate:options.candidate,library,apiKey:options.apiKey,scripted:options.scripted,onReceiptEvent:event=>appendFileSync(`${options.output}/requests.jsonl`,JSON.stringify({caseId:activeCase,event})+"\n")});
+ const bridge=await startBrowserBridge({dist:`${options.output}/application`,output:options.output,priorBudget:options.priorBudget,candidate:options.candidate,library,apiKey:options.apiKey,scripted:options.scripted,onReceiptEvent:event=>appendFileSync(`${options.output}/requests.jsonl`,JSON.stringify({caseId:activeCase,event})+"\n")});
  const browserEnv={...process.env};delete browserEnv.OPENROUTER_API_KEY;
  const browser=await chromium.launch({headless:true,env:browserEnv,args:["--use-fake-device-for-media-stream","--use-fake-ui-for-media-stream"]});const cases:any[]=[];
  const revision=execFileSync("git",["rev-parse","HEAD"],{cwd:root,encoding:"utf8"}).trim();
@@ -107,7 +108,9 @@ if(process.argv[1]&&resolvePath(process.argv[1])===fileURLToPath(import.meta.url
  const [profilePath,output,...flags]=process.argv.slice(2);if(!profilePath||!output)throw new Error("Usage: tsx evaluation/browser.ts PROFILE.json NEW_OUTPUT_DIRECTORY [--contracts-only]");
  const candidate=JSON.parse(readFileSync(profilePath,"utf8"));const casesArg=flags.find(flag=>flag.startsWith("--cases="));
  const only=flags.includes("--contracts-only")?["browser-cancel-waiting","browser-cancel-executing"]:casesArg?casesArg.slice(8).split(","):undefined;
- const result=await runBrowserSubset({candidate,output,apiKey:process.env.OPENROUTER_API_KEY,scripted:flags.includes("--contracts-only"),only});
+ const priorArg=flags.find(flag=>flag.startsWith("--prior-budget="));
+ const priorBudget=priorArg?JSON.parse(readFileSync(priorArg.slice(15),"utf8")):undefined;
+ const result=await runBrowserSubset({candidate,output,priorBudget,apiKey:process.env.OPENROUTER_API_KEY,scripted:flags.includes("--contracts-only"),only});
  console.log(JSON.stringify({cases:result.cases.map((c:any)=>({id:c.caseId,status:c.status})),reportedCostUSD:result.reportedCostUSD,unknownBilling:result.unknownBilling}));
 }
 function resolvePath(value:string){return fileURLToPath(new URL(value,`file://${process.cwd()}/`));}

@@ -12,6 +12,23 @@ export class SettingsStore extends Store {
 		};
 	}
 
+	async getProxyConfig(): Promise<{ enabled: boolean; url: string }> {
+		return this.getBackend().transaction(["settings"], "readonly", async tx => ({
+			enabled: (await tx.get<boolean>("settings", "proxy.enabled")) ?? false,
+			url: (await tx.get<string>("settings", "proxy.url")) ?? "http://localhost:3001",
+		}));
+	}
+
+	async setProxyConfig(config: { enabled: boolean; url: string }): Promise<void> {
+		const { enabled, url } = config;
+		if (typeof enabled !== "boolean" || typeof url !== "string") throw new Error("Invalid proxy configuration");
+		if (enabled && !/^https?:$/.test(new URL(url).protocol)) throw new Error("Proxy URL must use HTTP or HTTPS");
+		await this.getBackend().transaction(["settings"], "readwrite", async tx => {
+			await tx.set("settings", "proxy.enabled", enabled);
+			await tx.set("settings", "proxy.url", url);
+		});
+	}
+
 	async get<T>(key: string): Promise<T | null> {
 		return this.getBackend().get("settings", key);
 	}

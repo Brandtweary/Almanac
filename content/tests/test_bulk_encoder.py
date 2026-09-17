@@ -84,3 +84,43 @@ def test_unnegotiated_worker_keeps_parent_overflow_guard():
         finally:
             await encoder.close()
     asyncio.run(run())
+
+
+@pytest.mark.parametrize('phase,mode', [('handshake','cancel'), ('handshake','malformed'),
+    ('batch','cancel'), ('batch','timeout'), ('batch','malformed')])
+def test_uncertain_exchange_reaps_worker_and_cannot_reuse_reply(phase, mode):
+    p = profile(request_timeout=.03)
+    good = command(p)
+    script = good[-1]
+    if phase == 'handshake':
+        script = 'import time\n' + ('print("bad json",flush=True)\n' if mode == 'malformed' else '') + 'time.sleep(60)\n'
+    else:
+        script = script[:script.index('for line')]
+        script += 'import time\nsys.stdin.readline()\n'
+        script += 'print("bad json",flush=True)\n' if mode == 'malformed' else 'time.sleep(60)\n'
+    async def run():
+        encoder = ProcessEncoder([sys.executable, '-u', '-c', script], p, Tokens())
+        task = asyncio.create_task(encoder.start())
+        while encoder.process is None:
+            await asyncio.sleep(.001)
+        process = encoder.process
+        if phase == 'batch':
+            await task
+            task = asyncio.create_task(encoder.encode(['one']))
+        if mode == 'cancel':
+            await asyncio.sleep(.01)
+            task.cancel()
+            await asyncio.sleep(0)
+            task.cancel()
+        expected = asyncio.CancelledError if mode == 'cancel' else (TimeoutError if mode == 'timeout' else ValueError)
+        with pytest.raises(expected):
+            await asyncio.wait_for(task, 2)
+        assert encoder.process is None
+        assert process.returncode is not None
+        with pytest.raises(ValueError, match='not started'):
+            await encoder.encode(['new request'])
+        encoder.command = good
+        await encoder.start()
+        assert await encoder.encode(['fresh']) == [[1, 0]]
+        await encoder.close()
+    asyncio.run(run())

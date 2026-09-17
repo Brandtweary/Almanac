@@ -1,6 +1,6 @@
 # Almanac stock benchmark
 
-[September 2026 hosted screening results](results/hosted-screening.md) publish the ten-candidate comparison, settings, artifact identities and admission limits.
+[Full hosted campaign and follow-up review](results/full-campaign-20260917.md) reports the completed ten-candidate study with separate research, character, memory and Bash results; the [initial hosted screen](results/hosted-screening.md) retains its earlier scope.
 
 The separate [conversation and creativity probe](creative.md) compares two frozen production personas on five qualitative development conversations; it does not alter the 49 stock scenarios or their factual scores.
 
@@ -19,8 +19,8 @@ From the repository root, with a developer-only `OPENROUTER_API_KEY` already in 
 ```bash
 ./node_modules/.bin/tsx evaluation/benchmark-run.ts --validate
 ./node_modules/.bin/tsx evaluation/benchmark-run.ts \
-  --profiles evaluation/candidates.json --output /tmp/almanac-smoke \
-  --max-spend 5 --smoke
+  --profiles /tmp/pinned-candidates.json --output /tmp/almanac-smoke \
+  --max-spend 5 --prior-budget /tmp/prior-budget.json --smoke
 ./node_modules/.bin/tsx evaluation/benchmark-run.ts \
   --contracts --output /tmp/almanac-contracts
 python3 evaluation/adjudicate.py /tmp/almanac-smoke \
@@ -36,7 +36,7 @@ python3 evaluation/adjudicate.py /tmp/almanac-smoke \
 
 The companion Markdown table distinguishes workflow checks, semantic review, critical failures, transport errors, latency and spend. Missing semantic review stays unadjudicated. API refusals/rate limits are transport failures; bad source units or attribution are answer failures; missing explicit stage outcomes and unknown source handles are protocol failures. Tentative personal facts may be retained as tentative: an `add_term` call alone does not establish false provenance.
 
-Each run pins case/profile/source/schema identities, copies a source snapshot and keeps exact requests, responses and per-case receipts. A fresh directory is required; `--resume` accepts only an unchanged suite, source, profile and limits. Experiment output budgets, reasoning settings, request limits and conservative input-byte exposure bounds are explicit profile choices, not qualified production tokenizer budgets. Unknown billing retains a conservative reserve instead of silently counting as free. Candidate catalogs/prices must be refreshed before a later model comparison; `candidates.json` records its observation date.
+The legacy stock runner also requires `--prior-budget`; direct paid browser runs require `--prior-budget=PATH` with the same cumulative-budget schema and full `prices`/`providerRouting` in the candidate profile. Each run pins case/profile/source/schema identities, copies a source snapshot including its ESM package manifest and lockfile and keeps exact requests, responses and per-case receipts. A fresh directory is required; `--resume` accepts only an unchanged suite, source, profile and limits. Experiment output budgets, reasoning settings, request limits and conservative input-byte exposure bounds are explicit profile choices, not qualified production tokenizer budgets. Unknown billing retains a conservative reserve instead of silently counting as free. Candidate catalogs/prices must be refreshed before a later model comparison; `candidates.json` records its observation date.
 
 `benchmark-run.ts --browser` accepts a single candidate profile and runs the real-browser subset through the same entry point; `browser.ts` also exports `runBrowserSubset`. [Local qualification](local.md) uses the same cases through the production gateway and native token counter; measure-only admission performs no generation. The browser subset uses the real built UI with isolated browser storage and a loopback development bridge. The bridge keeps credentials server-side and reuses the production queue and controlled library adapter. It never becomes a product cloud fallback. A built application and Playwright Chromium are required. The controlled library deliberately identifies itself as an unqualified fixture; it tests agent research workflow, not real-index retrieval quality.
 
@@ -63,7 +63,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest evaluation.test_evaluation
 ./node_modules/.bin/tsx evaluation/export-memory.ts /tmp/role-schemas.json
 ```
 
-`screen.py` is an explicit paid developer transport, requiring `OPENROUTER_API_KEY`, a JSON model list and a fresh output directory. Never point it at production personal state. It preserves exact requests, provider responses, usage, completion status and source fixture digests. The hosted screen's output/input bounds are experiment exposure limits, not release context budgets. Use separate directories for prompt/budget revisions; do not overwrite failed attempts. Provider errors are transport findings, and hosted quantization/provider behavior is not local admission.
+`screen.py` is an explicit paid developer transport, requiring `OPENROUTER_API_KEY`, a JSON list of `{id, providerRouting: {only: [provider]}}` identities and a fresh output directory. Never point it at production personal state. It preserves exact requests, provider responses, usage, completion status and source fixture digests. The hosted screen's output/input bounds are experiment exposure limits, not release context budgets. Use separate directories for prompt/budget revisions; do not overwrite failed attempts. Provider errors are transport findings, and hosted quantization/provider behavior is not local admission.
 
 Release admission also needs corpus coverage beyond these seeds, actual retrieval/reranker measurements, tool-led research, retained-role runs, target quantization/parser checks, offline installation and measured speech/LLM overlap. Infrastructure fault tests belong to the application/content suites; these evaluator tests are not their substitute.
 
@@ -71,7 +71,7 @@ Release admission also needs corpus coverage beyond these seeds, actual retrieva
 
 EPA and FEMA fixtures contain text-only US federal agency excerpts with source URLs and original-byte hashes; no logos, photographs or third-party illustrations are included. The excerpts in `workflows.json` are by Appropedia contributors and remain under [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/), separately from the code license. Each excerpt identifies its source page, whose history supplies contributor attribution; changes are whitespace normalization and excerpt selection. The surrounding questions, scoring code and original annotations follow the repository license. No source-document rights are inferred from the application's MIT license.
 
-One combined leaderboard retains separate product, research and secondary shell categories:
+One combined leaderboard retains separate product, research and secondary shell categories, with targeted-rubric passes, explicitly clean answers and additional findings counted separately:
 
 ```bash
 python3 -m evaluation.leaderboard --product /tmp/product-run \

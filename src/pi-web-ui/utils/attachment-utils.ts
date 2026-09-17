@@ -1,3 +1,5 @@
+import { MAX_ATTACHMENT_BYTES, isOfficeArchive } from "../../attachment-limits.js";
+import { assertDocumentBudget } from "./document-budget.js";
 import { parseAsync } from "docx-preview";
 import JSZip from "jszip";
 import type { PDFDocumentProxy } from "pdfjs-dist";
@@ -57,6 +59,9 @@ export async function loadAttachment(
 	} else {
 		throw new Error(i18n("Invalid source type"));
 	}
+
+	if (size > MAX_ATTACHMENT_BYTES) throw new Error("Attachment exceeds the size limit");
+	await assertDocumentBudget(arrayBuffer, isOfficeArchive(detectedFileName, mimeType), detectedFileName.toLowerCase().endsWith(".xls"));
 
 	// Convert ArrayBuffer to base64 - handle large files properly
 	const uint8Array = new Uint8Array(arrayBuffer);
@@ -137,7 +142,7 @@ export async function loadAttachment(
 			fileName: detectedFileName,
 			mimeType: mimeType.startsWith("application/vnd")
 				? mimeType
-				: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+				: detectedFileName.toLowerCase().endsWith(".xls") ? "application/vnd.ms-excel" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 			size,
 			content: base64Content,
 			extractedText,

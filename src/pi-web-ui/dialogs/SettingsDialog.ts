@@ -43,6 +43,8 @@ export class ApiKeysTab extends SettingsTab {
 @customElement("proxy-tab")
 export class ProxyTab extends SettingsTab {
 	@state() private proxyEnabled = false;
+	@state() private saveError = "";
+	private saveVersion = 0;
 	@state() private proxyUrl = "http://localhost:3001";
 
 	override async connectedCallback() {
@@ -50,8 +52,7 @@ export class ProxyTab extends SettingsTab {
 		// Load proxy settings when tab is connected
 		try {
 			const storage = getAppStorage();
-			const enabled = await storage.settings.get<boolean>("proxy.enabled");
-			const url = await storage.settings.get<string>("proxy.url");
+			const { enabled, url } = await storage.settings.getProxyConfig();
 
 			if (enabled !== null) this.proxyEnabled = enabled;
 			if (url !== null) this.proxyUrl = url;
@@ -61,12 +62,13 @@ export class ProxyTab extends SettingsTab {
 	}
 
 	private async saveProxySettings() {
+		const version = ++this.saveVersion;
+		this.saveError = "";
 		try {
 			const storage = getAppStorage();
-			await storage.settings.set("proxy.enabled", this.proxyEnabled);
-			await storage.settings.set("proxy.url", this.proxyUrl);
+			await storage.settings.setProxyConfig({ enabled: this.proxyEnabled, url: this.proxyUrl });
 		} catch (error) {
-			console.error("Failed to save proxy settings:", error);
+			if (version === this.saveVersion) this.saveError = `Proxy settings were not saved: ${String(error)}`;
 		}
 	}
 
@@ -77,6 +79,7 @@ export class ProxyTab extends SettingsTab {
 	render(): TemplateResult {
 		return html`
 			<div class="flex flex-col gap-4">
+				${this.saveError ? html`<p role="alert">${this.saveError}</p>` : ""}
 				<p class="text-sm text-muted-foreground">
 					${i18n("Allows browser-based apps to bypass CORS restrictions when calling LLM providers. Required for Z-AI and Anthropic with OAuth token.")}
 				</p>

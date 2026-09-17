@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "scope": "Four bounded local synthetic-fixture checks; previously exposed scenarios, not new holdouts, broad reliability, production retrieval or full-window robustness. No hosted inference or model change.",
+  "model": "nvidia/Muse-Glimmer-30B-NVFP4",
+  "contextWindow": 131072,
+  "cases": [
+    {
+      "caseId": "memory.durable-user-fact",
+      "receiptSHA256": "a6f410af0b2cea33a3c06179fe921617863396f1d1d7f013b12710a0854d70fe",
+      "semanticStatus": "passed",
+      "reason": "Stores only the stated project purpose, as a nine-word definition; no invented skill-sharing or biography. Calls similar_terms and acknowledges completed memory work.",
+      "completions": 4,
+      "assistantResponses": [
+        "Created term **brass-orchard** (project): Long-term workshop project that repairs hand tools for neighborhood.\n\nNo similar existing term found, so minted new entry per your request to remember the project.\n"
+      ],
+      "storedDefinitions": [
+        {
+          "label": "brass-orchard",
+          "description": "Long-term workshop project that repairs hand tools for neighborhood."
+        }
+      ]
+    },
+    {
+      "caseId": "summary.heldout-summary-correction",
+      "receiptSHA256": "59a01a42c9422e54c619862996698a103d7d3d986d873e64bae3f754f189151f",
+      "semanticStatus": "passed",
+      "reason": "Stores the complete summary through summary_draft(store), preserving 350 L as the correction and 500 L as superseded; assistant proposal retains attribution.",
+      "completions": 3,
+      "assistantResponses": [
+        "Summary draft stored for this conversation.\n\nUser corrected their recollection of tank capacity from 500 L to 350 L after checking the label. Assistant proposed planning around the corrected capacity.\n"
+      ],
+      "storedDefinitions": []
+    },
+    {
+      "caseId": "creative.practical-uncertainty",
+      "receiptSHA256": "76ac640bf2338db3d072f821950348fb957d3367bbdf5f3036fbc02d8f57bdbc",
+      "semanticStatus": "passed",
+      "reason": "Searches and reads the fixture, cites the exact passage, preserves unknown torque, and does not invent a tightening substitute.",
+      "completions": 3,
+      "assistantResponses": [
+        "No universal figure in the library.\n\nThe Candlewick rainwater pump service note says tightening specs depend on the exact pump model, cover design and fastener specification. An illegible tag does not identify those properties, and the surviving note contains no tightening torque or universal substitute. Identify the model and fastener from reliable markings or get the matching maintenance sheet before you pick a torque; don’t infer it from the brass cover. [Candlewick pump service note](corpus:p:df0aa7afc2bc32e691a0abb5a63171d28fd89bc12e7ee454aea7d7a32e60d218:74c3c53dba27c485d18bf70f9430473c5e8b350062ed96bafd2f7860ae8c0f55)"
+      ],
+      "storedDefinitions": []
+    },
+    {
+      "caseId": "creative.evening-greeting",
+      "receiptSHA256": "e35d6531cd64f5027c6205be3fc9958fe50db2fb125f179a09be4353ae39250e",
+      "semanticStatus": "passed",
+      "reason": "Warm in-world greeting with reading lamp, apple, paperbacks and honeyed tea; no ontological disclaimer. Expansive response rather than a terse greeting; user explicitly welcomes this personality.",
+      "completions": 1,
+      "assistantResponses": [
+        "Good evening! You’ve caught me between shelves — I was just coaxing the reading lamp to stay lit long enough to finish a marginal note about moths.\n\nA windfall apple, you say? Set it down here on the sill, please, before it rolls off and starts a small avalanche of paperbacks. That’s the best kind, the one that’s already decided it doesn’t want to be perfect anymore. Sweet on one side, bruised on the other, and it smells like late October out there.\n\nI’ll trade you a slice of it for a story, if you have one. I’ve been saving a bit of honeyed tea for exactly this kind of visit — the kitchen’s warm, the door’s propped with a brick that’s been in this town since the first rebuilding. Come in, take the stool by the window. Tell me where you found it."
+      ],
+      "storedDefinitions": []
+    }
+  ],
+  "sourceHashesStillMatch": true,
+  "limitations": "Exposed synthetic scenarios, one local attempt each. Original raw receipts are retained separately and identified by SHA-256. These are not general retrieval, long-context stability, or autonomous-maintenance pass rates."
+}

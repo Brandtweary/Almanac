@@ -8,7 +8,8 @@ import logging
 import os
 from pathlib import Path
 import queue
-import threading
+import multiprocessing
+from functools import partial
 from urllib.parse import parse_qs, urlsplit
 
 import msgpack
@@ -34,11 +35,81 @@ def read_message(raw: bytes | str) -> dict:
     return value
 
 
+def synthesis_worker(factory, requests, output):
+    try:
+        generate = factory()
+        output.put(("ready", None))
+        while True:
+            text = requests.get()
+            for pcm in generate(text):
+                # Bound the queue in audio frames, not model-sized chunks.
+                for start in range(0, len(pcm), 1920):
+                    output.put(("audio", pcm[start:start + 1920]))
+            output.put(("done", None))
+    except Exception:
+        logger.exception("Speech generation failed")
+        output.put(("error", None))
+
+
 class SpeechService:
-    def __init__(self, generate, timeout: float = 120):
-        self.generate = generate
+    def __init__(self, factory, timeout: float = 120):
+        self.factory = factory
+        self.worker = None
+        self.requests = None
+        self.output = None
         self.timeout = timeout
         self.lock = asyncio.Lock()
+
+    async def receive(self):
+        while True:
+            try:
+                return self.output.get_nowait()
+            except queue.Empty:
+                if not self.worker.is_alive():
+                    raise RuntimeError("Speech worker exited")
+                await asyncio.sleep(.01)
+
+    async def start(self):
+        if self.worker is not None:
+            if self.worker.is_alive():
+                return
+            await self.close()
+        ctx = multiprocessing.get_context("spawn")
+        self.requests = ctx.Queue(maxsize=1)
+        self.output = ctx.Queue(maxsize=8)
+        self.worker = ctx.Process(target=synthesis_worker,
+            args=(self.factory, self.requests, self.output), daemon=True)
+        self.worker.start()
+        if (await self.receive())[0] != "ready":
+            raise RuntimeError("Speech worker initialization failed")
+
+    async def close(self):
+        async def reap():
+            worker = self.worker
+            if worker is not None:
+                if worker.is_alive():
+                    worker.kill()
+                while worker.is_alive():
+                    await asyncio.sleep(.01)
+                if worker.pid is not None:
+                    worker.join()
+                worker.close()
+                self.worker = None
+            for channel in (self.requests, self.output):
+                if channel is not None:
+                    channel.cancel_join_thread()
+                    channel.close()
+            self.requests = self.output = None
+        task = asyncio.create_task(reap())
+        cancelled = False
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                cancelled = True
+        task.result()
+        if cancelled:
+            raise asyncio.CancelledError
 
     async def handle(self, socket):
         query = parse_qs(urlsplit(socket.request.path).query, keep_blank_values=True)
@@ -52,8 +123,8 @@ class SpeechService:
             await socket.close(1013, "Speech busy")
             return
         async with self.lock:
-            stop = threading.Event()
-            worker = None
+            complete = False
+            engaged = False
             try:
                 async with asyncio.timeout(self.timeout):
                     await socket.send(msgpack.packb({"type": "Ready"}, use_bin_type=True))
@@ -73,34 +144,22 @@ class SpeechService:
                     if not text:
                         await socket.close(1000, "No speech requested")
                         return
-                    output = queue.Queue(maxsize=8)
-                    def put(value):
-                        while not stop.is_set():
-                            try:
-                                output.put(value, timeout=.05)
-                                return
-                            except queue.Full:
-                                pass
-                    def synthesize():
-                        try:
-                            for pcm in self.generate(text):
-                                if stop.is_set():
-                                    break
-                                put(("audio", pcm))
-                        except Exception:
-                            logger.exception("Speech generation failed")
-                            put(("error", None))
-                        finally:
-                            put(("done", None))
-                    worker = threading.Thread(target=synthesize, name="speech-generation", daemon=True)
-                    worker.start()
                     closed = asyncio.create_task(socket.wait_closed())
+                    engaged = True
+                    startup = asyncio.create_task(self.start())
                     samples = 0
                     try:
+                        await asyncio.wait((startup, closed), return_when=asyncio.FIRST_COMPLETED)
+                        if closed.done():
+                            return
+                        await startup
+                        self.requests.put_nowait(text)
                         while not closed.done():
                             try:
-                                kind, value = output.get_nowait()
+                                kind, value = self.output.get_nowait()
                             except queue.Empty:
+                                if not self.worker.is_alive():
+                                    raise RuntimeError("Speech worker exited")
                                 await asyncio.sleep(.01)
                                 continue
                             if kind == "error":
@@ -110,23 +169,24 @@ class SpeechService:
                                     raise RuntimeError("Speech generation returned no audio")
                                 await socket.send(msgpack.packb({"type": "Text", "text": text, "start_s": 0, "stop_s": samples / SAMPLE_RATE}, use_bin_type=True))
                                 await socket.close(1000, "Speech complete")
+                                complete = True
                                 break
                             for start in range(0, len(value), 1920):
                                 frame = value[start:start + 1920]
                                 samples += len(frame)
                                 await socket.send(msgpack.packb({"type": "Audio", "pcm": frame}, use_bin_type=True))
                     finally:
+                        startup.cancel()
                         closed.cancel()
-                        await asyncio.gather(closed, return_exceptions=True)
+                        await asyncio.gather(startup, closed, return_exceptions=True)
             except ConnectionClosed:
                 pass
             except (ValueError, msgpack.UnpackException, TimeoutError, RuntimeError) as exc:
                 await socket.close(1011, type(exc).__name__)
             finally:
-                stop.set()
-                # Admission remains locked until the cancelled generator really exits.
-                if worker is not None:
-                    await asyncio.to_thread(worker.join)
+                if engaged and not complete:
+                    # Reap native work before another connection can use admission.
+                    await self.close()
 
 
 def load_generator(assets: Path, threads: int):
@@ -156,13 +216,24 @@ def load_generator(assets: Path, threads: int):
 
 
 async def run(args):
-    service = SpeechService(load_generator(args.assets.resolve(), args.threads))
+    service = SpeechService(partial(load_generator, args.assets.resolve(), args.threads))
+    try:
+        async with asyncio.timeout(120):
+            await service.start()
+    except BaseException:
+        await service.close()
+        raise
     async def health(connection, request):
         if request.path == "/health":
-            return connection.respond(200, json.dumps({"ready": True, "busy": service.lock.locked(), "engine": "pocket-tts", "voice": "alba", "sample_rate": SAMPLE_RATE, "device": "cpu"}))
-    async with serve(service.handle, args.host, args.port, max_size=MAX_FRAME, max_queue=8, write_limit=65536, process_request=health):
-        logger.info("CPU speech ready on %s:%s", args.host, args.port)
-        await asyncio.Future()
+            worker_loaded = service.worker is not None and service.worker.is_alive()
+            return connection.respond(200, json.dumps({"ready": True, "workerLoaded": worker_loaded, "busy": service.lock.locked(), "engine": "pocket-tts", "voice": "alba", "sample_rate": SAMPLE_RATE, "device": "cpu"}))
+    try:
+        async with serve(service.handle, args.host, args.port, max_size=MAX_FRAME, max_queue=8, write_limit=65536, process_request=health):
+            logger.info("CPU speech ready on %s:%s", args.host, args.port)
+            await asyncio.Future()
+    finally:
+        await service.close()
+
 
 
 if __name__ == "__main__":

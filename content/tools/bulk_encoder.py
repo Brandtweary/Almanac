@@ -3,6 +3,8 @@ import asyncio
 from array import array
 import base64
 import json
+import os
+import signal
 import sys
 import time
 
@@ -16,21 +18,52 @@ class ProcessEncoder:
         self.command, self.profile, self.tokenizer = command, profile, tokenizer
         self.process = None
         self.identity = None
+        self._lock = asyncio.Lock()
         self.last_timings = {"available": False}
 
+    @staticmethod
+    async def _finish(task):
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                continue
+        return task.result()
+
     async def start(self):
-        self.process = await asyncio.create_subprocess_exec(*self.command, stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE, limit=16 * 1024 * 1024)
+        async with self._lock:
+            if self.process is not None:
+                raise ValueError("Bulk encoder already started")
+            try:
+                await self._start()
+            except BaseException:
+                await self._finish(asyncio.create_task(self._close(force=True)))
+                raise
+
+    async def _start(self):
+        spawn = asyncio.create_task(asyncio.create_subprocess_exec(*self.command, stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE, limit=16 * 1024 * 1024, start_new_session=True))
+        try:
+            self.process = await asyncio.shield(spawn)
+        except asyncio.CancelledError:
+            self.process = await self._finish(spawn)
+            raise
         line = await asyncio.wait_for(self.process.stdout.readline(), timeout=120)
         self.identity = json.loads(line)
         if self.identity.get("model_id") != self.profile.encoder_id or self.identity.get("revision") != self.profile.encoder_revision or self.identity.get("tokenizer_sha256") != self.profile.encoder_tokenizer_sha256 or self.identity.get("dimensions") != self.profile.encoder_dimensions:
-            await self.close()
             raise ValueError("Bulk encoder identity differs from the query encoder profile")
         if self.identity.get("vector_transport") not in (None, "float32-le-base64-v1"):
-            await self.close()
             raise ValueError("Unsupported bulk encoder vector transport")
 
     async def encode(self, texts):
+        async with self._lock:
+            try:
+                return await self._encode(texts)
+            except BaseException:
+                await self._finish(asyncio.create_task(self._close(force=True)))
+                raise
+
+    async def _encode(self, texts):
         started = time.perf_counter()
         if self.process is None:
             raise ValueError("Bulk encoder has not started")
@@ -41,7 +74,7 @@ class ProcessEncoder:
         if not worker_checks_window and any(self.tokenizer.count(text) > self.profile.encoder_max_tokens for text in texts):
             raise ValueError("Bulk embedding input exceeds encoder window")
         self.process.stdin.write((json.dumps({"texts": texts}) + "\n").encode())
-        await self.process.stdin.drain()
+        await asyncio.wait_for(self.process.stdin.drain(), timeout=self.profile.request_timeout)
         sent = time.perf_counter()
         line = await asyncio.wait_for(self.process.stdout.readline(), timeout=self.profile.request_timeout)
         received = time.perf_counter()
@@ -68,20 +101,29 @@ class ProcessEncoder:
         return vectors_valid(vectors, len(texts), self.profile.encoder_dimensions)
 
     async def close(self):
-        if self.process is None:
+        async with self._lock:
+            task = asyncio.create_task(self._close())
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                await self._finish(task)
+                raise
+
+    async def _close(self, force=False):
+        process, self.process = self.process, None
+        self.identity = None
+        if process is None:
             return
-        if self.process.stdin:
-            self.process.stdin.close()
-        try:
-            await asyncio.wait_for(self.process.wait(), timeout=30)
-        except asyncio.TimeoutError:
+        if process.stdin:
+            process.stdin.close()
+        if not force:
             try:
-                self.process.terminate()
-            except ProcessLookupError:
-                pass
-            try:
-                await asyncio.wait_for(self.process.wait(), timeout=5)
+                await asyncio.wait_for(process.wait(), timeout=30)
             except asyncio.TimeoutError:
-                self.process.kill()
-                await self.process.wait()
-        self.process = None
+                pass
+        # The process owns a session so descendants cannot retain its streams.
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        await process.wait()

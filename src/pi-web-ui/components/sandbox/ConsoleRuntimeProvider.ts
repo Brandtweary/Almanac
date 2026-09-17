@@ -51,7 +51,8 @@ export class ConsoleRuntimeProvider implements SandboxRuntimeProvider {
 					const text = args
 						.map((arg) => {
 							try {
-								return typeof arg === "object" ? JSON.stringify(arg) : String(arg);
+								const content = typeof arg === "object" ? JSON.stringify(arg) : String(arg);
+								return content ?? "(not provided)";
 							} catch {
 								return String(arg);
 							}

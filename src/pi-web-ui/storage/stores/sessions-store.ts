@@ -1,3 +1,4 @@
+import { isOfficeArchive } from "../../../attachment-limits.js";
 import { assertConversationMessages, validSavedUsage } from "../../../message-validation.js";
 import { ConversationHistory } from "../../../conversation-history.js";
 import type { AgentState } from "@earendil-works/pi-agent-core";
@@ -86,6 +87,20 @@ export class SessionsStore extends Store {
 		assertSessionData(data);
 		assertMetadata(meta);
 		const archive = new ConversationHistory(data.rawHistory, data.messages).snapshot();
+		const checked = new Set<string>();
+		for (const message of [...data.messages, ...archive.records.map(record => record.message)]) {
+			if (message.role !== "user-with-attachments") continue;
+			for (const attachment of message.attachments ?? []) {
+				const office = isOfficeArchive(attachment.fileName, attachment.mimeType);
+				const legacy = attachment.fileName.toLowerCase().endsWith(".xls");
+				const checkKey = `${office}:${legacy}:${attachment.content}`;
+				if ((!office && !attachment.content.startsWith("UEs")) || checked.has(checkKey)) continue;
+				checked.add(checkKey);
+				const { assertDocumentBudget } = await import("../../utils/document-budget.js");
+				await assertDocumentBudget(Uint8Array.from(atob(attachment.content), char => char.charCodeAt(0)).buffer, office, legacy);
+			}
+		}
+
 		const id = crypto.randomUUID();
 		const lastModified = new Date().toISOString();
 		await this.save({ ...data, id, rawHistory: archive, revision: undefined, lastModified },

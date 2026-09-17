@@ -1,3 +1,5 @@
+import { isOfficeArchive } from "../../attachment-limits.js";
+import { assertDocumentBudget } from "../utils/document-budget.js";
 import "@mariozechner/mini-lit/dist/ModeToggle.js";
 import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
@@ -310,6 +312,7 @@ export class AttachmentOverlay extends LitElement {
 		try {
 			// Convert base64 to ArrayBuffer
 			const arrayBuffer = this.base64ToArrayBuffer(this.attachment.content);
+			await assertDocumentBudget(arrayBuffer, isOfficeArchive(this.attachment.fileName, this.attachment.mimeType), this.attachment.fileName.toLowerCase().endsWith(".xls"));
 
 			// Cancel any existing loading task
 			if (this.currentLoadingTask) {
@@ -388,6 +391,7 @@ export class AttachmentOverlay extends LitElement {
 		try {
 			// Convert base64 to ArrayBuffer
 			const arrayBuffer = this.base64ToArrayBuffer(this.attachment.content);
+			await assertDocumentBudget(arrayBuffer, isOfficeArchive(this.attachment.fileName, this.attachment.mimeType), this.attachment.fileName.toLowerCase().endsWith(".xls"));
 
 			// Clear container first
 			container.innerHTML = "";
@@ -395,9 +399,7 @@ export class AttachmentOverlay extends LitElement {
 			// Create a wrapper div for the document
 			const wrapper = document.createElement("div");
 			wrapper.className = "docx-wrapper-custom";
-			container.appendChild(wrapper);
-
-			// Render the DOCX file into the wrapper
+			// Render the DOCX file into the detached wrapper
 			await renderAsync(arrayBuffer, wrapper as HTMLElement, undefined, {
 				className: "docx",
 				inWrapper: true,
@@ -414,6 +416,23 @@ export class AttachmentOverlay extends LitElement {
 				renderFootnotes: true,
 				renderEndnotes: true,
 			});
+
+			const fragment = DOMPurify.sanitize(wrapper, {
+				ALLOWED_TAGS: ["div", "section", "article", "p", "span", "br", "hr", "b", "strong", "i", "em", "u", "s", "sup", "sub", "table", "thead", "tbody", "tfoot", "tr", "td", "th", "ol", "ul", "li", "a", "img"],
+				ALLOWED_ATTR: ["class", "href", "title", "colspan", "rowspan", "style", "src", "alt"],
+				ALLOW_DATA_ATTR: false, ALLOW_ARIA_ATTR: false,
+				ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|blob:)/i,
+				RETURN_DOM_FRAGMENT: true,
+			});
+			for (const element of fragment.querySelectorAll<HTMLElement>("[style]")) {
+				const styles = ["font-weight", "font-style", "text-align", "text-decoration", "font-size", "color", "background-color"]
+					.map(name => [name, element.style.getPropertyValue(name)]);
+				element.removeAttribute("style");
+				for (const [name, value] of styles) if (/^[a-z0-9#%.,() -]+$/i.test(value) && !/url|var|expression/i.test(value)) element.style.setProperty(name, value);
+			}
+			for (const image of fragment.querySelectorAll("img")) if (!image.getAttribute("src")?.startsWith("blob:")) image.remove();
+			for (const link of fragment.querySelectorAll("a[href]")) if (!/^(?:https?:|mailto:)/i.test(link.getAttribute("href")!)) link.removeAttribute("href");
+			container.replaceChildren(fragment);
 
 			// Apply custom styles to match theme and fix sizing
 			const style = document.createElement("style");
@@ -489,6 +508,7 @@ export class AttachmentOverlay extends LitElement {
 		try {
 			// Convert base64 to ArrayBuffer
 			const arrayBuffer = this.base64ToArrayBuffer(this.attachment.content);
+			await assertDocumentBudget(arrayBuffer, isOfficeArchive(this.attachment.fileName, this.attachment.mimeType), this.attachment.fileName.toLowerCase().endsWith(".xls"));
 
 			// Read the workbook
 			const workbook = XLSX.read(arrayBuffer, { type: "array" });

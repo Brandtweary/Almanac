@@ -1,5 +1,8 @@
 /** Loopback-only hosted transport for developer browser evaluation; never a runtime fallback. */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { writeFileSync } from "node:fs";
+import {CampaignBudget,claimCampaign,type PriorBudget} from "./campaign-budget.js";
+import {hostedPayload,validateHostedIdentity} from "./hosted-policy.js";
 import { readFile } from "node:fs/promises";
 import { resolve, sep, extname } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -8,18 +11,22 @@ import type { FixtureLibrary } from "./library.js";
 
 export interface BrowserCandidate {
  model: string; name: string; thinkingLevel?: string; maxInputTokens: number; maxOutputTokens: number; maxStageOutputTokens: number;
- inputUSDPerMillion: number; outputUSDPerMillion: number; maxRequests: number; maxCostUSD: number;
+ prices: {input:number;output:number;cacheRead:number;cacheWrite:number}; providerRouting: {only?:string[];order?:string[]}; maxRequests: number; maxCostUSD: number;
 }
 export interface BrowserRequestReceipt { id: string; role: string; conversation: string; request: any; response?: any; frames?: any[]; state: string; inputTokens?: number; outputTokens?: number; costUSD?: number; provider?: string; seconds?: number }
-export async function startBrowserBridge(options: {dist: string; candidate: BrowserCandidate; apiKey?: string; library: FixtureLibrary; scripted?: boolean; onReceiptEvent?: (event: unknown) => void}) {
+export async function startBrowserBridge(options: {dist: string; output?:string; priorBudget?:PriorBudget; candidate: BrowserCandidate; apiKey?: string; library: FixtureLibrary; scripted?: boolean; onReceiptEvent?: (event: unknown) => void}) {
  const { candidate } = options;
- if(typeof candidate.model!=="string"||!candidate.model||[candidate.maxInputTokens,candidate.maxOutputTokens,candidate.maxStageOutputTokens,candidate.maxRequests].some(v=>!Number.isSafeInteger(v)||v<=0)||!Number.isFinite(candidate.maxCostUSD)||candidate.maxCostUSD<=0||[candidate.inputUSDPerMillion,candidate.outputUSDPerMillion].some(v=>typeof v!=="number"||!Number.isFinite(v)||v<0))throw new Error("Explicit valid developer model, usage, pricing and spend limits required");
+ if(typeof candidate.model!=="string"||!candidate.model||[candidate.maxInputTokens,candidate.maxOutputTokens,candidate.maxStageOutputTokens,candidate.maxRequests].some(v=>!Number.isSafeInteger(v)||v<=0)||!Number.isFinite(candidate.maxCostUSD)||candidate.maxCostUSD<=0||[candidate.prices?.input,candidate.prices?.output,candidate.prices?.cacheRead,candidate.prices?.cacheWrite].some(v=>typeof v!=="number"||!Number.isFinite(v)||v<0))throw new Error("Explicit valid developer model, usage, pricing and spend limits required");
  if (!options.scripted && !options.apiKey) throw new Error("Explicit developer credential required");
+ validateHostedIdentity(candidate);
+ if(!options.scripted&&(!options.output||!options.priorBudget||options.priorBudget.ceilingUSD!==candidate.maxCostUSD))throw new Error("Paid browser evaluation requires durable output and explicit cumulative budget");
+ const releaseOwnership=!options.scripted?claimCampaign(options.output!):()=>{};
+ const budget=!options.scripted?new CampaignBudget(resolve(options.output!,"budget-ledger.json"),options.priorBudget!):undefined;
  const events: any[] = []; const requests: BrowserRequestReceipt[] = [];
  const queue = new CompletionQueue({queueCapacity: 8, queueTimeoutMs: 60000, executionTimeoutMs: 120000}, event => events.push({at:Date.now(),...event}));
  const roles = Object.fromEntries(["chat","audit","memory","summary","compaction"].map(role => [role,{maxInputTokens:candidate.maxInputTokens,maxOutputTokens:candidate.maxOutputTokens,maxStageOutputTokens:candidate.maxStageOutputTokens,...(candidate.thinkingLevel?{thinkingLevel:candidate.thinkingLevel}:{})}]));
  const profile = {id:`hosted-browser-${candidate.model}`, qualified:false, model:{id:candidate.model,name:candidate.name,contextWindow:candidate.maxInputTokens+candidate.maxOutputTokens,maxTokens:candidate.maxOutputTokens,reasoning:Boolean(candidate.thinkingLevel),input:["text"]},roles,limits:{queueTimeoutMs:60000,executionTimeoutMs:120000}};
- let costUSD=0, reservedUSD=0, unknownBilling=false, fault:"none"|"hold-executing"="none";
+ let costUSD=0, unknownBilling=false, fault:"none"|"hold-executing"="none";
  let blocker: Lease|undefined;
  const active = new Set<AbortController>();
  function json(response: ServerResponse, status: number, body: unknown) { response.writeHead(status,{"Content-Type":"application/json"});response.end(JSON.stringify(body)); }
@@ -29,7 +36,7 @@ export async function startBrowserBridge(options: {dist: string; candidate: Brow
   const role=String(request.headers["x-request-role"]??"chat"); const conversation=String(request.headers["x-conversation-id"]??id);
   const record:BrowserRequestReceipt={id,role,conversation,request:structuredClone(payload),state:"waiting"};requests.push(record);options.onReceiptEvent?.({type:"request",at:Date.now(),id,role,conversation,payload});
   const abort=new AbortController();active.add(abort);response.on("close",()=>{if(!response.writableEnded)abort.abort();});
-  const started=performance.now();let lease:Lease|undefined;let reservation=0;let providerStarted=false;
+  const started=performance.now();let lease:Lease|undefined;let reservation=0;let providerStarted=false;let providerFinished=false;
   try {
    lease=await queue.acquire(id,conversation,role==="chat"||role==="compaction"?"foreground":"background",abort.signal);record.state="executing";
    if(fault==="hold-executing")await new Promise((_resolve,reject)=>lease!.signal.addEventListener("abort",()=>reject(new Error("declared_interruption")),{once:true}));
@@ -42,21 +49,21 @@ export async function startBrowserBridge(options: {dist: string; candidate: Brow
    } else {
     if(requests.filter(r=>r.state!=="interrupted").length>candidate.maxRequests||unknownBilling)throw new Error("developer_request_or_billing_limit");
     if(Buffer.byteLength(JSON.stringify(payload))+1024>candidate.maxInputTokens)throw new Error("developer_input_exposure_limit");
-    const maximum=(candidate.maxInputTokens*candidate.inputUSDPerMillion+candidate.maxOutputTokens*candidate.outputUSDPerMillion)/1e6;
-    if(costUSD+reservedUSD+maximum>candidate.maxCostUSD)throw new Error("developer_spend_limit");reservation=maximum;reservedUSD+=reservation;
-    const upstreamPayload={...payload,model:candidate.model,max_tokens:Math.min(Number(payload.max_tokens??payload.max_completion_tokens??candidate.maxOutputTokens),candidate.maxOutputTokens),temperature:0,provider:{require_parameters:true,allow_fallbacks:false},...(payload.stream?{stream_options:{include_usage:true}}:{})};
+    const maximum=(candidate.maxInputTokens*Math.max(candidate.prices.input,candidate.prices.cacheRead,candidate.prices.cacheWrite)+candidate.maxOutputTokens*candidate.prices.output)/1e6;
+    if(!budget!.reserve(id,maximum))throw new Error("developer_spend_limit");reservation=maximum;
+    const upstreamPayload:any=hostedPayload({...payload,model:candidate.model,max_tokens:Math.min(Number(payload.max_tokens??payload.max_completion_tokens??candidate.maxOutputTokens),candidate.maxOutputTokens),...(payload.stream?{stream_options:{include_usage:true}}:{})},candidate);
     delete upstreamPayload.reasoning_effort;
     if(candidate.thinkingLevel)upstreamPayload.reasoning={effort:candidate.thinkingLevel};
     providerStarted=true;
     options.onReceiptEvent?.({type:"provider-start",at:Date.now(),id});
     const upstream=await fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${options.apiKey}`},body:JSON.stringify(upstreamPayload),signal:lease.signal});
     if(!upstream.ok){record.response={httpStatus:upstream.status,body:await upstream.text()};throw new Error(`provider_transport_${upstream.status}`);}
-    if(!payload.stream){const raw=await upstream.json();record.response=raw;record.provider=raw.provider;record.costUSD=raw.usage?.cost;record.inputTokens=raw.usage?.prompt_tokens;record.outputTokens=raw.usage?.completion_tokens;json(response,200,raw);}
+    if(!payload.stream){const raw=await upstream.json();providerFinished=true;record.response=raw;record.provider=raw.provider;record.costUSD=raw.usage?.cost;record.inputTokens=raw.usage?.prompt_tokens;record.outputTokens=raw.usage?.completion_tokens;json(response,200,raw);}
     else {
      response.writeHead(200,{"Content-Type":"text/event-stream","Cache-Control":"no-cache"});record.frames=[];
      let buffer="";const decoder=new TextDecoder();
      for await(const chunk of upstream.body!){response.write(Buffer.from(chunk));buffer+=decoder.decode(chunk,{stream:true});let end:number;
-      while((end=buffer.indexOf("\n"))>=0){const line=buffer.slice(0,end).trim();buffer=buffer.slice(end+1);if(!line.startsWith("data:")||line==="data: [DONE]")continue;const frame=JSON.parse(line.slice(5));record.frames.push(frame);options.onReceiptEvent?.({type:"provider-frame",at:Date.now(),id,frame});if(frame.provider)record.provider=frame.provider;if(frame.usage){record.costUSD=frame.usage.cost;record.inputTokens=frame.usage.prompt_tokens;record.outputTokens=frame.usage.completion_tokens;}}
+      while((end=buffer.indexOf("\n"))>=0){const line=buffer.slice(0,end).trim();buffer=buffer.slice(end+1);if(line==="data: [DONE]"){providerFinished=true;continue;}if(!line.startsWith("data:"))continue;const frame=JSON.parse(line.slice(5));record.frames.push(frame);options.onReceiptEvent?.({type:"provider-frame",at:Date.now(),id,frame});if(frame.provider)record.provider=frame.provider;if(frame.usage){record.costUSD=frame.usage.cost;record.inputTokens=frame.usage.prompt_tokens;record.outputTokens=frame.usage.completion_tokens;}}
      }
      response.end();
     }
@@ -64,7 +71,14 @@ export async function startBrowserBridge(options: {dist: string; candidate: Brow
    }
    record.state="completed";lease.finish();
   }catch(error){record.state=abort.signal.aborted||lease?.signal.aborted||queue.status(id)?.state==="interrupted"?"interrupted":"failed";record.response??={error:error instanceof Error?error.message:String(error)};lease?.finish("failed");if(!response.headersSent)json(response,503,{error:record.response});else response.end();}
-  finally{options.onReceiptEvent?.({type:"request-final",at:Date.now(),record});if(providerStarted&&record.costUSD===undefined&&!record.response?.httpStatus)unknownBilling=true;reservedUSD-=reservation;record.seconds=(performance.now()-started)/1000;active.delete(abort);}
+  finally{
+   record.seconds=(performance.now()-started)/1000;active.delete(abort);
+   const known=typeof record.costUSD==="number"&&Number.isFinite(record.costUSD)&&record.costUSD>=0;
+   const incomplete=providerStarted&&(!known||!providerFinished);
+   if(incomplete)unknownBilling=true;
+   if(reservation){writeFileSync(resolve(options.output!,`request-${Buffer.from(id).toString("hex")}.json`),JSON.stringify(record,null,2)+"\n");budget!.settle(id,known?record.costUSD!:0,incomplete);costUSD=budget!.totals().reportedUSD;}
+   options.onReceiptEvent?.({type:"request-final",at:Date.now(),record});
+  }
  }
  const dist=resolve(options.dist);
  const server=createServer((request,response)=>{void(async()=>{
@@ -85,6 +99,6 @@ export async function startBrowserBridge(options: {dist: string; candidate: Brow
  return {url:`http://127.0.0.1:${address.port}`,requests,events,profile,
   get costUSD(){return costUSD;},get unknownBilling(){return unknownBilling;},
   async setFault(next:"none"|"hold-waiting"|"hold-executing") {blocker?.finish();blocker=undefined;fault=next==="hold-executing"?next:"none";if(next==="hold-waiting")blocker=await queue.acquire(randomUUID(),"fixture-blocker","foreground",new AbortController().signal);},
-  async close(){blocker?.finish();for(const controller of active)controller.abort();await new Promise<void>(resolve=>server.close(()=>resolve()));},
+  async close(){blocker?.finish();for(const controller of active)controller.abort();await new Promise<void>(resolve=>server.close(()=>resolve()));releaseOwnership();},
  };
 }

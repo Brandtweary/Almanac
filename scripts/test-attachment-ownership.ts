@@ -1,3 +1,4 @@
+import * as attachmentLimits from "../src/attachment-limits.js";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
@@ -6,6 +7,7 @@ import ts from "typescript";
 let attachmentLoader: (file: any) => Promise<any>;
 const decorator = () => () => undefined;
 const dependencies = {
+	...attachmentLimits,
 	LitElement: class { requestUpdate() {} }, customElement: () => (value: unknown) => value,
 	property: decorator, state: decorator, createRef: () => ({}),
 	loadAttachment: (file: any) => attachmentLoader(file), html: () => undefined,
@@ -19,7 +21,7 @@ const exports: Record<string, any> = {};
 vm.runInNewContext(js, { exports, require: () => dependencies, console, alert: () => undefined });
 const { MessageEditor } = exports;
 const file = { name: "fixture.txt", size: 10 };
-const attachment = { id: "fixture", fileName: "fixture.txt", mimeType: "text/plain", size: 10 };
+const attachment = { id: "fixture", type: "document", fileName: "fixture.txt", mimeType: "text/plain", size: 10, content: "YWFhYWFhYWFhYQ==" };
 function invoke(editor: any, source: string) {
 	if (source === "picker") return editor.handleFilesSelected({ target: { files: [file], value: "fixture.txt" } });
 	if (source === "drop") return editor.handleDrop({ dataTransfer: { files: [file] }, preventDefault() {}, stopPropagation() {} });

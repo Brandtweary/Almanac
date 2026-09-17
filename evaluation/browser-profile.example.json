@@ -4,8 +4,17 @@
   "maxInputTokens": 49152,
   "maxOutputTokens": 4096,
   "maxStageOutputTokens": 8192,
-  "inputUSDPerMillion": null,
-  "outputUSDPerMillion": null,
   "maxRequests": 32,
-  "maxCostUSD": 1
+  "maxCostUSD": 1,
+  "prices": {
+    "input": null,
+    "output": null,
+    "cacheRead": null,
+    "cacheWrite": null
+  },
+  "providerRouting": {
+    "only": [
+      "replace-with-explicit-provider"
+    ]
+  }
 }

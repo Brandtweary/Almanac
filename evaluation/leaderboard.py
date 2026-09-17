@@ -51,15 +51,15 @@ def assemble(categories:dict[str,list[dict]],comparison_models:list[str]|None=No
             exact=lambda r:all(any(c['id']==name and c['passed'] for c in r['checks']) for name in ['actual_execution','exact_result','fixture_preserved'])
             common_ids=set(common[category]['transportCompleteCaseIds']);shared=[r for r in subset if r['case'] in common_ids]
             line['categories'][category]={'planned':len(subset),'measured':len(measured),'reviewed':len(reviewed),
-                'passed':sum(r['status']=='passed' for r in measured),'supportedOutcome':sum(r.get('supportedOutcome',False) for r in measured),'recoveredToolErrors':sum(r.get('recoveredToolError',False) for r in measured),'workflowPassed':sum(r['mechanical_pass'] for r in measured),
+                'targetedPassed':sum(r['status']=='passed' for r in measured),'cleanAnswers':sum(r.get('cleanAnswer') is True and not r.get('additionalFindings') for r in measured),'additionalFindingCases':sum(bool(r.get('additionalFindings')) for r in measured),'supportedOutcome':sum(r.get('supportedOutcome',False) for r in measured),'recoveredToolErrors':sum(r.get('recoveredToolError',False) for r in measured),'workflowPassed':sum(r['mechanical_pass'] for r in measured),
                 'artifactCorrect':sum(exact(r) for r in measured) if category=='shell' else None,
                 'transportErrors':sum(r['status']=='transport_error' for r in subset),'evaluatorErrors':sum(r['status']=='evaluator_error' for r in subset),
                 'medianSeconds':statistics.median(r['metrics']['seconds'] for r in measured) if measured else None,
-                'commonMeasured':len(shared),'commonPassed':sum(r['status']=='passed' for r in shared),'commonSupportedOutcome':sum(r.get('supportedOutcome',False) for r in shared),
+                'commonMeasured':len(shared),'commonTargetedPassed':sum(r['status']=='passed' for r in shared),'commonCleanAnswers':sum(r.get('cleanAnswer') is True and not r.get('additionalFindings') for r in shared),'commonAdditionalFindingCases':sum(bool(r.get('additionalFindings')) for r in shared),'commonSupportedOutcome':sum(r.get('supportedOutcome',False) for r in shared),
                 'criticalFailures':sum(bool(r.get('criticalFailures')) for r in measured),
                 'reportedUSD':sum(r['metrics']['costUSD'] for r in subset)}
         table.append(line)
-    table.sort(key=lambda row:(-row['categories'].get('product',{}).get('passed',0),row['model']))
+    table.sort(key=lambda row:row['model'])
     return {'schemaVersion':1,'scope':'No weighted composite. Product/research are primary; Bash is an explicit secondary preference. Historical and current-prompt categories are separate; transport and evaluator gaps are not model failures.','models':table,'commonCases':common,'cases':rows}
 
 
@@ -70,14 +70,14 @@ def main():
     if args.output.exists():raise SystemExit('Use a fresh report output')
     data=assemble({name:read_runs(getattr(args,name),name) for name in ['product','research','shell']},args.compare.split(',') if args.compare else None)
     args.output.write_text(json.dumps(data,indent=2)+'\n')
-    lines=['# Almanac model comparison','',data['scope'],'','| Model | Product correct outcome/reviewed (pristine) | Current research passed/reviewed | Bash correct artifacts/measured | Bash finished/measured | Product median seconds | Unmeasured transport / evaluator |','|---|---:|---:|---:|---:|---:|---:|']
+    lines=['# Almanac model comparison','',data['scope'],'','| Model | Product supported/reviewed (targeted; clean; additional findings) | Current research targeted/reviewed | Bash correct artifacts/measured | Bash finished/measured | Product median seconds | Unmeasured transport / evaluator |','|---|---:|---:|---:|---:|---:|---:|']
     for row in data['models']:
         c=row['categories'];p=c.get('product',{});r=c.get('research',{});b=c.get('shell',{})
-        ratio=lambda x:f"{x['passed']}/{x['reviewed']}" if x else '—'
+        ratio=lambda x:f"{x['targetedPassed']}/{x['reviewed']}" if x else '—'
         latency='—' if p.get('medianSeconds') is None else f"{p['medianSeconds']:.2f}"
-        artifact=f"{b['artifactCorrect']}/{b['measured']}" if b else '—';finished=f"{b['passed']}/{b['measured']}" if b else '—'
+        artifact=f"{b['artifactCorrect']}/{b['measured']}" if b else '—';finished=f"{b['targetedPassed']}/{b['measured']}" if b else '—'
         transport=sum(v['transportErrors'] for v in c.values());evaluator=sum(v['evaluatorErrors'] for v in c.values())
-        lines.append(f"| {row['model']} | {str(p.get('supportedOutcome',0))+'/'+str(p.get('reviewed',0))+' ('+str(p.get('passed',0))+')' if p else '—'} | {ratio(r)} | {artifact} | {finished} | {latency} | {transport} / {evaluator} |")
-    lines+=['','The JSON includes the exact transport-complete common-case intersection for each category. Ratios use reviewed cases; inspect the missing cases before drawing a comparison. Correct role outcomes after a rejected call and successful repair are shown separately from pristine runs; this matches production recovery without rewriting the original checks. A correct Bash artifact with an unfinished turn is shown separately.']
+        lines.append(f"| {row['model']} | {str(p.get('supportedOutcome',0))+'/'+str(p.get('reviewed',0))+' ('+str(p.get('targetedPassed',0))+'; '+str(p.get('cleanAnswers',0))+'; '+str(p.get('additionalFindingCases',0))+')' if p else '—'} | {ratio(r)} | {artifact} | {finished} | {latency} | {transport} / {evaluator} |")
+    lines+=['','The JSON includes the exact transport-complete common-case intersection for each category. Ratios use reviewed cases; inspect the missing cases before drawing a comparison. Correct role outcomes after a rejected call and successful repair are shown separately from targeted-rubric passes; clean-answer counts require an explicit clean judgment; this matches production recovery without rewriting the original checks. A correct Bash artifact with an unfinished turn is shown separately.']
     args.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')
 if __name__=='__main__':main()

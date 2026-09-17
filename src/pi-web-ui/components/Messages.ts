@@ -1,3 +1,4 @@
+import "./SafeMarkdown.js";
 import type {
 	AssistantMessage as AssistantMessageType,
 	ImageContent,
@@ -12,10 +13,6 @@ import { renderTool } from "../tools/index.js";
 import type { Attachment } from "../utils/attachment-types.js";
 import { formatUsage } from "../utils/format.js";
 import { i18n } from "../utils/i18n.js";
-// Side-effect imports: these register the <markdown-block> and <code-block> custom
-// elements this file (and ThinkingBlock) renders. Nothing else in the bundle imports
-// them, so without these lines the tags are undefined and all chat text renders blank.
-import "@mariozechner/mini-lit/dist/MarkdownBlock.js";
 import "@mariozechner/mini-lit/dist/CodeBlock.js";
 import "./ThinkingBlock.js";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
@@ -66,7 +63,7 @@ export class UserMessage extends LitElement {
 		return html`
 			<div class="flex justify-start mx-4">
 				<div class="user-message-container py-2 px-4 rounded-xl">
-					<markdown-block .content=${content}></markdown-block>
+					<safe-markdown .content=${content}></safe-markdown>
 					${
 						this.message.role === "user-with-attachments" &&
 						this.message.attachments &&
@@ -112,7 +109,7 @@ export class AssistantMessage extends LitElement {
 
 		for (const chunk of this.message.content) {
 			if (chunk.type === "text" && chunk.text.trim() !== "") {
-				orderedParts.push(html`<markdown-block .content=${chunk.text}></markdown-block>`);
+				orderedParts.push(html`<safe-markdown .content=${chunk.text}></safe-markdown>`);
 			} else if (chunk.type === "thinking" && chunk.thinking.trim() !== "") {
 				orderedParts.push(
 					html`<thinking-block .content=${chunk.thinking} .isStreaming=${this.isStreaming}></thinking-block>`,

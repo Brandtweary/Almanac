@@ -82,7 +82,7 @@ export function createPipelineTools(deps: PipelineToolDeps): AgentTool<any>[] {
 			description: "Short, hyphenated, lowercase term name (e.g. 'vector-database').",
 		}),
 		description: Type.String({
-			description: "Evergreen definition (hard 100-word cap; aim 50-80 words).",
+			description: "Evergreen definition supported by the available evidence (hard 100-word cap; no minimum length).",
 		}),
 		type: Type.Optional(
 			Type.String({

@@ -1,3 +1,5 @@
+import type { MessageEditor } from "./pi-web-ui/components/MessageEditor.js";
+import { QuickStartTour } from "./quick-start-tour.js";
 import { type MemoryArchiveRecord, type MemoryArchiveQuery } from "./memory-archive.js";
 import { makeLexiconAsset, parseLexiconAsset, replacementPipeline, type LexiconReplacement } from "./lexicon-transfer.js";
 import { emptyMaintenance } from "./glossary-maintenance.js";
@@ -202,6 +204,7 @@ let currentSessionId: string | undefined;
 let currentTitle = "";
 let isEditingTitle = false;
 let currentView: "chat" | "about" = "chat";
+let quickStartTour: QuickStartTour | undefined;
 let agent: Agent;
 let memoryEpoch = 0;
 let memoryReplacing = false;
@@ -357,12 +360,8 @@ function oraclePrompt(): string {
 // MessageList to re-render. requestUpdate() then re-runs renderMessages with the
 // new reference. (Also fixes the stuck stop button: a post-finishRun repaint
 // re-renders the editor with isStreaming=false.)
-// Assistant-authored markdown can carry links, and mini-lit's MarkdownBlock renders
-// them via unsafeHTML with NO href-scheme check — so a model-emitted
-// `[label](javascript:…)` would reach the DOM as a live XSS vector (the app feeds the
-// model third-party web-search text it doesn't control). MarkdownBlock bundles its own
-// marked instance we can't hook, and renders into light DOM, so sanitize at the DOM:
-// strip the href from any chat anchor whose scheme isn't http(s)/mailto.
+// SafeMarkdown sanitizes before DOM insertion. This pass resolves corpus handles
+// against the evidence ledger and validates navigation from other chat components.
 const SAFE_HREF_SCHEME = /^(https?:|mailto:)/i;
 const sanitizeChatAnchors = () => {
 	if (!chatPanel) return;
@@ -1277,6 +1276,10 @@ const renderHeader = () => {
 						onClick: () => setView("about"),
 					}) : null}
 					${Button({
+						variant: "ghost", size: "sm", children: "Quick start", title: "Replay quick start",
+						onClick: () => { setView("chat"); quickStartTour?.start(); },
+					})}
+					${Button({
 						variant: "ghost",
 						size: "sm",
 						children: icon(History, "sm"),
@@ -1883,14 +1886,18 @@ async function initApp() {
 		if (!loaded) {
 			// Session doesn't exist — start a fresh chat in place (no reload).
 			await newSession();
-			return;
 		}
 	} else {
 		await createAgent();
 	}
 
 	updateBodyVisibility();
+	await chatPanel.updateComplete;
+	await chatPanel.agentInterface?.updateComplete;
+	await chatPanel.agentInterface?.querySelector<MessageEditor>("message-editor")?.updateComplete;
+	quickStartTour = new QuickStartTour();
 	renderHeader();
+	quickStartTour.startIfNew();
 }
 
 initApp().catch((error) => {

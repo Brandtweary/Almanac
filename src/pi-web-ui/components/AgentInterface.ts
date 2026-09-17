@@ -1,3 +1,4 @@
+import { renderOnboarding } from "../../onboarding.js";
 import { sendWithAdmission } from "../../send-admission.js";
 import type { ToolResultMessage, Usage } from "@earendil-works/pi-ai";
 import { streamSimple } from "../../pi-ai-slim-compat.js";
@@ -45,6 +46,7 @@ export class AgentInterface extends LitElement {
 	private _autoScroll = true;
 	private _sendingSessions = new WeakSet<Agent>();
 	@state() private _sendError = "";
+	@state() private _hasDraft = false;
 	private _lastScrollTop = 0;
 	private _lastClientHeight = 0;
 	private _scrollContainer?: HTMLElement;
@@ -165,8 +167,8 @@ export class AgentInterface extends LitElement {
 		// Set default streamFn with proxy support if not already set
 		if (this.session.streamFn === streamSimple) {
 			this.session.streamFn = createStreamFn(async () => {
-				const enabled = await getAppStorage().settings.get<boolean>("proxy.enabled");
-				return enabled ? (await getAppStorage().settings.get<string>("proxy.url")) || undefined : undefined;
+				const { enabled, url } = await getAppStorage().settings.getProxyConfig();
+				return enabled ? url || undefined : undefined;
 			});
 		}
 
@@ -258,6 +260,7 @@ export class AgentInterface extends LitElement {
 		if (!session.state.model) throw new Error("No model set on AgentInterface");
 		if (session.state.isStreaming || this._sendingSessions.has(session)) return;
 		this._sendingSessions.add(session);
+		this.requestUpdate();
 		this._sendError = "";
 		const editor = this._messageEditor;
 		const isCurrent = () => this.session === session && !session.state.isStreaming && !this.sendDisabled;
@@ -299,6 +302,7 @@ export class AgentInterface extends LitElement {
 			throw error;
 		} finally {
 			this._sendingSessions.delete(session);
+			this.requestUpdate();
 		}
 	}
 
@@ -306,6 +310,8 @@ export class AgentInterface extends LitElement {
 		if (!this.session)
 			return html`<div class="p-4 text-center text-muted-foreground">${i18n("No session available")}</div>`;
 		const state = this.session.state;
+		const showWelcome = !state.isStreaming && !this.sendDisabled && !this._sendingSessions.has(this.session) &&
+			!state.messages.some(message => ["user", "user-with-attachments", "assistant", "voice-pending", "compactionSummary"].includes(message.role));
 		// Build a map of tool results to allow inline rendering in assistant messages
 		const toolResultsById = new Map<string, ToolResultMessage<any>>();
 		for (const message of state.messages) {
@@ -315,6 +321,9 @@ export class AgentInterface extends LitElement {
 		}
 		return html`
 			<div class="flex flex-col gap-3">
+				${showWelcome ? renderOnboarding(this._hasDraft, text => {
+					if (!this.sendDisabled && !state.isStreaming && !this._sendingSessions.has(this.session!)) this._messageEditor?.insertSuggestion(text);
+				}) : ""}
 				<!-- Stable messages list - won't re-render during streaming -->
 				<message-list
 					.messages=${this._stableMessages}
@@ -404,6 +413,7 @@ export class AgentInterface extends LitElement {
 					<div class="max-w-3xl mx-auto px-2">
 						${this._sendError ? html`<div role="alert" class="text-sm text-red-500 py-2">${this._sendError}</div>` : ""}
 						<message-editor
+							@composer-draft-change=${(event: CustomEvent<boolean>) => { this._hasDraft = event.detail; }}
 							.disabled=${this.sendDisabled}
 							.isStreaming=${state.isStreaming}
 							.currentModel=${state.model}

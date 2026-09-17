@@ -34,3 +34,23 @@ def test_lazy_native_localization_matches_exhaustive_ranking(counts, constant):
         assert len(visited) < 15
     if counts == [1] * 40:
         assert len(visited) == 40
+
+
+@pytest.mark.parametrize("query", ["Water", "water"])
+def test_exact_title_is_discoverable_when_fulltext_buries_article(query):
+    import asyncio
+    reader = NativeReader.__new__(NativeReader)
+    reader.path = "archive.zim"
+    reader.verify_original = lambda: None
+    def by_title(title):
+        if title != "Water":
+            raise KeyError(title)
+        return SimpleNamespace(path="Water")
+    reader.archive = SimpleNamespace(get_entry_by_title=by_title)
+    reader._localize = lambda paths, *args: paths
+    class Search:
+        async def search(self, path, safe, limit):
+            return ["Water_companies", "Water_politics", "Water_tower"]
+    assert asyncio.run(reader.lexical(Search(), query, 3)) == [
+        "Water", "Water_companies", "Water_politics",
+    ]

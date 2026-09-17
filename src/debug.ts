@@ -16,11 +16,12 @@ const ORIG = {
 	debug: console.debug.bind(console),
 };
 
-function safe(arg: unknown): string {
+export function safe(arg: unknown): string {
 	if (typeof arg === "string") return arg;
 	if (arg instanceof Error) return `${arg.name}: ${arg.message}`;
 	try {
-		return JSON.stringify(arg);
+		const content = JSON.stringify(arg);
+		return content ?? "(not provided)";
 	} catch {
 		return String(arg);
 	}

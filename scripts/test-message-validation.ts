@@ -1,3 +1,4 @@
+import JSZip from "jszip";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
@@ -21,6 +22,10 @@ async function setup() {
  await store.save(data,meta,-1);await backend.set("memory-consent","choice","declined");
  return {store,backend,data,meta,exported:JSON.parse(await store.exportSession("original"))};
 }
+const malformedAttachments=[
+ ...[{size:0},{content:"!!!!"},{size:1.5},{preview:"invalid"}].map(patch=>({role:"user-with-attachments",content:"attachment",timestamp:1,attachments:[{id:"a",type:"document",fileName:"a.txt",mimeType:"text/plain",size:1,content:"YQ==",...patch}]})),
+ {role:"user-with-attachments",content:"attachment",timestamp:1,attachments:Array(11).fill({id:"a",type:"document",fileName:"a.txt",mimeType:"text/plain",size:1,content:"YQ=="})},
+];
 const malformed=[
  {...assistant,content:[null]}, {...tool,content:[null]}, {...assistant,content:"invalid assistant string"},
  {...tool,content:"invalid result string"}, {...assistant,content:[{type:"text",text:123}]},
@@ -34,7 +39,7 @@ const malformed=[
 
 test("malformed active or raw-history blocks reject uploaded exports before either store changes",async()=>{
  const h=await setup();
- for(const bad of malformed)for(const target of["active","raw"]){
+ for(const bad of [...malformed,...malformedAttachments])for(const target of["active","raw"]){
   const input=structuredClone(h.exported);if(target==="active")input.session.messages=[bad];else input.session.rawHistory.records[0].message=bad;
   await assert.rejects(h.store.importSession(JSON.stringify(input)),/Invalid/);
   assert.deepEqual(await h.backend.keys("sessions"),["original"]);assert.deepEqual(await h.backend.keys("sessions-metadata"),["original"]);
@@ -91,4 +96,28 @@ test("malformed saves and queued legacy memory messages fail before publication"
  const pipeline={buffers:{audit:[],memory:[],summary:[]},flags:[],runningContext:[],sttLexicon:{autoReplace:[],mistranscriptions:[]},generation:0,
   jobs:[{id:"job",sessionKey:"original",generation:0,isVoiceTurn:false,messages:[malformed[1]],stages:{audit:"pending",memory:"pending",summary:"pending"}}]};
  assert.throws(()=>validatePipelineState(pipeline),/Invalid memory coverage message content/);
+});
+
+
+test("compressed attachment imports fail before either session store changes", async()=>{
+ const h=await setup();const zip=new JSZip();zip.file("document.xml","x".repeat(40*1024*1024+1));
+ const bytes=await zip.generateAsync({type:"uint8array",compression:"DEFLATE"});
+ const attachment={id:"bomb",type:"document",fileName:"fixture.docx",mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",size:bytes.length,content:Buffer.from(bytes).toString("base64")};
+ const message={role:"user-with-attachments",content:"Read this",timestamp:1,attachments:[attachment]};
+ for(const target of["active","raw"]){
+  const input=structuredClone(h.exported);if(target==="active")input.session.messages=[message];else input.session.rawHistory.records[0].message=message;
+  await assert.rejects(h.store.importSession(JSON.stringify(input)),/expansion/);
+  assert.deepEqual(await h.backend.keys("sessions"),["original"]);assert.deepEqual(await h.backend.keys("sessions-metadata"),["original"]);
+ }
+});
+
+
+test("legacy XLS imports retain correctly labelled and previously mislabeled original bytes", async()=>{
+ const h=await setup();const XLSX=await import('xlsx');const workbook=XLSX.utils.book_new();XLSX.utils.book_append_sheet(workbook,XLSX.utils.aoa_to_sheet([['Retained cell',42]]),'Sheet1');
+ const content=XLSX.write(workbook,{bookType:'biff8',type:'base64'});
+ for(const mimeType of['application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']){
+  const input=structuredClone(h.exported);const attachment={id:'legacy',type:'document',fileName:'fixture.xls',mimeType,content,size:Buffer.from(content,'base64').length};
+  input.session.messages=[{role:'user-with-attachments',content:'Read this',timestamp:1,attachments:[attachment]}];input.session.rawHistory=new ConversationHistory(undefined,input.session.messages).snapshot();
+  const id=await h.store.importSession(JSON.stringify(input));assert.deepEqual((await h.store.get(id))!.messages,input.session.messages);
+ }
 });
