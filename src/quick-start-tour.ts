@@ -1,9 +1,9 @@
 const STORAGE_KEY = "almanac.quick-start.v1";
 const steps = [
-	{ selector: "message-editor textarea", title: "Start with a question", text: "Type what you want to know. Enter sends; Shift+Enter adds a new line. While a reply is being written, the send button becomes a stop button." },
-	{ selector: ".cw-mic", title: "Talk to the librarian", text: "Click the microphone or press Ctrl+Space to start recording. Use it again to stop and send. You choose when the microphone opens." },
+	{ selector: "message-editor textarea", title: "Start with a question", text: "Enter sends; Shift+Enter adds a new line." },
+	{ selector: ".cw-mic", title: "Voice input", text: "Click the microphone or press Ctrl+Space to start recording. Use it again to stop and send." },
 	{ selector: ".cw-stop", title: "A moment of quiet", text: "Click here or press Ctrl+Alt+Space to stop the voice without stopping the written reply. Double-click to mute future speech; double-click again to unmute." },
-	{ selector: ".cw-mem", title: "Let the conversation carry forward", text: "Memory is optional. Enable it here if you want Almanac to retain useful context between chats. You can use the reference library with memory off." },
+	{ selector: ".cw-mem", title: "Let the conversation carry forward", text: "Memory is optional. Enable it here if you want Almanac to retain useful context between chats." },
 	{ selector: '[title="Chats"]', title: "Find your way back", text: "Your saved conversations are here. They stay in this browser, ready for the next time you need them." },
 	{ selector: '[title="New Chat"]', title: "Turn to a fresh page", text: "Start another conversation here. You can replay this tour from Quick start in the header whenever you need it." },
 ];

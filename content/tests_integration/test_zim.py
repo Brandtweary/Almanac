@@ -56,3 +56,30 @@ def test_native_zim_search_and_streamed_article_identity(tmp_path):
     assert any("ZX42" in h["excerpt"] for h in hits)
     with store.connect(store.active()) as db:
         assert db.execute("SELECT count(*) FROM fts").fetchone()[0] == 0
+
+
+def test_catalog_native_discovery_uses_exact_title_when_bm25_omits_it(tmp_path, monkeypatch):
+    import libzim.search
+    path = tmp_path / "titles.zim"
+    with Creator(str(path)).config_indexing(True, "eng") as archive:
+        archive.add_item(Article("Water", "Water", "<h1>Water</h1><p>Liquid properties.</p>"))
+        archive.add_item(Article("Companies", "Companies", "<h1>Companies</h1><p>Water water companies.</p>"))
+        archive.set_mainpath("Water")
+    doc = Document(document_id="archive", work_id="fixture", pack_id="fixture", title="Archive",
+        language="en", source_url="https://example.org/archive", sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+        media_type="application/x-zim", license="CC0", extraction_revision="html-structural-v4", original_path=str(path))
+    store, dense, p = Store(tmp_path / "state"), Dense(), profile()
+    evidence = {"adapters": {"application/x-zim:html-structural-v4": {"checked": True, "receipt": "fixture"}}}
+    asyncio.run(build(store, zim_documents(doc), p, dense, Tokens(), evidence, managed_originals=True))
+    class Results:
+        def getResults(self, start, limit):
+            return ["Companies"]
+    class Searcher:
+        def __init__(self, archive): pass
+        def search(self, query): return Results()
+    monkeypatch.setattr(libzim.search, "Searcher", Searcher)
+    service = Service(store, p, dense, Tokens(), ZimLexical())
+    pool = asyncio.run(service.candidates("water"))
+    assert any(pool["passages"][pid].document_id == next(
+        d.document_id for d in zim_documents(doc) if d.article_path == "Water"
+    ) for pid, _ in pool["branches"]["lexical"])

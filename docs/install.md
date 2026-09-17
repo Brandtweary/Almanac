@@ -31,9 +31,10 @@ python3 deploy/setup.py --release deploy/packs/wikipedia-en-nopic-2026-06.json \
   --data "$ALMANAC_DATA/sources" --prepare-only --connections 4
 python3 deploy/setup.py --release deploy/packs/appropedia.json \
   --data "$ALMANAC_DATA/sources" --prepare-only
+python3 deploy/setup.py --release deploy/packs/cd3wd.json \
+  --data "$ALMANAC_DATA/sources" --prepare-only
 ```
 
-For the optional Oregon map file, use `deploy/packs/map-oregon.json` with the same command. Downloaded files appear under the corresponding `releases/<id>/sources/` or `maps/` directory. Every file is independently inspectable. Map acquisition does not start a map service.
 
 Before starting the reference service, provide the selected content profile and a published source generation. Native full-text search and complete original reading can be available while dense indexing continues; the service reports that incomplete semantic coverage explicitly and remains unqualified. The profile describes exact encoder/tokenizer identities and retrieval settings; [the content package](../content/README.md) documents the ingestion API and its receipts. The gateway profile independently describes the selected local language model, tokenizer/template and per-role resource budgets; [gateway configuration](../proxy/README.md) documents that schema. These files are outputs of preparing and measuring the chosen runtime, not API keys. Do not fill missing admission measurements with guessed values. An empty content state directory cannot answer corpus questions.
 
@@ -97,6 +98,24 @@ Prepare the verified complete-article Wikipedia archive with its checked-in v4 i
   --source-base-url https://en.wikipedia.org/wiki --license CC-BY-SA-4.0 \
   --selection-policy canonical-html \
   --inspection content/inspections/wikipedia-2026-06-html-v4.json \
+  --reserve-bytes "$CONTENT_INDEX_RESERVE_BYTES" \
+  --index-storage "$ALMANAC_DATA/index/qdrant" --workers 4 \
+  --embed-url "$CONTENT_EMBED_URL" --qdrant-url "$CONTENT_QDRANT_URL"
+```
+
+Prepare CD3WD's HTML articles in the same searchable library; the complete original archive retains PDF and other source files without requiring bulk OCR:
+
+```sh
+.venv/bin/python content/tools/prepare_native.py \
+  --profile "$ALMANAC_DATA/content-profile.json" --data "$ALMANAC_DATA/content-state" \
+  --archive "$ALMANAC_DATA/sources/releases/cd3wd-source-v1/sources/cd3wdproject.org_en_all_2025-11.zim" \
+  --sha256 f79a27413af0bd17d14adb3a556d282515a8bc1e127d791a5961c93ea9167b92 \
+  --pack-id cd3wd-en-2025-11 --title "CD3WD Practical Reference Library" \
+  --publisher "CD3WD collection and original publishers" \
+  --source-base-url https://www.cd3wdproject.org \
+  --license "Source-specific notices retained in original archive" \
+  --selection-policy canonical-html \
+  --inspection content/inspections/cd3wd-2025-11-html-v4.json \
   --reserve-bytes "$CONTENT_INDEX_RESERVE_BYTES" \
   --index-storage "$ALMANAC_DATA/index/qdrant" --workers 4 \
   --embed-url "$CONTENT_EMBED_URL" --qdrant-url "$CONTENT_QDRANT_URL"
@@ -178,7 +197,6 @@ The dedicated SSH control settings keep the forward owned by this process and re
 
 Both sizes exclude semantic/lexical derivatives, model and speech weights, application images, container-image expansion, and working space. The release records measured `index_workspace_bytes`, `runtime_workspace_bytes` and `image_store_bytes`. Setup reports additional required data space and checks the Docker store before downloads for an installation that will start services. Reservations sharing a filesystem are summed, including the portable export copy when its destination shares the data disk. Preparation-only and export modes do not reserve expanded container space because they do not load images. Download staging is on the data filesystem and is renamed into immutable storage, so it does not double the original's final disk requirement. Bundle export needs another full artifact copy on its destination filesystem. Final indexing elapsed time and disk use remain unmeasured; download completion alone is not retrieval readiness.
 
-Regional PMTiles are content files. The initial catalog pins Oregon, Washington and California using the upstream repository's Git LFS SHA-256/size declarations. Retain original file names and notices. They require an external reader; no map page, routing or AI map-reading capability is implied. Reader/style/font/sprite assets must be separately pinned and tested offline before a release claims map viewing. Oregon's inspected metadata records zooms 0–15, bounds `[-124.703541, 41.992082, -116.463262, 46.299099]` and OSM replication time `2025-12-18T04:00:00Z`; Washington and California remain uninspected. A filename date is not the underlying geographic data date.
 
 ## Optional portable bundles
 
@@ -241,7 +259,7 @@ Images do not include container writable layers or mounted volumes. Speech codec
 
 The selected CPU speech backend is [Pocket TTS with stock Alba](../speech/README.md); `deploy/packs/pocket-speech.json` pins its public assets, while `speech/Dockerfile` and `speech/requirements.lock` define the source build. The retained Orpheus manifests describe rollback artifacts and are not requirements for the selected backend.
 
-The checked-in `deploy/packs/wikipedia-en-nopic-2026-06.json`, `appropedia.json` and `map-oregon.json` are source-only acquisition manifests. Use the same setup entry with `--release` and `--prepare-only`. They retain originals and component-rights notices; zero index/workspace reservation means this invocation only acquires originals, not that full indexing costs zero. Their unresolved redistribution status deliberately prevents treating those downloads as an exportable release. License/configuration text may be embedded only when its UTF-8 size and SHA-256 match its declared artifact.
+The checked-in `deploy/packs/wikipedia-en-nopic-2026-06.json`, `appropedia.json` are source-only acquisition manifests. Use the same setup entry with `--release` and `--prepare-only`. They retain originals and component-rights notices; zero index/workspace reservation means this invocation only acquires originals, not that full indexing costs zero. Their unresolved redistribution status deliberately prevents treating those downloads as an exportable release. License/configuration text may be embedded only when its UTF-8 size and SHA-256 match its declared artifact.
 
 `--capture-assets recipe.json` captures already installed runtime files into the object store without downloading or changing services. A private host recipe adds a `capture` field to each pinned artifact, either `{"file": "/absolute/source"}` or `{"container": "exact-container-name", "path": "/absolute/container/path"}`. Container capture dereferences the named snapshot symlink and checks bytes against the pinned upstream digest; it does not sweep a whole cache or include credentials. The portable `captured-artifacts.json` omits those host capture locations. Include its artifacts and complete notices in the eventual release. Original nanosecond modification times are preserved when copying ordinary files so immutable corpus integrity receipts survive bundle movement.
 

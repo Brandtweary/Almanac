@@ -124,7 +124,7 @@ class Service:
         # Native libzim queries are conjunctive, without Boolean operators.
         safe_query = " ".join(re.findall(r"[^\W_]+", query))
         for index, path in enumerate(paths):
-            hits = await self.zim.search(str(self.store.root / path), safe_query, self.profile.lexical_depth)
+            hits = await self.zim.search(str(self.store.root / path), safe_query, self.profile.lexical_depth, title_query=query)
             article_branches, article_weights = {}, {}
             with self.store.connect(generation) as db:
                 for article_rank, article in enumerate(hits, 1):

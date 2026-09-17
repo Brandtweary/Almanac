@@ -40,7 +40,7 @@ try{
   const tour=page.getByRole('dialog',{name:'Start with a question'});await tour.waitFor();
   assert.equal(await page.locator('.cw-onboarding').count(),1);assert.match(await tour.textContent(),/Enter sends/);
   await page.screenshot({path:out+'/'+name+'-tour.png'});
-  await tour.getByRole('button',{name:'Next',exact:true}).click();await page.getByRole('dialog',{name:'Talk to the librarian'}).waitFor();
+  await tour.getByRole('button',{name:'Next',exact:true}).click();await page.getByRole('dialog',{name:'Voice input'}).waitFor();
   await page.keyboard.press('Control+Space');assert.equal(await page.evaluate(()=>window.micCalls),0);
   await page.screenshot({path:out+'/'+name+'-microphone.png'});
   await page.getByRole('button',{name:'Back',exact:true}).click();assert.equal(await tour.count(),1);

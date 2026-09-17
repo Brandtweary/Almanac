@@ -2,13 +2,13 @@
 
 *Local AI for self-reliance and homesteading.*
 
+This website is a free hosted demo of Almanac, so you can try the application before running it on your own hardware.
+
 Almanac combines a local AI assistant with an offline reference library for homesteads, preparedness and off-grid communities. It helps you find information about growing food, managing water, maintaining shelter, repairing equipment and other practical work.
 
-## Research with sources
+## Working with the library
 
-Ask a question in ordinary language. Almanac searches the collection, reads relevant passages and follows up when it needs more information. Its answers link back to sources you can inspect. Tool cards show what it is doing, and you can stop a reply while it is working.
-
-The model can miss details or misunderstand a source. References let you check the instructions against the original material and the equipment or conditions in front of you.
+Ask a question in ordinary language. Almanac searches the collection, reads relevant passages and follows up when it needs more information. Tool cards show its searches and the passages it reads. Citations link to the original source pages.
 
 ## The collection
 
@@ -21,19 +21,16 @@ The [collection guide](https://github.com/Brandtweary/Almanac/blob/main/docs/lib
 
 ## Using Almanac
 
-- **Text and voice:** type a question or press Ctrl+Space to record; press it again to stop and send. Replies can be read aloud. Ctrl+Alt+Space stops the voice.
-- **Saved conversations:** reopen earlier chats, start another, or export and import conversation files.
-- **Optional memory:** retain useful context between conversations. The reference library works with memory switched off.
+- **Voice:** local speech-to-text and TTS. Ctrl+Space starts or stops recording; Ctrl+Alt+Space stops TTS.
+- **Optional memory:** retain useful context between conversations.
 - **Document attachments:** bring your own reference documents, with previews for PDFs, Office documents and spreadsheets.
-- **Long conversations:** automatic summaries keep the conversation within the model's context window while preserving the original history.
-- **Guided first visit:** a short click-through tour explains the controls. Replay it from Quick start in the header.
 
 ## Local operation
 
-The reference setup runs Muse Glimmer with a 131,072-token context on a single RTX 5090 with 32 GB of VRAM. The model was selected to run on consumer hardware rather than require a datacenter GPU.
+The reference setup runs Muse Glimmer with a 131,072-token context on a single RTX 5090 with 32 GB of VRAM. The setup requires one high-end consumer GPU, not a cluster of datacenter GPUs.
 
 Inference, speech and the installed library work without an internet connection. Optional web search provides access to current information when you are online. Chats and personal memory are stored in your browser.
 
-This free hosted demo processes requests on its server. Install Almanac yourself to run that processing on hardware you control.
+The demo processes requests on its server. A local installation runs them on your own hardware.
 
 [Source code and installation](https://github.com/Brandtweary/Almanac#building-the-reading-room)

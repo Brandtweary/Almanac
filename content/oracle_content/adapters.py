@@ -212,7 +212,20 @@ class ZimLexical:
     def __init__(self):
         self.lock = threading.Lock()
 
-    async def search(self, path, query, limit):
+    @staticmethod
+    def _with_exact_title(archive, query, paths, limit):
+        # Full-text BM25 can bury a long article beneath pages repeating its
+        # title. The archive's title index supplies an exact navigation hit.
+        title = query.strip().replace("_", " ")
+        for candidate in dict.fromkeys((title, title[:1].upper() + title[1:])):
+            try:
+                entry = archive.get_entry_by_title(candidate)
+            except KeyError:
+                continue
+            return [entry.path, *(path for path in paths if path != entry.path)][:limit]
+        return paths
+
+    async def search(self, path, query, limit, *, title_query=None):
         def run():
             from libzim.reader import Archive
             from libzim.search import Query, Searcher
@@ -221,5 +234,6 @@ class ZimLexical:
                 if not archive.has_fulltext_index:
                     raise ValueError("declared native ZIM index unavailable")
                 result = Searcher(archive).search(Query().set_query(query))
-                return list(dict.fromkeys(archive.get_entry_by_path(path).get_item().path for path in result.getResults(0, limit)))
+                paths = list(dict.fromkeys(archive.get_entry_by_path(path).get_item().path for path in result.getResults(0, limit)))
+                return self._with_exact_title(archive, title_query, paths, limit) if title_query is not None else paths
         return await asyncio.to_thread(run)

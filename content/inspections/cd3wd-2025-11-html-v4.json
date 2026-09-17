@@ -1,0 +1,33 @@
+{
+  "source_sha256": "f79a27413af0bd17d14adb3a556d282515a8bc1e127d791a5961c93ea9167b92",
+  "extraction_revision": "html-structural-v4",
+  "selection_policy": "canonical-html",
+  "checked": true,
+  "scope": "Representative CD3WD HTML text and source structure; original notices retained; PDFs preserved without OCR",
+  "observations": [
+    {
+      "path": "www.cd3wdproject.org/BIOGSHTM/APPLDEV/CONSTRUCT/AGITATION.HTML",
+      "title": "AT Information - Biogas Digest: Agitation",
+      "blocks": 48,
+      "lead_characters": 713,
+      "title_only_semantic_representation": false,
+      "body_text_sha256": "20ca724ce7be2a5886a65813ce6f48a01c60c285f6db4a3b53f3ebf206ee792f"
+    },
+    {
+      "path": "www.cd3wdproject.org/BIOGSHTM/APPLDEV/CONSTRUCT/CHECKLIST.HTML",
+      "title": "AT Information - Biogas Digest: Checklist for building a biogas plant",
+      "blocks": 35,
+      "lead_characters": 0,
+      "title_only_semantic_representation": true,
+      "body_text_sha256": "a62acda4668bd833ba2f1c5f4554cad2cab50e81aaa02afa85d7da89478a4432"
+    },
+    {
+      "path": "www.cd3wdproject.org/BIOGSHTM/APPLDEV/CONSTRUCT/PIPING.HTML",
+      "title": "AT Information - Biogas Digest: Piping systems",
+      "blocks": 28,
+      "lead_characters": 454,
+      "title_only_semantic_representation": false,
+      "body_text_sha256": "a89820159721695330cedecba104dcd38f99fb6764dda1c6711c5288964d4878"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "id": "cd3wd-source-v1",
+  "scope": "source acquisition only; component-specific extraction and rights review separate",
+  "index_workspace_bytes": 0,
+  "runtime_workspace_bytes": 0,
+  "image_store_bytes": 0,
+  "artifacts": [
+    {
+      "path": "notices/cd3wd.txt",
+      "kind": "license",
+      "bytes": 355,
+      "sha256": "25c6a0bbf80296c7faf1f4d8259c426cdc76e7c2db33865c52c073e2ccd7df75",
+      "embedded_text": "Source pack: CD3WD\nOriginal: https://lb.download.kiwix.org/zim/zimit/cd3wdproject.org_en_all_2025-11.zim\nSHA-256: f79a27413af0bd17d14adb3a556d282515a8bc1e127d791a5961c93ea9167b92\nAcquired from public upstream for local use. Container availability does not grant redistribution rights for every underlying work. Retain source labels and component notices.\n",
+      "urls": [],
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://lb.download.kiwix.org/zim/zimit/cd3wdproject.org_en_all_2025-11.zim.meta4"
+        ],
+        "notice": "notices/cd3wd.txt"
+      }
+    },
+    {
+      "path": "sources/cd3wdproject.org_en_all_2025-11.zim",
+      "bytes": 581165229,
+      "sha256": "f79a27413af0bd17d14adb3a556d282515a8bc1e127d791a5961c93ea9167b92",
+      "urls": [
+        "https://lb.download.kiwix.org/zim/zimit/cd3wdproject.org_en_all_2025-11.zim"
+      ],
+      "kind": "corpus",
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://lb.download.kiwix.org/zim/zimit/cd3wdproject.org_en_all_2025-11.zim.meta4"
+        ],
+        "notice": "notices/cd3wd.txt"
+      }
+    }
+  ]
+}

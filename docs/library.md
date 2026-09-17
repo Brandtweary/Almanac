@@ -1,12 +1,12 @@
 # Reference collection
 
-Almanac’s chat searches the installed English Wikipedia and Appropedia snapshots. The additional reference originals below are a source collection: download them from their publishers for independent reading. They are not included in the standard searchable installation or served as a document download bundle by the demo.
+Almanac’s chat searches the installed English Wikipedia, Appropedia and CD3WD snapshots. The additional reference originals below are a source collection: download them from their publishers for independent reading. They are not included in the standard searchable installation or served as a document download bundle by the demo.
 
-## Searchable collections and maps
+## Searchable collections
 
 - **English Wikipedia:** full articles without images, June 2026. The [source installation guide](install.md#source-based-local-setup) acquires and prepares the pinned archive.
 - **Appropedia:** English practical-reference archive, February 2026. The same installation guide covers acquisition and preparation.
-- **Oregon vector map:** an optional PMTiles file, acquired with the [map manifest](../deploy/packs/map-oregon.json) using the setup command in the [installation guide](install.md#source-based-local-setup). Files remain readable independently of the AI. A separate PMTiles reader, with its own offline styles and supporting assets, is required; the application supplies no map view or routing. See [content-pack preparation](install.md) for the reader and attribution boundary.
+- **CD3WD:** practical-reference archive, November 2025, with 13,220 HTML articles searchable and readable through the same tools. The complete original archive also retains its 77 PDFs; no OCR pass is required for the HTML collection. Acquisition and HTML preparation use the [installation guide](install.md#source-based-local-setup).
 
 ## Reference originals
 
