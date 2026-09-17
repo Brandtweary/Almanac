@@ -5,7 +5,7 @@ const steps = [
 	{ selector: ".cw-stop", title: "A moment of quiet", text: "Click here or press Ctrl+Alt+Space to stop the voice without stopping the written reply. Double-click to mute future speech; double-click again to unmute." },
 	{ selector: ".cw-mem", title: "Let the conversation carry forward", text: "Memory is optional. Enable it here if you want Almanac to retain useful context between chats." },
 	{ selector: '[title="Chats"]', title: "Find your way back", text: "Your saved conversations are here. They stay in this browser, ready for the next time you need them." },
-	{ selector: '[title="New Chat"]', title: "Turn to a fresh page", text: "Start another conversation here. You can replay this tour from Quick start in the header whenever you need it." },
+	{ selector: '[title="New Chat"]', title: "Turn to a fresh page", text: "Start another conversation here." },
 ];
 
 /** A first-visit tour explains controls without activating them. */
@@ -117,7 +117,7 @@ export class QuickStartTour {
 
 	private finish(): void {
 		if (this.dialog.open) this.dialog.close();
-		try { localStorage.setItem(STORAGE_KEY, "seen"); } catch { /* Replay remains available when persistence is unavailable. */ }
+		try { localStorage.setItem(STORAGE_KEY, "seen"); } catch { /* Storage restrictions can prevent remembering dismissal. */ }
 		if (this.restoreFocus?.isConnected) this.restoreFocus.focus({ preventScroll: true });
 	}
 

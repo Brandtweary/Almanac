@@ -1,7 +1,7 @@
 import { isUserMessage, userStatementText } from "./user-messages.js";
 import { MAINTENANCE_INSTRUCTIONS, emptyMaintenance, prepareMaintenance, createMaintenanceTool, forgetMaintenanceDecision, type MaintenanceState } from "./glossary-maintenance.js";
-// Durable personal-memory coverage. Audit and memory drafts run serially while
-// summaries run independently; only atomic acknowledged publications become live.
+// Durable personal-memory coverage. Audit, memory and summary run serially;
+// only atomic acknowledged publications become live.
 // The action buffers and coverage records survive reload without persisting model
 // credentials. All generation and retrieval calls use the local admission gateway.
 
@@ -232,6 +232,8 @@ export class PipelineRuntime {
 	private historyCoverage: Record<string, MemoryHistoryRef> = Object.create(null);
 	private publications: Promise<unknown> = Promise.resolve();
 	private attempted = new Set<string>();
+	// Failed receipt writes cannot alter committed snapshots, but must remain retryable.
+	private failedPublications = new Set<string>();
 	private deletedSessions = new Set<string>();
 	private activeSessionKey: string | undefined;
 	private explicitRetries = new Set<string>();
@@ -488,6 +490,7 @@ export class PipelineRuntime {
 				"outcome", { outcome: { kind: "cancelled" }, history: job.history, generation: job.generation }, "cancelled"))) : [];
 		this.generation++;
 		this.jobs = [];
+		this.failedPublications.clear();
 		for (const controller of this.controllers) controller.abort();
 		if (!persist) return this.pending;
 		const clear = this.ordered(async () => {
@@ -515,6 +518,9 @@ export class PipelineRuntime {
 		this.runningContext = state.runningContext;
 		this.generation = state.generation ?? 0;
 		this.jobs = state.jobs ?? [];
+		for (const id of this.failedPublications) {
+			if (!this.jobs.some(job => job.id === id && Object.values(job.stages).some(stage => stage !== "complete"))) this.failedPublications.delete(id);
+		}
 		this.maintenance = state.maintenance ?? emptyMaintenance();
 		this.historyCoverage = Object.assign(Object.create(null), state.historyCoverage ?? {});
 	}
@@ -571,14 +577,14 @@ export class PipelineRuntime {
 	}
 
 	get hasFailedWork(): boolean {
-		return this.jobs.some(job => Object.values(job.stages).some(state => state === "failed" || state === "refused"));
+		return this.jobs.some(job => this.failedPublications.has(job.id) || Object.values(job.stages).some(state => state === "failed" || state === "refused"));
 	}
 
 	/** Retry the oldest unfinished turn; later turns retain chronological ownership. */
 	retryPending(): void {
 		if (this.running || !this.allowed()) return;
 		const job = this.jobs.find(job => Object.values(job.stages).some(state => state !== "complete"));
-		if (job) { this.attempted.delete(job.id); this.explicitRetries.add(job.id); }
+		if (job) { this.attempted.delete(job.id); this.explicitRetries.add(job.id); this.failedPublications.delete(job.id); }
 		this.resumePending();
 	}
 
@@ -609,12 +615,19 @@ export class PipelineRuntime {
 				} catch (cancellationError) { this.report(cancellationError); }
 				return;
 			}
-			if (this.active(input)) await this.ordered(async () => {
-				const next = this.snapshot(); const current = next.jobs!.find(row => row.id === input.id);
-				if (current) { const role = (["audit", "memory", "summary"] as const).find(role => current.stages[role] !== "complete");
-					if (role) { current.stages[role] = "failed"; (current.outcomes ??= {})[role] = { kind: "failed", reason: String(error) }; await this.publish(next); } }
-			});
-			this.report(error);
+			let reported = error;
+			try {
+				if (this.active(input)) await this.ordered(async () => {
+					const next = this.snapshot(); const current = next.jobs!.find(row => row.id === input.id);
+					if (current) { const role = (["audit", "memory", "summary"] as const).find(role => current.stages[role] !== "complete");
+						if (role) { current.stages[role] = "failed"; (current.outcomes ??= {})[role] = { kind: "failed", reason: String(error) }; await this.publish(next); } }
+				});
+			} catch (publicationError) {
+				if (this.active(input)) this.failedPublications.add(input.id);
+				reported = new AggregateError([error, publicationError],
+					"Memory failed and its failure receipt could not be saved; unfinished work is retained for retry.");
+			}
+			this.report(reported);
 		}).finally(() => {
 			this.activeSessionKey = undefined;
 			this.running = false;
@@ -714,7 +727,12 @@ export class PipelineRuntime {
 		};
 		const continuation = () => user(`${base}\nCurrent evidence remains readable at memory_inspect(window, id=current). Earlier tool exchanges are archived in tool_results; inspect them rather than infer missing results. The current summary draft remains in working_summary/current.`);
 		const inspector = createMemoryInspector({ records, assertActive, page: async (record, collection, cursor, callId, args) => {
-			const call = { role: "assistant", content: [{ type: "toolCall", id: callId, name: "memory_inspect", arguments: args }], stopReason: "toolUse", timestamp: Date.now() } as AgentMessage;
+			// Measurement-only envelope: no generation occurred and these zero counters
+			// never enter retained messages, traces or usage accounting.
+			const call = { role: "assistant", api: input.model.api, provider: input.model.provider, model: input.model.id,
+				content: [{ type: "toolCall", id: callId, name: "memory_inspect", arguments: args as Record<string, unknown> }], stopReason: "toolUse", timestamp: Date.now(),
+				usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0,
+					cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } } satisfies import("@earendil-works/pi-ai").AssistantMessage;
 			const render = (slice: string, end: number) => [continuation(), call, { role: "toolResult", toolCallId: callId, toolName: "memory_inspect", isError: false,
 				content: [{ type: "text", text: inspectionPage(record, collection, cursor, slice, end) }], timestamp: Date.now() } as AgentMessage];
 			const page = await fitMemoryText(record.text, cursor, render, measure, limit);

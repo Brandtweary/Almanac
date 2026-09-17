@@ -76,7 +76,7 @@ export async function serializeModelRequest(context: Parameters<StreamFn>[1], ro
 		apiKey: "local", reasoning: releaseProfile().roles[role].thinkingLevel, maxTokens: releaseProfile().roles[role].maxOutputTokens, maxRetries: 0,
 		onPayload(payload) { captured = payload; throw new Error("Local serialization capture"); },
 	});
-	await stream.result();
-	if (!captured) throw new Error("Could not serialize model context");
+	const result = await stream.result();
+	if (!captured) throw new Error(`Could not serialize model context: ${result.errorMessage ?? result.stopReason}`);
 	return captured;
 }

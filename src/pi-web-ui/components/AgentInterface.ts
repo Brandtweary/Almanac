@@ -36,6 +36,7 @@ export class AgentInterface extends LitElement {
 	@property({ attribute: false }) onBeforeToolCall?: (toolName: string, args: any) => boolean | Promise<boolean>;
 	// Optional callback called when cost display is clicked
 	@property({ attribute: false }) onCostClick?: () => void;
+	@property({ attribute: false }) getSourceMessages?: () => AgentMessage[];
 	// Optional callback to override model selector behavior
 	@property({ attribute: false }) onModelSelect?: () => void;
 
@@ -60,9 +61,11 @@ export class AgentInterface extends LitElement {
 	// deliberately does NOT refresh this — the streaming container renders the live
 	// message, and re-rendering the whole list per token would defeat that split.
 	private _stableMessages: AgentMessage[] = [];
+	private _sourceMessages: AgentMessage[] = [];
 
 	private refreshStableMessages() {
 		this._stableMessages = this.session ? [...this.session.state.messages] : [];
+		this._sourceMessages = this.getSourceMessages?.() ?? [];
 	}
 
 	/** Re-sync the committed message list after an EXTERNAL edit to
@@ -95,6 +98,7 @@ export class AgentInterface extends LitElement {
 
 	override willUpdate(changedProperties: Map<string, any>) {
 		super.willUpdate(changedProperties);
+		if (changedProperties.has("getSourceMessages")) this._sourceMessages = this.getSourceMessages?.() ?? [];
 
 		// Re-subscribe when session property changes
 		if (changedProperties.has("session")) {
@@ -327,6 +331,7 @@ export class AgentInterface extends LitElement {
 				<!-- Stable messages list - won't re-render during streaming -->
 				<message-list
 					.messages=${this._stableMessages}
+					.sourceMessages=${this._sourceMessages}
 					.tools=${state.tools}
 					.pendingToolCalls=${this.session ? this.session.state.pendingToolCalls : new Set<string>()}
 					.isStreaming=${state.isStreaming}

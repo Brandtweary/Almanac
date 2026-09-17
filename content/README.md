@@ -54,8 +54,7 @@ in both generation indexes are searchable, so installation must enumerate/ingest
 scope and report exclusions. Native article hits undergo temporary per-article FTS5 localization, so a matching
 identifier late in an article enters lexical candidates. Native article rank and within-article
 passage rank combine through nested RRF; raw BM25 scores from separate articles are never added.
-This explicit ranking choice still requires quality calibration. Archives without native full-text indexes use extracted FTS5. Regional maps
-are inventory assets only, not model tools or vector points.
+This explicit ranking choice still requires quality calibration. Archives without native full-text indexes use extracted FTS5.
 
 See [API contracts](docs/api.md). `Service.candidates` exposes branch ranks and the fused candidate
 pool for evaluation without a public diagnostic endpoint. Run mechanical tests with

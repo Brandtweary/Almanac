@@ -19,7 +19,7 @@ function backend(name = `stages-${serial++}`) {
     stores: ["lexicon", "pipeline", "memory-consent"].map(name => ({ name })) });
 }
 async function fixture(options: { raw?: ReturnType<typeof backend>; loop?: PipelineDeps["runLoop"]; summary?: PipelineDeps["completion"];
-  initialGraph?: GraphAsset; beforeWrite?: (state: PipelineSnapshot) => Promise<void>; afterWrite?: (state: PipelineSnapshot, graph: GraphAsset) => void } = {}) {
+  roleLoop?: boolean; initialGraph?: GraphAsset; beforeWrite?: (state: PipelineSnapshot) => Promise<void>; afterWrite?: (state: PipelineSnapshot, graph: GraphAsset) => void } = {}) {
   const raw = options.raw ?? backend(); const storage = new MemoryStorage(raw);
   if (options.initialGraph) { await storage.load(); await storage.save({ graph: options.initialGraph }); }
   const saved = await storage.load(); let graph = saved.graph.present ? new Graph(saved.graph.value as GraphAsset) : Graph.empty();
@@ -34,9 +34,11 @@ async function fixture(options: { raw?: ReturnType<typeof backend>; loop?: Pipel
     getConsent: () => storage.invalidated ? "declined" : consent, addCost: () => {}, onStateChange: () => {}, onActivity: () => {},
     onError: error => { errors.push(error); }, runLoop: async (...args) => {
       const output = await (options.loop ?? (async () => completed()))(...args);
-      await args[1].tools!.find(tool => tool.name === "memory_finish")!.execute("finish", { outcome: "completed", reason: "Fixture completed" }, undefined, undefined);
+      const summaryDraft = args[1].tools!.find(tool => tool.name === "summary_draft");
+      if (summaryDraft) await summaryDraft.execute("finish", { operation: "store", text: "The user maintains an orchard." }, undefined, undefined);
+      else await args[1].tools!.find(tool => tool.name === "memory_finish")!.execute("finish", { outcome: "completed", reason: "Fixture completed" }, undefined, undefined);
       return output;
-    }, completion: args => async (...params) => { const text = await (options.summary ?? (() => async () => "[NO_ENTRY]"))(args)(...params); args.onUsage?.({promptTokens:1,completionTokens:1}); return text; },
+    }, completion: options.roleLoop ? undefined : args => async (...params) => { const text = await (options.summary ?? (() => async () => "[NO_ENTRY]"))(args)(...params); args.onUsage?.({promptTokens:1,completionTokens:1}); return text; },
   });
   runtime.loadSnapshot(saved); runtime.startSession("conversation");
   return { runtime, storage, raw, graph: () => graph, errors, revoke: () => { consent = "declined"; return runtime.cancel(); } };
@@ -250,3 +252,66 @@ test("glossary review drafts roll back with failed stages and publish receipts o
   assert.equal(durable!.maintenance!.decisions[0].survivorId,a.id);
   assert.equal(durable!.jobs![0].stages.memory,"complete");
 });
+
+for (const failedRole of ["audit", "memory", "summary"] as const) {
+  test(`persistent storage failure after ${failedRole} intent remains visible and retryable`, async () => {
+    let unavailable = false;
+    let inject = true;
+    const h = await fixture({ roleLoop: true,
+      loop: async (prompt, context) => {
+        const text = String((prompt[0] as any).content);
+        if (text.includes("## Your role: audit")) await add(context, "audit-term");
+        else if (!text.includes("## Your role: summary")) await add(context, "memory-term");
+        return completed();
+      },
+      beforeWrite: async state => {
+        if (inject && state.jobs?.[0].stages[failedRole] === "complete") unavailable = true;
+        if (unavailable) throw new Error("Synthetic storage unavailable");
+      },
+    });
+    h.runtime.onTurnEnd(() => messages, false);
+    await assert.doesNotReject(h.runtime.whenIdle());
+    assert(h.errors.length > 0, "storage failure must reach the application error surface");
+    assert(h.runtime.hasFailedWork, "idle indicator must expose failed publication instead of showing saved");
+    const durable = await h.raw.get<PipelineSnapshot>("pipeline", "state");
+    assert.equal(durable!.jobs![0].stages[failedRole], "running", "failed receipt must not invent durable acknowledgement");
+    assert.equal(durable!.jobs![0].messages.length, 1, "unfinished source must remain recoverable");
+    const prior = ["audit", "memory", "summary"].indexOf(failedRole);
+    assert.equal(h.graph().thoughts.size, Math.min(prior, 2), "failed graph draft must stay private");
+    assert.equal(h.runtime.getRunningContext().length, 0);
+    inject = false; unavailable = false;
+    h.runtime.retryPending(); await h.runtime.whenIdle();
+    assert.equal(h.runtime.hasFailedWork, false);
+    assert.deepEqual(Object.values(h.runtime.snapshot().jobs![0].stages), ["complete", "complete", "complete"]);
+  });
+}
+
+
+for (const failedRole of ["audit", "memory", "summary"] as const) {
+  test(`provider failure in ${failedRole} rolls back that role and retry does not replay siblings`, async () => {
+    let fail = true;
+    const calls: string[] = [];
+    const h = await fixture({ roleLoop: true, loop: async (prompt, context) => {
+      const text = String((prompt[0] as any).content);
+      const role = text.includes("## Your role: audit") ? "audit" : text.includes("## Your role: summary") ? "summary" : "memory";
+      calls.push(role);
+      if (role !== "summary") await add(context, `${role}-term`);
+      if (role === failedRole && fail) throw new Error("Synthetic provider disconnect after draft mutation");
+      return completed();
+    } });
+    h.runtime.onTurnEnd(() => messages, false); await h.runtime.whenIdle();
+    const roles = ["audit", "memory", "summary"] as const;
+    const index = roles.indexOf(failedRole);
+    assert.deepEqual(calls, roles.slice(0, index + 1));
+    assert.equal(h.runtime.snapshot().jobs![0].stages[failedRole], "failed");
+    assert.equal(h.graph().thoughts.size, Math.min(index, 2));
+    assert.equal(h.runtime.getRunningContext().length, 0);
+    const committedBefore = await h.raw.get<PipelineSnapshot>("pipeline", "state");
+    assert.equal(committedBefore!.jobs![0].stages[failedRole], "failed");
+    fail = false; h.runtime.retryPending(); await h.runtime.whenIdle();
+    assert.deepEqual(calls, [...roles.slice(0, index + 1), ...roles.slice(index)]);
+    assert.deepEqual(Object.values(h.runtime.snapshot().jobs![0].stages), ["complete", "complete", "complete"]);
+    assert.equal(h.graph().thoughts.size, 2);
+    assert.equal(h.runtime.getRunningContext()[0].text, "The user maintains an orchard.");
+  });
+}

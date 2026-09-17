@@ -17,6 +17,8 @@ The source Docker recipe is `speech/Dockerfile`; `speech/compose.yaml` mounts ve
 
 Startup requires all assets locally and disables model-hub network access. `GET /health` reports service readiness after initial model/voice loading, with `workerLoaded` distinguishing a warm worker from one awaiting lazy reload. The only synthesis path is `/api/tts_streaming?voice=alba&format=PcmMessagePack`. `cfg_alpha` is accepted for compatibility but does not change Pocket's sampling configuration.
 
+The browser streams link labels into speech while excluding link destinations and corpus handles before sentence chunking; written responses and their citations remain intact.
+
 Each connection receives `Ready`, accumulates bounded `Text` frames, and begins generation at `Eos`; the browser already supplies sentence-sized sessions. Audio streams as 24 kHz mono float PCM `Audio` frames, followed by a `Text` timing receipt and normal close. A failure closes abnormally. One generation owns the engine at a time; busy clients receive 1013. Synthesis runs in a persistent spawned process; disconnect, deadline expiry or failure kills and reaps that worker before admission is released, and the next request loads a fresh engine. Queued audio, frame size, text length and session lifetime are bounded.
 
 ## Tests and measurements

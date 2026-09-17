@@ -57,7 +57,8 @@ try{
   await page.evaluate(()=>window.load([{role:'user',content:'Existing question',timestamp:1}]));assert.equal(await page.locator('.cw-onboarding').count(),0,'saved conversation has no introduction');
   await page.evaluate(()=>window.load([{role:'memory-context',content:'injected context'}]));assert.equal(await page.locator('.cw-onboarding').count(),1,'memory alone does not hide the introduction');
   await page.evaluate(()=>window.load([{role:'voice-pending',timestamp:new Date().toISOString()}]));assert.equal(await page.locator('.cw-onboarding').count(),0,'recording hides introduction');
-  await page.getByTitle('New Chat',{exact:true}).click();await page.getByTitle('Replay quick start',{exact:true}).click();
+  assert.equal(await page.getByTitle('Replay quick start',{exact:true}).count(),0);
+  await page.evaluate(()=>localStorage.removeItem('almanac.quick-start.v1'));await page.reload();await page.waitForFunction(()=>window.ready===true);
   for(let step=0;step<6;step++){
    const bounds=await page.locator('dialog[open]').boundingBox();assert(bounds.x>=0&&bounds.y>=0&&bounds.x+bounds.width<=viewport.width+1&&bounds.y+bounds.height<=viewport.height+1);
    assert(await page.locator('dialog[open]').evaluate(e=>document.activeElement===e.querySelector('h2')),'each new instruction receives accessible focus');
@@ -66,7 +67,7 @@ try{
   await page.getByRole('button',{name:'About',exact:true}).click();await page.screenshot({path:out+'/'+name+'-about.png',fullPage:true});
   assert.match(await page.locator('#about').textContent(),/Local AI for self-reliance and homesteading/);
   await page.locator('#about').evaluate(e=>e.scrollTop=e.scrollHeight);await page.screenshot({path:out+'/'+name+'-about-library.png'});
-  await page.getByTitle('Replay quick start',{exact:true}).click();assert.equal(await page.locator('dialog[open]').count(),1,'replay returns from About to anchored chat');
+  await page.evaluate(()=>localStorage.removeItem('almanac.quick-start.v1'));await page.reload();await page.waitForFunction(()=>window.ready===true);
   await page.setViewportSize({width:320,height:300});await page.getByRole('button',{name:'Next',exact:true}).click();
   const short=await page.locator('dialog[open]').boundingBox();assert(short.y>=0&&short.y+short.height<=301,'short viewport contains tour');await page.getByRole('button',{name:'Skip tour',exact:true}).click();
   assert.equal(await page.evaluate(()=>window.micCalls),0);assert.deepEqual(errors,[]);await page.close();

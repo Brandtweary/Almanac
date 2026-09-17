@@ -50,3 +50,11 @@ def test_v4_retains_mediawiki_heading_anchor_without_reinterpreting_v3():
     source = '<h2><span class="mw-headline" id="Area">Area m<sup>2</sup></span></h2>'
     assert html_blocks(source)[0].anchor == 'Area'
     assert html_blocks(source, 'html-structural-v3')[0].anchor is None
+
+
+def test_deep_legacy_markup_preserves_text_and_math_without_recursion():
+    from oracle_content.extract import html_blocks
+    inline = '<font>' * 1500 + 'Keep compost aerated; H<sub>2</sub>O and x<sup>2</sup>.' + '</font>' * 1500
+    assert html_blocks('<p>' + inline + '</p>')[0].text == 'Keep compost aerated; H_(2)O and x^(2).'
+    blocks = html_blocks('<div>' * 1500 + '<p>Keep compost aerated.</p>' + '</div>' * 1500)
+    assert [block.text for block in blocks] == ['Keep compost aerated.']

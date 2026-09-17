@@ -39,39 +39,50 @@ class TokenCounter:
 def inline_content(node):
     """Preserve inline mathematical structure without interpreting expressions."""
     flags = set()
-    def render(value):
+    parts = []
+    stack = [(node, parts, None)]
+    while stack:
+        value, output, parent = stack.pop()
+        if parent is not None:
+            text = "".join(output)
+            if value.name == "sup":
+                # Citation superscripts remain citations, not numerical exponents.
+                if "reference" not in value.get("class", []) and not re.fullmatch(r"\s*\[[^\]]+\]\s*", text):
+                    text = "^(" + text.strip() + ")"
+            else:
+                text = "_(" + text.strip() + ")"
+            parent.append(text)
+            continue
         if isinstance(value, NavigableString):
-            return str(value)
-        if not isinstance(value, Tag):
-            return ""
-        if value.name in {"script", "style", "nav", "noscript"}:
-            return ""
+            output.append(str(value))
+            continue
+        if not isinstance(value, Tag) or value.name in {"script", "style", "nav", "noscript"}:
+            continue
         if value.name == "math":
             annotation = value.find("annotation", attrs={"encoding": re.compile(r"(?:application/x-tex|text/x-tex)", re.I)})
             tex = value.get("alttext") or (annotation.get_text() if annotation else None)
             if tex:
-                return "\\(" + tex.strip() + "\\)"
-            flags.add("math_requires_original_inspection")
-            flags.add("text_omitted")
-            return "[Mathematical expression; inspect original]"
+                output.append("\\(" + tex.strip() + "\\)")
+            else:
+                flags.update(("math_requires_original_inspection", "text_omitted"))
+                output.append("[Mathematical expression; inspect original]")
+            continue
         if value.name == "img" and any("math" in cls for cls in value.get("class", [])):
             if value.get("alt"):
-                return "\\(" + value["alt"].strip() + "\\)"
-            flags.add("math_requires_original_inspection")
-            flags.add("text_omitted")
-            return "[Mathematical expression; inspect original]"
-        text = "".join(render(child) for child in value.children)
-        if value.name == "sup":
-            # Citation superscripts remain citations, not numerical exponents.
-            if "reference" in value.get("class", []) or re.fullmatch(r"\s*\[[^\]]+\]\s*", text):
-                return text
-            return "^(" + text.strip() + ")"
-        if value.name == "sub":
-            return "_(" + text.strip() + ")"
+                output.append("\\(" + value["alt"].strip() + "\\)")
+            else:
+                flags.update(("math_requires_original_inspection", "text_omitted"))
+                output.append("[Mathematical expression; inspect original]")
+            continue
         if value.name == "br":
-            return "\n"
-        return text
-    return render(node), sorted(flags)
+            output.append("\n")
+            continue
+        if value.name in {"sup", "sub"}:
+            children_output = []
+            stack.append((value, children_output, output))
+            output = children_output
+        stack.extend((child, output, None) for child in reversed(value.contents))
+    return "".join(parts), sorted(flags)
 
 
 def html_blocks(html: str, revision: str = "html-structural-v4") -> list[Block]:
@@ -86,6 +97,13 @@ def html_blocks(html: str, revision: str = "html-structural-v4") -> list[Block]:
     root = soup.select_one(".mw-parser-output") or soup.find("main") or soup.find("article") or soup.body or soup
     containers = {"p", "li", "pre", "table", "figure", "ul", "ol", "div", "section", "article", "main", "blockquote"}
     headings_tags = {"h1", "h2", "h3", "h4", "h5", "h6"}
+    # Cache subtree membership instead of rescanning deeply nested wrappers.
+    descendant_blocks = {}
+    for tag in reversed([root, *(value for value in root.descendants if isinstance(value, Tag))]):
+        descendant_blocks[id(tag)] = any(
+            isinstance(child, Tag) and (child.name in containers or child.name in headings_tags or descendant_blocks.get(id(child), False))
+            for child in tag.children
+        )
 
     def emit(text, kind, node, flags=None):
         text = text.strip()
@@ -156,17 +174,23 @@ def html_blocks(html: str, revision: str = "html-structural-v4") -> list[Block]:
                 mathematical_image = child.name == "img" and any("math" in cls for cls in child.get("class", []))
                 if child.name in containers or child.name in headings_tags or (child.name == "img" and (legacy or not mathematical_image)):
                     flush()
-                    visit(child, kind)
-                elif child.find(list(containers | headings_tags)):
+                    yield child, kind
+                elif descendant_blocks.get(id(child), False):
                     flush()
-                    visit(child, kind)
+                    yield child, kind
                 else:
                     value = child.get_text(" ", strip=True) if legacy else inline_content(child)[0]
                     if value:
                         buffer.append(value)
         flush()
 
-    visit(root)
+    visits = [visit(root)]
+    while visits:
+        try:
+            child, kind = next(visits[-1])
+            visits.append(visit(child, kind))
+        except StopIteration:
+            visits.pop()
     if not blocks:
         text = content(root)
         if text:

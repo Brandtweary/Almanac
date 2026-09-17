@@ -4,6 +4,8 @@ The browser loads its model, role budgets and readiness from `/v1/profile`, send
 
 Reference and conversation-history tool cards keep raw arguments/results collapsed behind the existing inspector; source coverage and failures remain visible in their compact status.
 
+Researched answers include a sources footer derived from successful corpus calls in that user turn, reconstructed from original conversation history after reload or compaction. It lists documents read, or explicitly labeled search results when no document was read; links open the retained source in a new tab or download it, and do not certify the answer's claims.
+
 Queue status and cancellation use transient request handles, context compaction preserves an explicit source ledger and marks omitted evidence for rereading, and personal-memory failure pauses its durable queue with a visible retry control while reference chat remains usable.
 
 Automatic compaction runs before new input and within long research turns, preserving the current request and complete tool-call/result groups under the profile's measured budgets. Full citation metadata remains stored for validation while its model-facing representation is a fixed notice; summaries retain source handles and document identities, and original evidence remains available through history and corpus reads.

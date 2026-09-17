@@ -1,3 +1,4 @@
+import { SpeechTextFilter } from "./speech-text.js";
 import { waitForSpeechEnd } from "./tts-idle.js";
 import { speechSocketUrl } from "./app-paths.js";
 // tts.ts — the streaming text-to-speech half of the browser-orchestrated voice
@@ -54,8 +55,8 @@ const TRAILING_CLOSERS = /[.!?)\]}"'»”’]/;
 //   2. A newline (a hard break even without terminal punctuation).
 //   3. The long-buffer fallback (FLUSH_MAX_CHARS) so an unterminated run speaks.
 //
-// Punctuation is DELIBERATELY preserved — the TTS server enunciates it, and markdown
-// (* _ `) is already stripped upstream. We only trim surrounding whitespace.
+// Sentence punctuation and quantities are preserved. Link destinations are
+// removed by the speech projection before text reaches this chunker.
 export class SentenceChunker {
 	private buf = "";
 
@@ -124,7 +125,8 @@ export class SentenceChunker {
 // One-shot: split a complete string into speakable chunks (Tier-3 fallback path).
 export function chunkText(text: string): string[] {
 	const chunker = new SentenceChunker();
-	const out = chunker.push(text);
+	const speech = new SpeechTextFilter();
+	const out = chunker.push(speech.push(text) + speech.flush());
 	const tail = chunker.flush();
 	if (tail) out.push(tail);
 	return out;
@@ -134,9 +136,11 @@ export function chunkText(text: string): string[] {
 // boundaries complete (Tier-1 path — overlaps generation with synthesis).
 export async function* chunkStream(tokens: AsyncIterable<string>): AsyncIterable<string> {
 	const chunker = new SentenceChunker();
+	const speech = new SpeechTextFilter();
 	for await (const tok of tokens) {
-		for (const chunk of chunker.push(tok)) yield chunk;
+		for (const chunk of chunker.push(speech.push(tok))) yield chunk;
 	}
+	for (const chunk of chunker.push(speech.flush())) yield chunk;
 	const tail = chunker.flush();
 	if (tail) yield tail;
 }

@@ -30,3 +30,5 @@
 .cw-tour-content { max-height: var(--tour-content-height); overflow-y: auto; }
 
 .cw-tour h2:focus { outline: none; }
+
+button.cw-stop-response, button.cw-stop-response:hover { color: var(--destructive); }

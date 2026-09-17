@@ -344,8 +344,9 @@ export class MessageEditor extends LitElement {
 										variant: "ghost",
 										size: "icon",
 										onClick: this.onAbort,
+										title: "Stop response",
 										children: icon(Square, "sm"),
-										className: "h-8 w-8",
+										className: "h-8 w-8 cw-stop-response",
 									})}
 								`
 								: html`

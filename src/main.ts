@@ -902,6 +902,7 @@ const createAgent = async (initialState?: Partial<AgentState>, savedHistory?: Co
 	evidenceLedger.restore(agent.state.messages);
 	const owner = agent;
 	const history = new ConversationHistory(savedHistory, initialState?.messages);
+	evidenceLedger.restore(history.messages());
 	histories.set(owner, history);
 	sessionRevisions.set(owner, savedRevision);
 	let preparation: AbortController | undefined;
@@ -1150,6 +1151,7 @@ const createAgent = async (initialState?: Partial<AgentState>, savedHistory?: Co
 
 	if (creation !== agentCreation) return;
 	if (chatPanel.agentInterface) {
+		chatPanel.agentInterface.getSourceMessages = () => history.messages();
 		chatPanel.agentInterface.enableModelSelector = false;
 		chatPanel.agentInterface.enableThinkingSelector = false;
 	}
@@ -1275,10 +1277,6 @@ const renderHeader = () => {
 						children: "About",
 						onClick: () => setView("about"),
 					}) : null}
-					${Button({
-						variant: "ghost", size: "sm", children: "Quick start", title: "Replay quick start",
-						onClick: () => { setView("chat"); quickStartTour?.start(); },
-					})}
 					${Button({
 						variant: "ghost",
 						size: "sm",

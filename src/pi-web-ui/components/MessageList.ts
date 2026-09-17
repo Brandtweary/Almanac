@@ -1,3 +1,5 @@
+import { collectAnswerSources, answerIdentity } from "../../answer-sources.js";
+import { renderAnswerSources } from "./AnswerSources.js";
 import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
 import type {
 	AssistantMessage as AssistantMessageType,
@@ -10,6 +12,7 @@ import { renderMessage } from "./message-renderer-registry.js";
 
 export class MessageList extends LitElement {
 	@property({ type: Array }) messages: AgentMessage[] = [];
+	@property({ type: Array }) sourceMessages: AgentMessage[] = [];
 	@property({ type: Array }) tools: AgentTool[] = [];
 	@property({ type: Object }) pendingToolCalls?: ReadonlySet<string>;
 	@property({ type: Boolean }) isStreaming: boolean = false;
@@ -25,6 +28,8 @@ export class MessageList extends LitElement {
 	}
 
 	private buildRenderItems() {
+		const currentSources = collectAnswerSources(this.messages);
+		const archivedSources = collectAnswerSources(this.sourceMessages);
 		// Map tool results by call id for quick lookup
 		const resultByCallId = new Map<string, ToolResultMessageType>();
 		for (const message of this.messages) {
@@ -69,7 +74,7 @@ export class MessageList extends LitElement {
 						.hideToolCalls=${false}
 						.hidePendingToolCalls=${this.isStreaming}
 						.onCostClick=${this.onCostClick}
-					></assistant-message>`,
+					></assistant-message>${renderAnswerSources(archivedSources.get(answerIdentity(amsg)) ?? currentSources.get(answerIdentity(amsg)))}`,
 				});
 				index++;
 			} else {
