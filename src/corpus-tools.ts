@@ -99,7 +99,7 @@ const searchSchema = Type.Object({ query: Type.String({ minLength: 1 }), documen
 const readSchema = Type.Object({ document_id: Type.String({ minLength: 1 }), passage_id: Type.Optional(Type.String()), cursor: Type.Optional(Type.String()) });
 export function createCorpusTools(ledger: EvidenceLedger): AgentTool[] {
 	return [
-		{ name: "corpus_search", label: "Search library", description: "Search the installed offline reference library with lexical and semantic retrieval. Returns immutable passage handles, scope and degradation status. Excerpts may omit qualifications: read supporting sections before practical advice.", parameters: searchSchema, execute: (_id, params, signal) => corpusRequest("search", params, ledger, signal) },
+		{ name: "corpus_search", label: "Search library", description: "Search the installed offline reference library with lexical and semantic retrieval. Use concise topic terms: native archive lexical search requires all terms. Refine the query or search within a document when needed, and follow cursors for additional results. Returns immutable passage handles, scope and degradation status. Excerpts may omit qualifications: read supporting sections before practical advice.", parameters: searchSchema, execute: (_id, params, signal) => corpusRequest("search", params, ledger, signal) },
 		{ name: "corpus_read", label: "Read source", description: "Read an exact source passage and neighboring context, or request a document's contents without passage_id. Preserve table headers, units, warnings and exceptions; follow continuation handles for incomplete sections.", parameters: readSchema, execute: (_id, params, signal) => corpusRequest("read", params, ledger, signal) },
 	];
 }

@@ -338,7 +338,9 @@ class NativeReader:
         self.verify_original()
         paths = []
         if not document_id:
-            safe = " OR ".join('"' + token + '"' for token in re.findall(r"[^\W_]+", query))
+            # libzim combines terms with AND and disables Boolean syntax;
+            # injected OR would be another required word, not an operator.
+            safe = " ".join(re.findall(r"[^\W_]+", query))
             paths = await zim.search(str(self.path), safe, limit) if safe else []
         return await asyncio.to_thread(self._localize, paths, query, limit, document_id)
 

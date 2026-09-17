@@ -121,7 +121,8 @@ class Service:
         if paths and self.zim is None:
             raise ValueError("native ZIM lexical adapter unavailable")
         branches = {"extracted": rows}
-        safe_query = " OR ".join('"' + t.replace('"', '') + '"' for t in re.findall(r"[^\W_]+", query))
+        # Native libzim queries are conjunctive, without Boolean operators.
+        safe_query = " ".join(re.findall(r"[^\W_]+", query))
         for index, path in enumerate(paths):
             hits = await self.zim.search(str(self.store.root / path), safe_query, self.profile.lexical_depth)
             article_branches, article_weights = {}, {}

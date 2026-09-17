@@ -47,6 +47,8 @@ def test_native_zim_search_and_streamed_article_identity(tmp_path):
     service = Service(store, p, dense, Tokens(), ZimLexical())
     result = asyncio.run(service.search(SearchRequest(query="ZX42")))
     assert any("ZX42" in h["excerpt"] for h in result["hits"])
+    pool = asyncio.run(service.candidates("ZX42 pressure"))
+    assert pool["branches"]["lexical"]
     hits = list(result["hits"])
     while result["cursor"]:
         result = asyncio.run(service.search(SearchRequest(query="ZX42", cursor=result["cursor"])))

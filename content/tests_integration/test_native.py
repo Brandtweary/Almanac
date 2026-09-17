@@ -66,6 +66,9 @@ def test_native_full_reader_and_independent_search_without_duplicate_catalog(tmp
     assert pool["branches"]["lexical"]
     # Fake dense intentionally returns Water by paraphrase; lexical finds Valve independently.
     assert pool["branches"]["dense"]
+    multiword = asyncio.run(service.candidates("ZX42 pressure"))
+    assert multiword["branches"]["lexical"]
+    assert any("ZX42 pressure" in multiword["passages"][pid].text for pid, _ in multiword["branches"]["lexical"])
     result = asyncio.run(service.search(SearchRequest(query="ZX42")))
     hit = next(hit for hit in result["hits"] if "ZX42" in hit["excerpt"])
     read = asyncio.run(service.read(ReadRequest(document_id=hit["document_id"], passage_id=hit["passage_id"])))

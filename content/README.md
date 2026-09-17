@@ -4,6 +4,7 @@ A Python service owns immutable source generations, SQLite FTS5 retrieval and so
 It independently queries a local Qdrant vector index through a pinned local embedding service,
 combines ranks, and optionally applies a qualified local reranker. It does not run an additional
 LLM research agent. The browser chooses what to search and read.
+Native archive lexical queries require all supplied terms, so use concise topic terms and refine or scope the query when necessary; Boolean operators are not supported by libzim.
 
 Install this package using the deployment preparation workflow. Run `python -m oracle_content`
 with `CONTENT_STATE_DIR`, `CONTENT_PROFILE`, `CONTENT_EMBED_URL`, `CONTENT_QDRANT_URL` and, for a
