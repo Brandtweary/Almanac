@@ -6,6 +6,7 @@ import { ConversationHistory, createConversationHistoryTool, historyWithoutPerso
 import { buildOraclePrompt } from "./oracle-prompts.js";
 import { compactContext, COMPACTION_INSTRUCTIONS } from "./oracle-context.js";
 import { EvidenceLedger, createCorpusTools, resolveCorpusCitation } from "./corpus-tools.js";
+import { registerReferenceToolRenderers } from "./reference-tool-renderers.js";
 import { createLocalStreamFn, subscribeRequests, countRequestTokens, serializeModelRequest } from "./oracle-runtime.js";
 import { voiceLeaseResponse, serviceError } from "./service-contracts.js";
 import { sendWithAdmission } from "./send-admission.js";
@@ -44,7 +45,6 @@ import {
 	MYRIAPOD_THINKING_LEVEL,
 	proxyChatModel,
 	loadReleaseProfile,
-	qualificationMode,
 	releaseProfile,
 } from "./myriapod-model.js";
 import readmeDoc from "../README.md?raw";
@@ -80,6 +80,7 @@ import { installStopAudioButton } from "./stop-audio-button.js";
 registerCustomMessageRenderers();
 registerMemoryToolRenderers();
 registerWebToolRenderer();
+registerReferenceToolRenderers();
 
 // Rename pi-web-ui's "session" vocabulary to the friendlier "chat" everywhere it
 // surfaces (the SessionListDialog title etc. render via mini-lit's i18n). We
@@ -173,10 +174,6 @@ let servingPath: ServingPath;
 async function resolveServingPath(): Promise<ServingPath> {
 	await migrateLocalAccess();
 	await loadReleaseProfile();
-	if (qualificationMode && !document.getElementById("qualification-warning")) {
-		const notice = document.createElement("div"); notice.id = "qualification-warning"; notice.setAttribute("role", "status"); notice.className = "p-3 text-sm border border-amber-400";
-		notice.textContent = "Local qualification build — model and retrieval quality are under evaluation. This is not an admitted release."; document.body.prepend(notice);
-	}
 	return { model: proxyChatModel(), baseUrl: MYRIAPOD_PROXY_BASE, auth: "" };
 }
 const openSettings = async () => {

@@ -198,7 +198,8 @@ export class ToolMessageDebugView extends LitElement {
 				const maybeJson = JSON.parse(value);
 				return { content: JSON.stringify(maybeJson, null, 2), isJson: true };
 			}
-			return { content: JSON.stringify(value, null, 2), isJson: true };
+			const content = JSON.stringify(value, null, 2);
+			return { content: content ?? "(not provided)", isJson: content !== undefined };
 		} catch {
 			return { content: typeof value === "string" ? value : String(value), isJson: false };
 		}
