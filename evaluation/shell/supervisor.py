@@ -38,7 +38,9 @@ for stream in (process.stdout, process.stderr):
     selector.register(stream, selectors.EVENT_READ)
 outputs = {process.stdout: bytearray(), process.stderr: bytearray()}
 timed_out = truncated = False
-while selector.get_map():
+# EOF can precede the leader's exit. Wait for both under the same deadline;
+# poll() also reaps a normally exited leader before descendant cleanup.
+while selector.get_map() or process.poll() is None:
     if time.monotonic()-started > 5:
         timed_out = True
         break
@@ -54,6 +56,8 @@ while selector.get_map():
             truncated = True
     if truncated:
         break
+# Kill remaining group members after normal completion, or the whole group on
+# timeout/output overflow. A normally completed leader already has its status.
 try:
     os.killpg(process.pid, signal.SIGKILL)
 except ProcessLookupError:

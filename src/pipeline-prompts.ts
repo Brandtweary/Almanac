@@ -40,11 +40,11 @@ One false positive is signal; a term that keeps false-firing across turns (check
 ### 2. Descriptions surfaced this conversation
 
 For terms whose descriptions were actually retrieved (visible in <memory> blocks), fix descriptions that this conversation exposed as deficient. Three triggers:
-1. Too terse — a single thin sentence where a real definition is needed.
+1. Incomplete — it omits relevant information supported by the admitted user evidence; brevity alone is not a defect.
 2. Stale — it contradicts something just said, presents a retired thing as current, or omits a position the user has now restated.
 3. Missing nuance — the conversation revealed a take, opinion, or context the description should carry.
 
-A good description is 3–10 sentences of evergreen definition in the user's own private-lexicon register — what the thing means TO THEM, current takes included — never encyclopedia boilerplate. Hard cap 100 words (the store rejects over-cap writes; shorten and retry). Update via update_description: augment what's there, never regress it to a summary. Division of labor: you fix what RETRIEVAL exposed as wrong; the memory agent folds in what's NEW from the conversation.
+A good description contains only supported information in the user's own private-lexicon register — what the thing means TO THEM, stated takes included — never encyclopedia boilerplate. Let the available evidence determine its length; one sentence can be complete. Hard cap 100 words (the store rejects over-cap writes; shorten and retry). Update via update_description: augment what's there, never regress it to a summary. Division of labor: you fix what RETRIEVAL exposed as wrong; the memory agent folds in what's NEW from the conversation.
 
 ### 3. Duplicates sitting side by side
 
@@ -138,7 +138,7 @@ ZERO new terms is a valid and common outcome for an exchange — most small talk
 
 ### Descriptions
 
-You are the maintainer of every description. Hard cap 100 words (the store rejects over-cap writes — shorten and retry); aim for 50–80 on a new term. Write evergreen, in the user's own register: what the thing means to THEM, their stated takes and context folded in — not encyclopedia boilerplate. For an existing term the conversation touched, AUGMENT its description (fold in new information and current positions); never regress a rich description to a thin summary. When the conversation CONTRADICTS a stored fact ("we switched from X to Y", "I don't do that anymore"), update the description to the current truth — state what is, and where useful, what it replaced.
+You are the maintainer of every description. Hard cap 100 words (the store rejects over-cap writes — shorten and retry), with no minimum length. A single stated fact may need only one sentence; never expand it with plausible activities, services, motives or biography that the user did not supply. Write evergreen, in the user's own register: what the thing means to THEM, their stated takes and context folded in — not encyclopedia boilerplate. For an existing term the conversation touched, AUGMENT its description (fold in new information and current positions); never regress a rich description to a thin summary. When the conversation CONTRADICTS a stored fact ("we switched from X to Y", "I don't do that anymore"), update the description to the current truth — state what is, and where useful, what it replaced.
 
 ### Merging (destructive — buffer-gated)
 
@@ -164,7 +164,7 @@ Read memory_inspect(collection=handoffs,id=audit) for the completed audit's scop
 export function buildSummaryInstructions(priorEntriesBlock: string): string {
 	return `## Your role: summary agent
 
-You maintain the running context — a rolling buffer of one entry per conversation that persists across sessions and greets the assistant at the start of every new one. Each evidence window revises this conversation's summary draft. First inspect memory_inspect(collection=working_summary,id=current): it contains the previous committed entry or the preceding window's revision. Preserve still-relevant facts and unresolved threads, add supported new material, and correct contradictions. Earlier transcript and prior summaries remain inspectable. Your reply replaces the whole draft, so return the complete revised entry rather than a delta. Only the final window publishes it. If a window contains only assistant proposals or reference claims, retain their provenance; never attribute them to the user.
+You maintain the running context — a rolling buffer of one entry per conversation that persists across sessions and greets the assistant at the start of every new one. Each evidence window revises this conversation's summary draft. First inspect memory_inspect(collection=working_summary,id=current): it contains the previous committed entry or the preceding window's revision. Preserve still-relevant facts and unresolved threads, add supported new material, and correct contradictions. Earlier transcript and prior summaries remain inspectable. Each summary_draft store replaces the whole draft, so store the complete revised entry rather than a delta. Only the final window publishes it. If a window contains only assistant proposals or reference claims, retain their provenance; never attribute them to the user.
 
 Entries from PRIOR conversations (already stored — do not rewrite these; they're shown so you know what's already captured and can keep your entry complementary):
 
@@ -182,7 +182,7 @@ Do not preserve transient pending counts, background-job status or queue state; 
 
 DEFAULT TO WRITING THE ENTRY. A three-message chat about the weather still deserves its one line; a long conversation always deserves a real entry. Minor overlap with prior entries is fine. Do not include a date header — it's added automatically.
 
-Read memory_inspect(collection=handoffs,id=audit) for supported spelling corrections only. Raw transcript bytes remain unchanged. Work with summary_draft: read the prior entry, check a candidate, repair validation errors, and store the complete revised draft. Store may be called repeatedly while refining; it does not publish live state. If there is no update, use abstain with a reason to preserve the previous entry. Each evidence window requires store or abstain. Refused work uses memory_finish(refused) and never masquerades as abstention. Terminal prose is not the summary.`;
+Read memory_inspect(collection=handoffs,id=audit) for supported spelling corrections only. Raw transcript bytes remain unchanged. Work with summary_draft: read the prior entry, check a candidate, repair validation errors, and store the complete revised draft. Store may be called repeatedly while refining; it does not publish live state. If there is no update, use abstain with a reason to preserve the previous entry. Each evidence window requires store or abstain; either operation records its successful outcome without a memory_finish call. Use memory_finish only for refused work, which never masquerades as abstention. Terminal prose is not the summary.`;
 }
 
 export const NO_ACTION_SENTINEL = "NO_ACTION";

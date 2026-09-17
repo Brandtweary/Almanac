@@ -20,6 +20,8 @@ mkdir -p "$ALMANAC_DATA"
 
 Next follow [source runtime startup](source-runtime.md) to acquire the exact chat, encoder and transcription files, pull the pinned images, and start isolated inference plus persistent Qdrant and local speech input. That guide produces the model paths and service endpoints consumed by the commands below; it does not assume an already-running model.
 
+Native Python wheels require the system C++ runtime (`libstdc++.so.6`); on NixOS, expose the installed GCC runtime library directory through `LD_LIBRARY_PATH` when running the virtual environment because `NIX_LD` alone does not supply Python extension dependencies. Verify the installed environment with `.venv/bin/python -c "import oracle_content, libzim, tokenizers"` before starting the service.
+
 Install the optional `espeak-ng` system package if pronunciation hints are wanted. Its absence does not disable typed corpus chat or ordinary transcription. Prepare the chosen PDF/OCR assets separately; the content process must not fetch extraction models at first use.
 
 Acquire reference originals through the same setup entry. Complete English article text is the selected Wikipedia format:

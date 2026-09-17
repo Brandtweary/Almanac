@@ -21,6 +21,20 @@ try{
  assert.equal((await session.execute('while :; do printf 123456789; done')).outputTruncated,true);
  assert.equal((await session.execute('while :; do printf 123456789 >&2; done')).outputTruncated,true);
  assert.equal((await session.execute('sleep 20 & printf spawned')).timedOut,true);
+ // Pipe EOF is not process termination: preserve work and the eventual leader exit status.
+ const closedSuccess=await session.execute('exec 1>&- 2>&-; sleep 0.15; printf finished > after-eof.txt; exit 0');
+ assert.equal(closedSuccess.exitCode,0,JSON.stringify(closedSuccess));assert.equal(closedSuccess.timedOut,false);
+ assert.equal((await session.inspect())['after-eof.txt'],'finished');
+ const closedFailure=await session.execute('exec 1>&- 2>&-; sleep 0.15; exit 7');
+ assert.equal(closedFailure.exitCode,7,JSON.stringify(closedFailure));assert.equal(closedFailure.timedOut,false);
+ const closedTimeout=await session.execute('exec 1>&- 2>&-; sleep 20; printf late > timed-out-child.txt');
+ assert.equal(closedTimeout.timedOut,true);assert.equal(closedTimeout.exitCode,-9);
+ assert.equal('timed-out-child.txt' in await session.inspect(),false);
+ const closedDescendant=await session.execute('(exec 1>&- 2>&-; sleep 20; printf late > descendant.txt) & exit 0');
+ assert.equal(closedDescendant.exitCode,0);assert.equal(closedDescendant.timedOut,false);
+ assert.equal('descendant.txt' in await session.inspect(),false);
+ assert.equal((await session.execute('printf usable-after-cleanup')).stdout,'usable-after-cleanup');
+
  assert.equal((await session.execute("PYTHONHOME=/ /bin/python3 -s -S -c \"import os; os.symlink('/supervisor.py', 'alias')\"")).exitCode,0);
  assert.equal('alias' in await session.inspect(),false);
  assert.equal((await session.execute('printf alive')).stdout,'alive');
