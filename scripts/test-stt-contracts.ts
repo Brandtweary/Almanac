@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'vite';
-const server = await createServer({ optimizeDeps: { noDiscovery: true, include: [] }, server: { middlewareMode: true }, appType: 'custom' });
+const server = await createServer({ optimizeDeps: { noDiscovery: true, include: [] }, server: { middlewareMode: true, hmr: false }, appType: 'custom' });
 try {
  const {applyAutoReplace, emptySttLexicon, mistranscriptionCount, validateAutoReplace} = await server.ssrLoadModule('/src/stt-lexicon.ts');
  const {createPipelineTools} = await server.ssrLoadModule('/src/pipeline-tools.ts');

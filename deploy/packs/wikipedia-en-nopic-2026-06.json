@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "id": "wikipedia-en-nopic-2026-06-source",
+  "scope": "acquisition-only; indexing and distribution admission pending",
+  "index_workspace_bytes": 0,
+  "runtime_workspace_bytes": 0,
+  "image_store_bytes": 0,
+  "wikipedia": {
+    "flavour": "nopic",
+    "path": "sources/wikipedia_en_all_nopic_2026-06.zim"
+  },
+  "artifacts": [
+    {
+      "path": "notices/wikipedia-en-nopic.txt",
+      "bytes": 1182,
+      "sha256": "082d44e198717a9221b217fc8247c7857463a2fd2d8fed526248cc1bcf3f9691",
+      "kind": "license",
+      "embedded_text": "English Wikipedia, complete articles without images\nSnapshot: wikipedia_en_all_nopic_2026-06.zim\nPublisher of archive: Kiwix / Wikimedia contributors\nOriginal encyclopedia: https://en.wikipedia.org/\nArchive integrity metadata: https://download.kiwix.org/zim/wikipedia/wikipedia_en_all_nopic_2026-06.zim.meta4\n\nMost article text is available under Creative Commons Attribution-ShareAlike 4.0 and compatible terms; individual source content may carry exceptions. Preserve article title, attribution, original/history URL and applicable license for each retrieved passage. The archive is not a complete revision-history copy. This project does not relicense encyclopedia content under its software license.\n\nReuse guidance: https://www.mediawiki.org/wiki/Wikimedia_APIs/Content_reuse\nLicense legal text: https://creativecommons.org/licenses/by-sa/4.0/legalcode.en\n\nThis acquisition manifest permits locally evaluating the upstream archive. Redistribution admission and article-level attribution validation remain separate; the installer must refuse a distributable export until those checks have receipts. Download completion does not establish full lexical-plus-dense index coverage.\n",
+      "urls": [],
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://www.mediawiki.org/wiki/Wikimedia_APIs/Content_reuse",
+          "https://download.kiwix.org/zim/wikipedia/wikipedia_en_all_nopic_2026-06.zim.meta4"
+        ],
+        "notice": "notices/wikipedia-en-nopic.txt"
+      }
+    },
+    {
+      "path": "sources/wikipedia_en_all_nopic_2026-06.zim",
+      "bytes": 52690706555,
+      "sha256": "441a56d9e05b2d98f8ae9acb7986a513ed47904d73852c92dc6b7d50baa122e5",
+      "kind": "corpus",
+      "urls": [
+        "https://ny.mirror.driftle.ss/kiwix/zim/wikipedia/wikipedia_en_all_nopic_2026-06.zim",
+        "https://mirror.download.kiwix.org/zim/wikipedia/wikipedia_en_all_nopic_2026-06.zim",
+        "https://ftp.nluug.nl/pub/kiwix/zim/wikipedia/wikipedia_en_all_nopic_2026-06.zim"
+      ],
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://www.mediawiki.org/wiki/Wikimedia_APIs/Content_reuse",
+          "https://download.kiwix.org/zim/wikipedia/wikipedia_en_all_nopic_2026-06.zim.meta4"
+        ],
+        "notice": "notices/wikipedia-en-nopic.txt"
+      },
+      "metalink": "https://download.kiwix.org/zim/wikipedia/wikipedia_en_all_nopic_2026-06.zim.meta4"
+    }
+  ]
+}

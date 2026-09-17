@@ -1,0 +1,2 @@
+# Preserve pinned upstream notices byte-for-byte.
+speech/notices/* -whitespace

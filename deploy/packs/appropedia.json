@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "id": "appropedia-source-v1",
+  "scope": "acquisition-only; indexing, component-rights and offline-reader admission pending",
+  "index_workspace_bytes": 0,
+  "runtime_workspace_bytes": 0,
+  "image_store_bytes": 0,
+  "artifacts": [
+    {
+      "path": "notices/appropedia.txt",
+      "kind": "license",
+      "bytes": 908,
+      "sha256": "d3bb19dc4df0315656954446f8232ea5ab2fd3266352fc533810085e27e66a97",
+      "embedded_text": "Source pack: appropedia\nOriginal: https://lb.download.kiwix.org/zim/other/appropedia_en_all_maxi_2026-02.zim\nExact SHA-256: dcf200ba723c27397e1c9a2e4891ff91fa13993df1fa285315190d8525a53469\n\nThis pack is acquired from its public upstream distributor for local evaluation. Archive/container availability is not a blanket redistribution grant. Retain originals, source labels and component notices. No model-readability or verified practical coverage is claimed merely because download completed.\n\nAppropedia content is generally CC BY-SA with page/file exceptions, including imported CD3WD material without the ordinary grant. Preserve authors, page/revision URLs and individual licenses. See https://www.appropedia.org/Appropedia:Copyrights and https://www.appropedia.org/CD3WD . This full archive is not approved for redistribution until excluded/restricted entries and attribution requirements are handled.\n",
+      "urls": [],
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://lb.download.kiwix.org/zim/other/appropedia_en_all_maxi_2026-02.zim.meta4"
+        ],
+        "notice": "notices/appropedia.txt"
+      }
+    },
+    {
+      "path": "sources/appropedia_en_all_maxi_2026-02.zim",
+      "bytes": 581641351,
+      "sha256": "dcf200ba723c27397e1c9a2e4891ff91fa13993df1fa285315190d8525a53469",
+      "urls": [
+        "https://mirror.download.kiwix.org/zim/other/appropedia_en_all_maxi_2026-02.zim"
+      ],
+      "kind": "corpus",
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://lb.download.kiwix.org/zim/other/appropedia_en_all_maxi_2026-02.zim.meta4"
+        ],
+        "notice": "notices/appropedia.txt"
+      }
+    }
+  ]
+}

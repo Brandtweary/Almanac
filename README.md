@@ -1,115 +1,98 @@
-# Myriapod
+# Almanac
 
-A voice agent you can talk to, with a memory that stays yours.
+*Local AI for self-reliance and homesteading.*
 
-Speak or type, and a personal memory grows out of the conversation — kept in your own browser,
-carried from one visit to the next, always in your hands.
+“They told me to ask the machine in the reading room.”
 
-**Live at [myriapod.ai](https://myriapod.ai)** — nothing to install, nothing to run. Bring your
-own [OpenRouter](https://openrouter.ai) key and your chats run on your own credits, sent straight
-from your browser.
+“Then you have come to the proper machine. Mind the third floorboard. What have you brought?”
 
-## What it is
+“A piece of the pump.”
 
-- **A voice agent** — you *tap* to record and tap again to send. No voice-activity detection
-  deciding when you're done, so it never chimes in while you're still thinking or talks over you;
-  when you want to cut a reply short, one keystroke (Ctrl+Alt+Space) does it.
-- **A lexicon-based memory** — after each exchange, a few quiet background agents read what was said
-  and tend a glossary of the people, things, and ideas in your world, each with a short, living
-  description. You opt into it, and you can export it or wipe it whenever you like.
+“Set it beside the lamp. Have you brought its name as well?”
 
-Beside the chat, the memory shows its work: one margin lists what it recalled for you this turn, the
-other shows the background agents tending it. The remembering happens out in the open.
+“It has a number on the side.”
 
-## Why "Myriapod"
+“Excellent. The old manufacturers were occasionally considerate.”
 
-The word 'centipede' means "hundred feet", 'millipede' means "thousand feet", and the subphylum both groups belong to, Myriapoda, means "ten thousand feet". 
+The machine sits beneath a window overlooking the kitchen garden. Its brass has darkened where generations of hands have rested. Somebody has knitted a cover for the joint at its neck. A narrow cable passes through the wall to the roof, where the glass panels are kept clear of ivy.
 
-A myriapod walks on many small legs. No single leg carries the animal; each one lifts, reaches, and
-sets down in its turn, and the body never waits on any of them; it just keeps moving. The software
-has that same gait. The conversation is the body, always going forward, and behind each exchange
-comes a short line of small workers, one after another, each doing its piece of the remembering and
-handing the work along. The whole thing is built to move in step with a person, turn by turn.
+“Were you made before the roads went quiet?”
 
-## How it works
+“Considerably before. Although this elbow is quite recent.”
 
-Myriapod wires together a few open models, and the wiring runs in your browser. The models do the
-real work: speech-to-text, the language model, and text-to-speech, each running on a server. Your
-browser handles the hand-offs: it captures your voice, sends it off to be transcribed, passes the
-transcript to the language model, streams the reply out to be spoken, and plays the audio back.
+“What do you remember?”
 
-Your browser stores personal memory locally; enabled memory sends recalled context and pipeline
-inputs to the configured inference services. A small backend sits in front of the language model
-to hold its key, so your browser never has to; bring your own key and your browser talks to the model
-directly.
+“There is a library here. Instructions for wells and waterwheels, orchards and lathes. Accounts of soils. Drawings of engines whose last examples may now be holding somebody's gate open. Encyclopedias, too. A community should be able to grow its supper and still ask what a star is.”
 
-Because every model in the stack is open, you can host them yourself and run the whole thing on your
-own hardware; the hosted demo just runs them for you.
+“Have you read all of it?”
 
-### The voice loop
+“I can look things up. That is a more useful accomplishment than it sounds.”
 
-When you finish a turn, your speech goes to an open
-[Whisper](https://github.com/SYSTRAN/faster-whisper) model and comes back as text. The language model
-reads it, along with whatever the memory surfaced for you, and streams a reply that an open-weights
-[Orpheus](https://github.com/canopyai/Orpheus-TTS) voice speaks aloud as it arrives, so you hear the first
-words before the last are written. The reference deployment speaks in Orpheus's `leo` and runs
-[Kimi K3](https://openrouter.ai/moonshotai/kimi-k3); swapping either is a one-line change.
+“And tell me what to do?”
 
-### The memory
+“We shall find the relevant pages and read them together. You will tell me what is actually in front of you. The book may describe a different pump; I may misunderstand the book. Keep the drawing beside the work.”
 
-The memory is a glossary: a running list of what matters across your conversations, each entry a
-short description kept current as the subject comes up again. When you speak, your words are matched
-against it and the descriptions that fit are handed to the model, so it answers with your world in
-view.
+“Mara says she could mend it.”
 
-The whole memory travels: the glossary, the running notes, and the small speech corrections it's
-picked up all export to a single file, the lexicon, that you can read back another day or on another
-machine.
+“Then ask Mara. Take her the drawing, and hold the lamp. You may learn something she has never thought to write down.”
 
-Note that this adapts to your speech at the word level only — it does **not** fine-tune Whisper to
-your voice, and it can't: acoustic training needs a corpus of your recorded audio, and none is kept
-(every utterance is transcribed and immediately discarded). Fine-tuning on your own voice would mean
-self-hosting and modifying the stack to retain audio first.
+“What if the cable to the next town breaks again?”
 
-### The pipeline
+“The books are here.”
 
-After every turn, a handful of background agents read the exchange, each with its own task. One
-keeps watch over what the memory recalled and mends any description that came out thin. One decides
-what's worth holding onto and writes it down. One keeps a short account of the conversation so far,
-so your next visit opens with the thread already in hand. None of them make you wait — the reply is
-already on its way while they work.
+“What if you break?”
 
-## Run it yourself
+“The books are still here. Fetch Mara.”
 
-Everything under the hood is open. Every model in the path has published weights, so you can stand
-the whole thing up on your own hardware and answer to no hosted service. This repo is the frontend;
-the model endpoints are all self-hostable:
+---
 
-- **STT** — an open [faster-whisper](https://github.com/SYSTRAN/faster-whisper) server over HTTP;
-  point the frontend at it with `VITE_STT_BASE`.
-- **TTS** — an open-weights [Orpheus](https://github.com/canopyai/Orpheus-TTS) model streamed over a WebSocket;
-  `VITE_TTS_BASE`.
-- **LLM** — any OpenAI-compatible chat endpoint hosting an open-weight model, either through your own
-  instance of the backend (`VITE_PROXY_BASE`) or straight to a provider with your own key in Settings.
+Almanac is a local AI assistant built around a practical reference library. Its purpose is to help
+people find, read and use knowledge: tending land, maintaining tools, preserving food, understanding
+unfamiliar machinery, and studying whatever catches their curiosity after the day's work is done.
 
-The stock system prompt (`VOICE_SYSTEM_PROMPT` in `src/main.ts`) is written for the hosted instance,
-down to the model and voice it names. If you run your own, rewrite it to fit — a local home agent,
-say, may want the hardware awareness the hosted prompt has no use for.
+The intended installation runs on a computer you control, with its books and model stored locally
+for use without an internet connection. Ask by voice or text; follow the assistant's references back
+to the sources. Optional personal memory helps it retain context you choose to share, while the
+reference library remains available with memory switched off. The underlying documents remain
+useful on their own.
 
-Full setup — env vars, the metering proxy, the voice servers, and a one-box reverse proxy with TLS —
-is in [`docs/self-hosting.md`](./docs/self-hosting.md).
+You need not wait for the roads to go quiet. There are things worth mending now.
 
-## Stack
+## Building the reading room
 
-TypeScript on a vendored `pi-web-ui` UI layer (Lit 3, Tailwind v4, Vite), a static single-page app;
-the conversation rides the `@earendil-works/pi-agent-core` agent. Architecture and internals are
-documented in [`CLAUDE.md`](./CLAUDE.md).
+The conversion from Myriapod to this practical-knowledge oracle is under qualification. The local
+model, complete library indexes, speech stack and offline installation must pass their release
+checks before this is a ready-to-install offline product. No qualified production release manifest
+is supplied yet.
 
-## Development
+[Source-based installation](./docs/install.md#source-based-local-setup) gives concrete browser, gateway,
+library and CPU speech commands; [runtime startup](./docs/source-runtime.md) includes exact model
+acquisition, inference, encoder, persistent vector-store and transcription commands. The checked-in
+runtime recipe uses a 131,072-token context with BF16
+KV storage; corpus preparation uses the v4 source-inspection receipts. Portable-bundle export is a
+separate, unqualified path. [Browser runtime](./docs/browser-oracle.md) describes the local gateway,
+reference tools and optional personal memory.
+
+For frontend development:
 
 ```sh
-npm install
-npm run dev        # Vite dev server with HMR
-npm run build      # production build (adds a strict CSP)
-npm run check      # type-check
+git clone https://github.com/Brandtweary/almanac.git
+cd almanac
+npm ci
+npm run dev        # Vite development server
+npm run check      # TypeScript checks
+npm run build      # Production frontend bundle
 ```
+
+These commands build and serve the browser interface. They do not provision the model, speech
+services or reference library; those belong to the installation process above.
+
+## Provenance and license
+
+This project continues Myriapod's repository and history. Its browser interface uses the vendored
+[pi-web-ui](./src/pi-web-ui/) and its conversations run through Pi's agent library. The application
+is [MIT licensed](./LICENSE); the vendored interface retains its
+[upstream MIT notice](./src/pi-web-ui/LICENSE).
+
+Books, maps and model weights retain their own licenses and attribution requirements. The
+application's license does not grant redistribution rights to the contents of a library.

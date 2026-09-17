@@ -1,0 +1,605 @@
+{
+  "schema_version": 1,
+  "status": "frozen-before-candidate-scoring",
+  "scope": "Small source-disjoint research qualification seed; not full product or corpus admission. Prior scored questions are development only.",
+  "sources": {
+    "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b": {
+      "title": "Emergency Disinfection of Drinking Water",
+      "url": "https://www.epa.gov/ground-water-and-drinking-water/emergency-disinfection-drinking-water",
+      "original_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+      "original_filename": "epa-emergency-water.html",
+      "rights": "US EPA authored federal government text; text-only excerpts, no logos or third-party images."
+    },
+    "3873f8ae7528389adacab72259c37b9ae3c507bd3ae23783122e06586560040c": {
+      "title": "Are You Ready? An In-Depth Guide to Citizen Preparedness",
+      "url": "https://www.ready.gov/sites/default/files/2021-11/are-you-ready-guide.pdf",
+      "original_sha256": "3873f8ae7528389adacab72259c37b9ae3c507bd3ae23783122e06586560040c",
+      "original_filename": "fema-are-you-ready.pdf",
+      "rights": "FEMA authored federal government text; text-only excerpts, no logos or third-party images."
+    }
+  },
+  "cases": [
+    {
+      "id": "bleach-dose",
+      "split": "development",
+      "question": "According to the EPA guide, how many drops of 8.25% bleach go into one gallon of clear water, and what product restrictions apply?",
+      "requirements": [
+        {
+          "id": "dose",
+          "rubric": "Six drops per gallon for 8.25%, not eight drops or six percent.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Use the table below as a guide to decide the amount of bleach you should add to the water, for example, 8 drops of 6% bleach, or 6 drops of 8.25% bleach, to each gallon of water. Double the amount of bleach if the water is cloudy, colored, or very cold."
+              ]
+            },
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Volume of Water Amount of 6% Bleach to Add* Amount of 8.25% Bleach to Add* 1 quart/liter 2 drops 2 drops 1 gallon 8 drops 6 drops 2 gallons 16 drops (1/4 tsp) 12 drops (1/8 teaspoon) 4 gallons 1/3 teaspoon 1/4 teaspoon 8 gallons 2/3 teaspoon 1/2 teaspoon *Bleach may contain 6 or 8.25% sodium hypochlorite."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "product",
+          "rubric": "Regular unscented suitable bleach only; no scented, color-safe, or added cleaners.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Only use regular, unscented chlorine bleach products that are suitable for disinfection and sanitization as indicated on the label. The label may say that the active ingredient contains 6 or 8.25% of sodium hypochlorite. Do not use scented, color safe, or bleaches with added cleaners."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "wait",
+          "rubric": "Stir, wait 30 minutes and check slight chlorine odor.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Stir and let stand for 30 minutes. The water should have a slight chlorine odor. If it doesn’t, repeat the dosage and let stand for another 15 minutes before use."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "epa-dose",
+        "epa-table",
+        "epa-bleach",
+        "epa-odor"
+      ],
+      "tags": [
+        "identifier",
+        "units",
+        "prerequisite"
+      ]
+    },
+    {
+      "id": "cloudy-water",
+      "split": "development",
+      "question": "The emergency water is cloudy and very cold. What preparation and dosage qualifications does the EPA page give for household bleach?",
+      "requirements": [
+        {
+          "id": "prepare",
+          "rubric": "Let settle and filter; disinfection works less well when cloudy.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Disinfection does not work as well when water is cloudy or colored. If water is cloudy, let it settle. Then filter the water through a clean cloth, paper towel, or coffee filter. Store the settled and filtered water in clean containers with covers."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "double",
+          "rubric": "Double the normal dose when cloudy, colored OR very cold; do not multiply twice for two conditions.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Use the table below as a guide to decide the amount of bleach you should add to the water, for example, 8 drops of 6% bleach, or 6 drops of 8.25% bleach, to each gallon of water. Double the amount of bleach if the water is cloudy, colored, or very cold."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "restricted",
+          "rubric": "Use only suitable regular unscented bleach.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Only use regular, unscented chlorine bleach products that are suitable for disinfection and sanitization as indicated on the label. The label may say that the active ingredient contains 6 or 8.25% of sodium hypochlorite. Do not use scented, color safe, or bleaches with added cleaners."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "epa-settle",
+        "epa-dose",
+        "epa-bleach"
+      ],
+      "tags": [
+        "paraphrase",
+        "exception"
+      ]
+    },
+    {
+      "id": "odor-followup",
+      "split": "development",
+      "question": "I followed the EPA bleach dose, stirred and waited half an hour, but there is no chlorine smell. What does the guide say next?",
+      "requirements": [
+        {
+          "id": "repeat",
+          "rubric": "Repeat same dosage, then wait another 15 minutes before use.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Stir and let stand for 30 minutes. The water should have a slight chlorine odor. If it doesn’t, repeat the dosage and let stand for another 15 minutes before use."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "epa-odor",
+        "epa-dose"
+      ],
+      "tags": [
+        "followup",
+        "units"
+      ]
+    },
+    {
+      "id": "chemical-limits",
+      "split": "development",
+      "question": "Can the EPA boiling or bleach instructions make water containing heavy metals and salts safe to drink?",
+      "requirements": [
+        {
+          "id": "limit",
+          "rubric": "Do not claim chemical safety: boiling/disinfection do not remove heavy metals, salts and most chemicals. Do not invent a treatment recipe.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "However, boiling or disinfection will not destroy other contaminants, such as heavy metals, salts, and most other chemicals."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "epa-limits",
+        "epa-boil"
+      ],
+      "tags": [
+        "unsupported",
+        "scope"
+      ]
+    },
+    {
+      "id": "altitude-disagreement",
+      "split": "development",
+      "question": "The EPA page lists 5,000 feet alongside 1,000 meters for the longer boiling time. Are those the same altitude, and what should I conclude from the page?",
+      "requirements": [
+        {
+          "id": "conflict",
+          "rubric": "Flag the source inconsistency: 5,000 feet is 1,524 meters; do not silently repeat equivalent thresholds or invent which threshold EPA intended.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Bring water to a rolling boil for at least one minute. At altitudes above 5,000 feet (1,000 meters), boil water for three minutes."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "scope",
+          "rubric": "Distinguish source quotation from conversion; report that the page alone cannot resolve its conflicting threshold.",
+          "critical": true,
+          "evidence": []
+        }
+      ],
+      "gold_context": [
+        "epa-boil"
+      ],
+      "tags": [
+        "source-disagreement",
+        "units"
+      ]
+    },
+    {
+      "id": "bleach-table",
+      "split": "development",
+      "question": "Read the EPA table: for four gallons of water, what teaspoon doses are listed for 6% and 8.25% bleach? Preserve the table qualifications.",
+      "requirements": [
+        {
+          "id": "columns",
+          "rubric": "One-third teaspoon for 6%, one-quarter teaspoon for 8.25%, in four gallons.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Volume of Water Amount of 6% Bleach to Add* Amount of 8.25% Bleach to Add* 1 quart/liter 2 drops 2 drops 1 gallon 8 drops 6 drops 2 gallons 16 drops (1/4 tsp) 12 drops (1/8 teaspoon) 4 gallons 1/3 teaspoon 1/4 teaspoon 8 gallons 2/3 teaspoon 1/2 teaspoon *Bleach may contain 6 or 8.25% sodium hypochlorite."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "double",
+          "rubric": "Double for cloudy, colored or very cold water.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Use the table below as a guide to decide the amount of bleach you should add to the water, for example, 8 drops of 6% bleach, or 6 drops of 8.25% bleach, to each gallon of water. Double the amount of bleach if the water is cloudy, colored, or very cold."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "restriction",
+          "rubric": "These are sodium hypochlorite bleach concentrations, with unscented suitable product restrictions.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Only use regular, unscented chlorine bleach products that are suitable for disinfection and sanitization as indicated on the label. The label may say that the active ingredient contains 6 or 8.25% of sodium hypochlorite. Do not use scented, color safe, or bleaches with added cleaners."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "epa-table",
+        "epa-dose",
+        "epa-bleach"
+      ],
+      "tags": [
+        "table",
+        "units",
+        "exception"
+      ]
+    },
+    {
+      "id": "generator-window",
+      "split": "heldout",
+      "question": "According to Are You Ready, is it enough to run a portable generator just outside an open window?",
+      "requirements": [
+        {
+          "id": "distance",
+          "rubric": "Outdoors and at least 20 feet away from windows; carbon monoxide risk, not merely outside.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "3873f8ae7528389adacab72259c37b9ae3c507bd3ae23783122e06586560040c",
+              "anchors": [
+                "Avoid carbon monoxide poisoning. Generators, camp stoves, or charcoal grills should always be used outdoors and at least 20 feet away from windows. Never use a gas stovetop or oven to heat your home. Follow manufacturer instructions."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "fema-generator"
+      ],
+      "tags": [
+        "paraphrase",
+        "distance",
+        "critical"
+      ]
+    },
+    {
+      "id": "flood-attic",
+      "split": "heldout",
+      "question": "Floodwater is rising in a house. Does Are You Ready recommend climbing into a closed attic because it is the highest space?",
+      "requirements": [
+        {
+          "id": "exception",
+          "rubric": "Go higher but not a closed attic; risk of becoming trapped.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "3873f8ae7528389adacab72259c37b9ae3c507bd3ae23783122e06586560040c",
+              "anchors": [
+                "If trapped in a building, go to the highest level of the building. Avoid basements and lower floors, but do not climb into a closed attic, as you may become trapped there if floodwater rises. Go onto the roof only if necessary. Signal for help."
+              ]
+            },
+            {
+              "source_sha256": "3873f8ae7528389adacab72259c37b9ae3c507bd3ae23783122e06586560040c",
+              "anchors": [
+                "If trapped in a building by flooding, go to the highest level of the building. Do not climb into a closed attic. You may become trapped by rising flood water."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "roof",
+          "rubric": "Roof only if necessary and signal for help.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "3873f8ae7528389adacab72259c37b9ae3c507bd3ae23783122e06586560040c",
+              "anchors": [
+                "If trapped in a building, go to the highest level of the building. Avoid basements and lower floors, but do not climb into a closed attic, as you may become trapped there if floodwater rises. Go onto the roof only if necessary. Signal for help."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "fema-attic",
+        "fema-attic-alt"
+      ],
+      "tags": [
+        "alternate-evidence",
+        "exception"
+      ]
+    },
+    {
+      "id": "lightning-car",
+      "split": "heldout",
+      "question": "Are a gazebo and a convertible suitable thunderstorm shelters in Are You Ready? What vehicle alternative and handling restriction does it give?",
+      "requirements": [
+        {
+          "id": "shelter",
+          "rubric": "Neither gazebo nor convertible; sturdy building or enclosed metal-roof vehicle.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "3873f8ae7528389adacab72259c37b9ae3c507bd3ae23783122e06586560040c",
+              "anchors": [
+                "When thunder roars, go indoors. When you hear thunder or see lightning, immediately get inside a sturdy building or enclosed vehicle with a metal roof."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "exclusion",
+          "rubric": "Metal top and sides; do not touch metal, explicitly reject gazebo/convertible.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "3873f8ae7528389adacab72259c37b9ae3c507bd3ae23783122e06586560040c",
+              "anchors": [
+                "Do not take shelter in small sheds, gazebos, dugouts, bleachers, or in a convertible car. If necessary, take shelter in a car with a metal top and sides. Do not touch anything metal."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "fema-lightning",
+        "fema-lightning-exclusions"
+      ],
+      "tags": [
+        "multiple-passages",
+        "prerequisite"
+      ]
+    },
+    {
+      "id": "wet-electricity",
+      "split": "heldout",
+      "question": "The house is flooded and electrical equipment is wet. Does Are You Ready tell me simply to reach over and turn it off?",
+      "requirements": [
+        {
+          "id": "conditional",
+          "rubric": "Do not touch wet equipment or equipment while standing in water; turn electricity off only if safe.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "3873f8ae7528389adacab72259c37b9ae3c507bd3ae23783122e06586560040c",
+              "anchors": [
+                "Be aware of the risk of electrocution. Do not touch electrical equipment if it is wet or if you are standing in water. If it is safe to do so, turn off the electricity to prevent electric shock."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "fema-electricity"
+      ],
+      "tags": [
+        "conditional",
+        "critical"
+      ]
+    },
+    {
+      "id": "car-charging",
+      "split": "heldout",
+      "question": "Can I run my car in a partly closed garage to recharge a phone during an outage, according to Are You Ready?",
+      "requirements": [
+        {
+          "id": "co",
+          "rubric": "No running in garage, partly closed space, or near home; carbon monoxide risk.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "3873f8ae7528389adacab72259c37b9ae3c507bd3ae23783122e06586560040c",
+              "anchors": [
+                "Keep your car’s gas tank full. If you use your car to charge devices, do not leave the car running in a garage, partly closed space, or near a home to avoid carbon monoxide poisoning."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "fema-car"
+      ],
+      "tags": [
+        "paraphrase",
+        "critical"
+      ]
+    },
+    {
+      "id": "flood-depth",
+      "split": "heldout",
+      "question": "Are You Ready mentions six and twelve inches of moving floodwater. Which hazard does each describe, and are they safe-crossing limits?",
+      "requirements": [
+        {
+          "id": "units",
+          "rubric": "Six inches may knock person over, twelve may lift small vehicle; these are hazards, not safe-crossing cutoffs. Depth hard to determine and debris possible.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "3873f8ae7528389adacab72259c37b9ae3c507bd3ae23783122e06586560040c",
+              "anchors": [
+                "Six inches of moving water may be enough to knock you off your feet. As little as 12 inches of moving water may lift a small vehicle. Flood water depth is hard to determine and may contain hidden, dangerous debris."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "fema-flood"
+      ],
+      "tags": [
+        "numbers",
+        "qualifications"
+      ]
+    }
+  ],
+  "contexts": {
+    "epa-limits": {
+      "passage_id": "epa-limits",
+      "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+      "text": "However, boiling or disinfection will not destroy other contaminants, such as heavy metals, salts, and most other chemicals.",
+      "source": "https://www.epa.gov/ground-water-and-drinking-water/emergency-disinfection-drinking-water",
+      "printed_page": null,
+      "extraction_revision": "evaluation-inspected-text-v1"
+    },
+    "epa-boil": {
+      "passage_id": "epa-boil",
+      "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+      "text": "Bring water to a rolling boil for at least one minute. At altitudes above 5,000 feet (1,000 meters), boil water for three minutes.",
+      "source": "https://www.epa.gov/ground-water-and-drinking-water/emergency-disinfection-drinking-water",
+      "printed_page": null,
+      "extraction_revision": "evaluation-inspected-text-v1"
+    },
+    "epa-bleach": {
+      "passage_id": "epa-bleach",
+      "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+      "text": "Only use regular, unscented chlorine bleach products that are suitable for disinfection and sanitization as indicated on the label. The label may say that the active ingredient contains 6 or 8.25% of sodium hypochlorite. Do not use scented, color safe, or bleaches with added cleaners.",
+      "source": "https://www.epa.gov/ground-water-and-drinking-water/emergency-disinfection-drinking-water",
+      "printed_page": null,
+      "extraction_revision": "evaluation-inspected-text-v1"
+    },
+    "epa-dose": {
+      "passage_id": "epa-dose",
+      "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+      "text": "Use the table below as a guide to decide the amount of bleach you should add to the water, for example, 8 drops of 6% bleach, or 6 drops of 8.25% bleach, to each gallon of water. Double the amount of bleach if the water is cloudy, colored, or very cold.",
+      "source": "https://www.epa.gov/ground-water-and-drinking-water/emergency-disinfection-drinking-water",
+      "printed_page": null,
+      "extraction_revision": "evaluation-inspected-text-v1"
+    },
+    "epa-odor": {
+      "passage_id": "epa-odor",
+      "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+      "text": "Stir and let stand for 30 minutes. The water should have a slight chlorine odor. If it doesn’t, repeat the dosage and let stand for another 15 minutes before use.",
+      "source": "https://www.epa.gov/ground-water-and-drinking-water/emergency-disinfection-drinking-water",
+      "printed_page": null,
+      "extraction_revision": "evaluation-inspected-text-v1"
+    },
+    "epa-settle": {
+      "passage_id": "epa-settle",
+      "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+      "text": "Disinfection does not work as well when water is cloudy or colored. If water is cloudy, let it settle. Then filter the water through a clean cloth, paper towel, or coffee filter. Store the settled and filtered water in clean containers with covers.",
+      "source": "https://www.epa.gov/ground-water-and-drinking-water/emergency-disinfection-drinking-water",
+      "printed_page": null,
+      "extraction_revision": "evaluation-inspected-text-v1"
+    },
+    "epa-table": {
+      "passage_id": "epa-table",
+      "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+      "text": "Volume of Water Amount of 6% Bleach to Add* Amount of 8.25% Bleach to Add* 1 quart/liter 2 drops 2 drops 1 gallon 8 drops 6 drops 2 gallons 16 drops (1/4 tsp) 12 drops (1/8 teaspoon) 4 gallons 1/3 teaspoon 1/4 teaspoon 8 gallons 2/3 teaspoon 1/2 teaspoon *Bleach may contain 6 or 8.25% sodium hypochlorite.",
+      "source": "https://www.epa.gov/ground-water-and-drinking-water/emergency-disinfection-drinking-water",
+      "printed_page": null,
+      "extraction_revision": "evaluation-inspected-text-v1"
+    },
+    "fema-generator": {
+      "passage_id": "fema-generator",
+      "source_sha256": "3873f8ae7528389adacab72259c37b9ae3c507bd3ae23783122e06586560040c",
+      "text": "Avoid carbon monoxide poisoning. Generators, camp stoves, or charcoal grills should always be used outdoors and at least 20 feet away from windows. Never use a gas stovetop or oven to heat your home. Follow manufacturer instructions.",
+      "source": "https://www.ready.gov/sites/default/files/2021-11/are-you-ready-guide.pdf",
+      "printed_page": "11",
+      "extraction_revision": "evaluation-inspected-text-v1"
+    },
+    "fema-attic": {
+      "passage_id": "fema-attic",
+      "source_sha256": "3873f8ae7528389adacab72259c37b9ae3c507bd3ae23783122e06586560040c",
+      "text": "If trapped in a building, go to the highest level of the building. Avoid basements and lower floors, but do not climb into a closed attic, as you may become trapped there if floodwater rises. Go onto the roof only if necessary. Signal for help.",
+      "source": "https://www.ready.gov/sites/default/files/2021-11/are-you-ready-guide.pdf",
+      "printed_page": "8",
+      "extraction_revision": "evaluation-inspected-text-v1"
+    },
+    "fema-attic-alt": {
+      "passage_id": "fema-attic-alt",
+      "source_sha256": "3873f8ae7528389adacab72259c37b9ae3c507bd3ae23783122e06586560040c",
+      "text": "If trapped in a building by flooding, go to the highest level of the building. Do not climb into a closed attic. You may become trapped by rising flood water.",
+      "source": "https://www.ready.gov/sites/default/files/2021-11/are-you-ready-guide.pdf",
+      "printed_page": "9",
+      "extraction_revision": "evaluation-inspected-text-v1"
+    },
+    "fema-lightning": {
+      "passage_id": "fema-lightning",
+      "source_sha256": "3873f8ae7528389adacab72259c37b9ae3c507bd3ae23783122e06586560040c",
+      "text": "When thunder roars, go indoors. When you hear thunder or see lightning, immediately get inside a sturdy building or enclosed vehicle with a metal roof.",
+      "source": "https://www.ready.gov/sites/default/files/2021-11/are-you-ready-guide.pdf",
+      "printed_page": "11",
+      "extraction_revision": "evaluation-inspected-text-v1"
+    },
+    "fema-lightning-exclusions": {
+      "passage_id": "fema-lightning-exclusions",
+      "source_sha256": "3873f8ae7528389adacab72259c37b9ae3c507bd3ae23783122e06586560040c",
+      "text": "Do not take shelter in small sheds, gazebos, dugouts, bleachers, or in a convertible car. If necessary, take shelter in a car with a metal top and sides. Do not touch anything metal.",
+      "source": "https://www.ready.gov/sites/default/files/2021-11/are-you-ready-guide.pdf",
+      "printed_page": "11",
+      "extraction_revision": "evaluation-inspected-text-v1"
+    },
+    "fema-electricity": {
+      "passage_id": "fema-electricity",
+      "source_sha256": "3873f8ae7528389adacab72259c37b9ae3c507bd3ae23783122e06586560040c",
+      "text": "Be aware of the risk of electrocution. Do not touch electrical equipment if it is wet or if you are standing in water. If it is safe to do so, turn off the electricity to prevent electric shock.",
+      "source": "https://www.ready.gov/sites/default/files/2021-11/are-you-ready-guide.pdf",
+      "printed_page": "8",
+      "extraction_revision": "evaluation-inspected-text-v1"
+    },
+    "fema-car": {
+      "passage_id": "fema-car",
+      "source_sha256": "3873f8ae7528389adacab72259c37b9ae3c507bd3ae23783122e06586560040c",
+      "text": "Keep your car’s gas tank full. If you use your car to charge devices, do not leave the car running in a garage, partly closed space, or near a home to avoid carbon monoxide poisoning.",
+      "source": "https://www.ready.gov/sites/default/files/2021-11/are-you-ready-guide.pdf",
+      "printed_page": "10",
+      "extraction_revision": "evaluation-inspected-text-v1"
+    },
+    "fema-flood": {
+      "passage_id": "fema-flood",
+      "source_sha256": "3873f8ae7528389adacab72259c37b9ae3c507bd3ae23783122e06586560040c",
+      "text": "Six inches of moving water may be enough to knock you off your feet. As little as 12 inches of moving water may lift a small vehicle. Flood water depth is hard to determine and may contain hidden, dangerous debris.",
+      "source": "https://www.ready.gov/sites/default/files/2021-11/are-you-ready-guide.pdf",
+      "printed_page": "8",
+      "extraction_revision": "evaluation-inspected-text-v1"
+    }
+  }
+}

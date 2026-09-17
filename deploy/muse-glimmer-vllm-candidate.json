@@ -1,0 +1,181 @@
+{
+  "schema_version": 1,
+  "status": "provisional-vllm-candidate-not-release",
+  "qualified": false,
+  "repo": "nvidia/Muse-Glimmer-30B-NVFP4",
+  "revision": "47818374517751c48c55cde2621594926b1888b6",
+  "files": [
+    {
+      "path": "LICENSE",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "url": "https://huggingface.co/nvidia/Muse-Glimmer-30B-NVFP4/resolve/47818374517751c48c55cde2621594926b1888b6/LICENSE"
+    },
+    {
+      "path": "README.md",
+      "bytes": 13973,
+      "sha256": "b0c600f9f2c429567b795f2b5b17291267bce8ffd132e098b8bc972169638749",
+      "url": "https://huggingface.co/nvidia/Muse-Glimmer-30B-NVFP4/resolve/47818374517751c48c55cde2621594926b1888b6/README.md"
+    },
+    {
+      "path": "USAGE_POLICY.md",
+      "bytes": 5230,
+      "sha256": "98a14dab9fd97de1666dc8589d399efab1e7fc3ba4e6230d037d6637ba9481d3",
+      "url": "https://huggingface.co/nvidia/Muse-Glimmer-30B-NVFP4/resolve/47818374517751c48c55cde2621594926b1888b6/USAGE_POLICY.md"
+    },
+    {
+      "path": "chat_template.jinja",
+      "bytes": 7167,
+      "sha256": "114f55ebdc1804c1af371197b9fdf2d6bb925966c9dfe46b73782a71bc07965e",
+      "url": "https://huggingface.co/nvidia/Muse-Glimmer-30B-NVFP4/resolve/47818374517751c48c55cde2621594926b1888b6/chat_template.jinja"
+    },
+    {
+      "path": "config.json",
+      "bytes": 88682,
+      "sha256": "f3add3cfff62038fc7087e72f7df5a560660707aba7c8e65761bfa6bf8f08774",
+      "url": "https://huggingface.co/nvidia/Muse-Glimmer-30B-NVFP4/resolve/47818374517751c48c55cde2621594926b1888b6/config.json"
+    },
+    {
+      "path": "generation_config.json",
+      "bytes": 190,
+      "sha256": "9d62b496fee012cd1981b8b0fa70fc6493859d18153dc4cc3a4813b981db1fe1",
+      "url": "https://huggingface.co/nvidia/Muse-Glimmer-30B-NVFP4/resolve/47818374517751c48c55cde2621594926b1888b6/generation_config.json"
+    },
+    {
+      "path": "hf_quant_config.json",
+      "bytes": 54217,
+      "sha256": "97b68b91007adab31b684c102b5f2c22253a66c80a7fe497ed6b70848e1b139c",
+      "url": "https://huggingface.co/nvidia/Muse-Glimmer-30B-NVFP4/resolve/47818374517751c48c55cde2621594926b1888b6/hf_quant_config.json"
+    },
+    {
+      "path": "model-00001-of-00003.safetensors",
+      "bytes": 9961191764,
+      "sha256": "0e260a8f2c5e16bcc2ad8e90a8a59f1e889431b0de82f4c490c31d9ea9114ce4",
+      "url": "https://huggingface.co/nvidia/Muse-Glimmer-30B-NVFP4/resolve/47818374517751c48c55cde2621594926b1888b6/model-00001-of-00003.safetensors"
+    },
+    {
+      "path": "model-00002-of-00003.safetensors",
+      "bytes": 9963335980,
+      "sha256": "6a04e8f3e9e68b9d7e0ed8a5d762694eb73e76d2a13ad4951d909238059a6cc5",
+      "url": "https://huggingface.co/nvidia/Muse-Glimmer-30B-NVFP4/resolve/47818374517751c48c55cde2621594926b1888b6/model-00002-of-00003.safetensors"
+    },
+    {
+      "path": "model-00003-of-00003.safetensors",
+      "bytes": 4745091980,
+      "sha256": "017293c10a76b131f36116c597f6a4eb9a4dd52d8773318b8df4b6afcc625132",
+      "url": "https://huggingface.co/nvidia/Muse-Glimmer-30B-NVFP4/resolve/47818374517751c48c55cde2621594926b1888b6/model-00003-of-00003.safetensors"
+    },
+    {
+      "path": "model.safetensors.index.json",
+      "bytes": 213580,
+      "sha256": "71823cd92701dfd1632fe37bb7dfcf432a0d068cee2cc26dcc1b94189c3c3b04",
+      "url": "https://huggingface.co/nvidia/Muse-Glimmer-30B-NVFP4/resolve/47818374517751c48c55cde2621594926b1888b6/model.safetensors.index.json"
+    },
+    {
+      "path": "processor_config.json",
+      "bytes": 1084,
+      "sha256": "97e2a486dd9866b81f40cf4b8bc0c9ced9a7cd8a5bc65aa4cc2f4de0712dae77",
+      "url": "https://huggingface.co/nvidia/Muse-Glimmer-30B-NVFP4/resolve/47818374517751c48c55cde2621594926b1888b6/processor_config.json"
+    },
+    {
+      "path": "tokenizer.json",
+      "bytes": 28129897,
+      "sha256": "c9dbee66967b58f31a7c27f723c3760da3526ccd0427578e8905b0abb0031c4d",
+      "url": "https://huggingface.co/nvidia/Muse-Glimmer-30B-NVFP4/resolve/47818374517751c48c55cde2621594926b1888b6/tokenizer.json"
+    },
+    {
+      "path": "tokenizer_config.json",
+      "bytes": 79978,
+      "sha256": "ee60d284ed7857ba89155f437cc915951e16056453ca7ae2491c5ae87a395c39",
+      "url": "https://huggingface.co/nvidia/Muse-Glimmer-30B-NVFP4/resolve/47818374517751c48c55cde2621594926b1888b6/tokenizer_config.json"
+    }
+  ],
+  "artifact_bytes": 24698225080,
+  "weight_bytes": 24669619724,
+  "serving": {
+    "image": "vllm/vllm-openai@sha256:082ca6f035279109041ffd3fe0695cb568b29bc580b35c4f297a66a08b216c1b",
+    "version": "0.29.0",
+    "source_revision": "98dff2a81d747d1dba01a47f939f48c3526d4206",
+    "platform": "linux/amd64"
+  },
+  "proposed_measurement": {
+    "context_tokens": 131072,
+    "max_num_seqs": 1,
+    "max_num_batched_tokens": 2048,
+    "gpu_memory_utilization": 0.8,
+    "enforce_eager": false,
+    "speculative_decoding": false,
+    "environment": {
+      "HF_HUB_OFFLINE": "1",
+      "TRANSFORMERS_OFFLINE": "1"
+    },
+    "command": [
+      "/model",
+      "--served-model-name",
+      "muse-glimmer-qualification",
+      "--host",
+      "0.0.0.0",
+      "--port",
+      "8000",
+      "--max-model-len",
+      "131072",
+      "--max-num-seqs",
+      "1",
+      "--max-num-batched-tokens",
+      "2048",
+      "--gpu-memory-utilization",
+      "0.80",
+      "--enable-auto-tool-choice",
+      "--tool-call-parser",
+      "muse_glimmer",
+      "--reasoning-parser",
+      "muse_glimmer",
+      "--kv-cache-dtype",
+      "auto",
+      "--chat-template",
+      "/model/chat_template.jinja",
+      "--language-model-only",
+      "--generation-config",
+      "vllm",
+      "--kv-cache-memory-bytes",
+      "2415919104",
+      "--compilation-config",
+      "{\"mode\":0,\"cudagraph_mode\":\"FULL_DECODE_ONLY\",\"cudagraph_capture_sizes\":[1]}",
+      "--attention-backend",
+      "FLASH_ATTN"
+    ],
+    "mounts": [
+      {
+        "source": "prepared verified snapshot",
+        "target": "/model",
+        "read_only": true
+      }
+    ],
+    "network": "Internal-only inference network; inspect its container address, then forward that address through a dedicated SSH loopback listener to the source gateway. Internal-network Docker host port publishing is not assumed.",
+    "memory_gate": "Full native131072 BF16-cache trial after user-selected CPU PocketTTS deployment. Explicit2.25GiB KV derives from measured1.125GiB INT8-per-token-head capacity154237; verify actualBF16 capacity rather than extrapolating24K. Same weights/template/sampling and single decode graph; long-window/speech/throughput admission pending.",
+    "disk_gate": "Reserve remaining corpus acquisition plus index/build/runtime writes before acquiring this complete snapshot; do not stage both candidates concurrently.",
+    "kv_cache_memory_bytes": 2415919104,
+    "compilation_config": {
+      "mode": 0,
+      "cudagraph_mode": "FULL_DECODE_ONLY",
+      "cudagraph_capture_sizes": [
+        1
+      ]
+    },
+    "sampling": {
+      "temperature": 1,
+      "top_p": 0.95,
+      "top_k": 64
+    },
+    "kv_cache_dtype": "auto",
+    "attention_backend": "FLASH_ATTN",
+    "speech_concurrency": 1,
+    "speech": {
+      "engine": "pocket-tts",
+      "voice": "alba",
+      "device": "cpu",
+      "stt": "existing-cuda-whisper"
+    }
+  },
+  "recipe": "https://huggingface.co/nvidia/Muse-Glimmer-30B-NVFP4"
+}

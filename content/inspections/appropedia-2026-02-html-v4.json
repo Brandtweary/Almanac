@@ -1,0 +1,305 @@
+{
+  "source_sha256": "dcf200ba723c27397e1c9a2e4891ff91fa13993df1fa285315190d8525a53469",
+  "extraction_revision": "html-structural-v4",
+  "selection_policy": "appropedia-open-english-v2",
+  "archive_uuid": "7b656250-40ad-8d4d-5fa2-1486590278da",
+  "archive_bytes": 581641351,
+  "entry_count": 65139,
+  "article_count_including_redirects": 30736,
+  "native_fulltext": true,
+  "counter": "application/javascript=4;application/pdf=128;image/gif=1641;image/jpeg=2;image/png=6;image/svg+xml=26;image/svg+xml; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/SVG/1.0.0\"=395;image/webp=32148;text/css=34;text/html=22320;text/html; charset=UTF-8=15;text/html; charset=iso-8859-1=1;text/javascript=3",
+  "observations": [
+    {
+      "path": "Composting",
+      "canonical_path": "Composting",
+      "title": "Composting",
+      "html_bytes": 45882,
+      "blocks": 193,
+      "lead_characters": 955,
+      "lead_sha256": "95b12af2ad3f9bb412bd74c68c5fb5cad10ccc8a36e05957a8265754792367a4",
+      "body_text_sha256": "70922f7d0e885caa131129ac7e93dccea092092e5cf15da630494f2fa5554afc",
+      "headings": [
+        [
+          "Purpose"
+        ],
+        [
+          "Inputs"
+        ],
+        [
+          "Outputs"
+        ],
+        [
+          "Outputs",
+          "Decomposers"
+        ],
+        [
+          "Compostable materials"
+        ],
+        [
+          "Compostable materials",
+          "Plant materials"
+        ],
+        [
+          "Compostable materials",
+          "Animal materials"
+        ],
+        [
+          "Compostable materials",
+          "Man-made materials"
+        ]
+      ],
+      "tables": 1,
+      "math_notation_blocks": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": [
+        true,
+        null,
+        "CC-BY-SA-3.0"
+      ]
+    },
+    {
+      "path": "Soil",
+      "canonical_path": "Soil",
+      "title": "Soil",
+      "html_bytes": 16811,
+      "blocks": 55,
+      "lead_characters": 532,
+      "lead_sha256": "d3cf63cf0798a5fc87528f1ca414c2d91c7c319456643189eae8a0f8eed0a4dc",
+      "body_text_sha256": "ec1e48cf91b10dabd0119873364ae6e9b3ed085f8e79bdd346449f1afdb6c084",
+      "headings": [
+        [
+          "Soil in agriculture"
+        ],
+        [
+          "Complexity of soil"
+        ],
+        [
+          "Soil structure"
+        ],
+        [
+          "Care of soils"
+        ],
+        [
+          "Soil conservation practices"
+        ],
+        [
+          "Soil in construction"
+        ],
+        [
+          "See also"
+        ],
+        [
+          "References"
+        ]
+      ],
+      "tables": 1,
+      "math_notation_blocks": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": [
+        true,
+        null,
+        "CC-BY-SA-3.0"
+      ]
+    },
+    {
+      "path": "Microhydro",
+      "canonical_path": "Microhydro",
+      "title": "Microhydro",
+      "html_bytes": 24287,
+      "blocks": 68,
+      "lead_characters": 885,
+      "lead_sha256": "adad270cc68a3d9f0c8a1a4d0a4c3f405e5c0fe1fc4fe6c8cdc1b42c3ba3f51d",
+      "body_text_sha256": "0ae1ec7583b54b740008334e2981e3e1098937d7574c27768f0820474703dbae",
+      "headings": [
+        [
+          "Hydropower Sizes"
+        ],
+        [
+          "Equation"
+        ],
+        [
+          "Water Wheels"
+        ],
+        [
+          "Impulse Turbines"
+        ],
+        [
+          "References"
+        ],
+        [
+          "Resources"
+        ],
+        [
+          "External links"
+        ]
+      ],
+      "tables": 4,
+      "math_notation_blocks": 14,
+      "flags": [
+        "math_requires_original_inspection"
+      ],
+      "lead_flags": [],
+      "selection": [
+        true,
+        null,
+        "CC-BY-SA-3.0"
+      ]
+    },
+    {
+      "path": "Rainwater_harvesting",
+      "canonical_path": "Rainwater_harvesting",
+      "title": "Rainwater harvesting",
+      "html_bytes": 50524,
+      "blocks": 142,
+      "lead_characters": 302,
+      "lead_sha256": "421da46d19326f43a4638bbafb34890f369bca59bcbba0036ac74da8381dffee",
+      "body_text_sha256": "836bbdd116e5195d6f485c95c8a03c88fd655629a08adc4e4e0e6eb729f2f1c5",
+      "headings": [
+        [
+          "Advantages"
+        ],
+        [
+          "Disadvantages"
+        ],
+        [
+          "Principles"
+        ],
+        [
+          "Systems"
+        ],
+        [
+          "Systems",
+          "Domestic rooftop rainwater systems"
+        ],
+        [
+          "Systems",
+          "Industrial systems"
+        ],
+        [
+          "Rainwater urban design and infrastructure"
+        ],
+        [
+          "Successful case studies"
+        ]
+      ],
+      "tables": 1,
+      "math_notation_blocks": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": [
+        true,
+        null,
+        "CC-BY-SA-3.0"
+      ]
+    },
+    {
+      "path": "CD3WD",
+      "canonical_path": "CD3WD",
+      "title": "CD3WD",
+      "html_bytes": 43981,
+      "blocks": 22,
+      "lead_characters": 318,
+      "lead_sha256": "30a719543bc329fe567ddbabd07efe3166d42dd7c7aac8ec7eb2b4b7dee3cb76",
+      "body_text_sha256": "d62f10232e356dae2491b96108374b09392875f8feb7e859bc71a7279dff4f20",
+      "headings": [
+        [
+          "The Restart of the CD3WD Project"
+        ],
+        [
+          "Full List of Publications"
+        ],
+        [
+          "Done - ported to Appropedia"
+        ],
+        [
+          "To Do"
+        ],
+        [
+          "Maybe Later"
+        ],
+        [
+          "See also"
+        ],
+        [
+          "External Links"
+        ]
+      ],
+      "tables": 1,
+      "math_notation_blocks": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": [
+        true,
+        null,
+        "CC-BY-SA-3.0"
+      ]
+    },
+    {
+      "path": "Air_powered_car/ja",
+      "canonical_path": "Air_powered_car/ja",
+      "title": "Air powered car/ja",
+      "html_bytes": 16328,
+      "blocks": 19,
+      "lead_characters": 157,
+      "lead_sha256": "86377fa28305e5d0b05a6bb5317d9af5853c0e07d0cbd57cbbb32cd44a2583f3",
+      "body_text_sha256": "07b43450a1db8cd455f5cb0341b3f6d00c0901e54b0b3e309d602c8cba5f189d",
+      "headings": [
+        [
+          "\u30b3\u30f3\u30c6\u30f3\u30c4"
+        ],
+        [
+          "\u52b9\u7387\u6027\u3068\u74b0\u5883\u3078\u306e\u5f71\u97ff"
+        ],
+        [
+          "\u6b74\u53f2"
+        ],
+        [
+          "\u30c6\u30af\u30ce\u30ed\u30b8\u30fc"
+        ],
+        [
+          "\u6b20\u70b9"
+        ],
+        [
+          "\u53c2\u8003\u6587\u732e"
+        ]
+      ],
+      "tables": 0,
+      "math_notation_blocks": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": [
+        false,
+        "language_not_explicit_english",
+        null
+      ]
+    }
+  ],
+  "checked": true,
+  "archive": "appropedia_en_all_maxi_2026-02.zim",
+  "scope": "Representative original native HTML structure and math-preserving extraction; not full factual correctness or blanket redistribution clearance",
+  "checks": [
+    "Sibling and nested headings preserve source ancestry",
+    "Superscript/subscript mathematical notation is explicit in prose, lead excerpts and tables",
+    "MathML/LaTeX alternatives are preserved where supported; unsupported math is flagged omitted",
+    "v3 full-body and title/lead extraction retain versioned historical behavior; new v4 generations have distinct identities",
+    "Native full-text index and complete source reading remain separate from title/lead-only dense representation"
+  ],
+  "excluded_articles": {
+    "Building_with_Pumice": "Reproduced GTZ/Vieweg 1990 book retains an all-rights notice; generic page metadata does not resolve relicensing.",
+    "Small_Scale_Production_of_Lime_for_Building": "Reproduced GTZ/Vieweg 1985 book retains an all-rights notice; generic page metadata does not resolve relicensing.",
+    "Swadeshi": "Page expressly marks a reproduced essay as Copyrighted Material without a resolved reuse grant.",
+    "Intuitive_Foundation": "Separate source terms and all-rights notice conflict with the generic default declaration; retained for source-specific resolution."
+  },
+  "license_authority": "https://www.appropedia.org/Appropedia:Intellectual_property",
+  "license_policy": "English article text inherits CC-BY-SA-4.0 unless a page explicitly declares another supported open license. The four recorded unresolved contrary source notices are excluded from serving/indexing, not a legal verdict; originals are retained. Copyright discussion, citations and permission acknowledgements are not blanket exclusions."
+}

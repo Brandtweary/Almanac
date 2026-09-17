@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "almanac-contracts",
+  "version": "0.2.0",
+  "scope": "Application correctness, not candidate model scores; real production modules with deterministic fault injection.",
+  "groups": [
+    {
+      "id": "memory-publication-recovery",
+      "file": "scripts/test-memory-stages.ts",
+      "family": "recovery"
+    },
+    {
+      "id": "bounded-context-inspection",
+      "file": "scripts/test-memory-windows.ts",
+      "family": "context"
+    },
+    {
+      "id": "maintenance-identity",
+      "file": "scripts/test-glossary-maintenance.ts",
+      "family": "memory"
+    }
+  ]
+}

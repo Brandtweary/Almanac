@@ -1,0 +1,305 @@
+{
+  "schema_version": 1,
+  "status": "frozen-before-workflow-scoring",
+  "scope": "Development-only extension; every source was eligible for prior development research; no heldout claims.",
+  "sources": {
+    "9744d9ae3538e83430ae85f202bffc7fb886a8a33f4e733a00db64e8e604f369": {
+      "title": "Composting",
+      "url": "https://www.appropedia.org/Composting",
+      "original_sha256": "9744d9ae3538e83430ae85f202bffc7fb886a8a33f4e733a00db64e8e604f369",
+      "license": "CC-BY-SA-3.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "attribution": "Appropedia contributors; linked original page supplies authorship/history",
+      "modifications": "Whitespace normalized text-only excerpt; no images."
+    },
+    "5a922eb9031544ed5240d05780ec3d0fe087ea6b3b3f60cc1b8ebb3d56d364de": {
+      "title": "Microhydro",
+      "url": "https://www.appropedia.org/Microhydro",
+      "original_sha256": "5a922eb9031544ed5240d05780ec3d0fe087ea6b3b3f60cc1b8ebb3d56d364de",
+      "license": "CC-BY-SA-3.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "attribution": "Appropedia contributors; linked original page supplies authorship/history",
+      "modifications": "Whitespace normalized text-only excerpt; no images."
+    },
+    "68c459462879de65545f0ea1b6ee7c4fc3b007fe805ce461781af6abf6305432": {
+      "title": "Photovoltaics",
+      "url": "https://www.appropedia.org/Photovoltaics",
+      "original_sha256": "68c459462879de65545f0ea1b6ee7c4fc3b007fe805ce461781af6abf6305432",
+      "license": "CC-BY-SA-3.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "attribution": "Appropedia contributors; linked original page supplies authorship/history",
+      "modifications": "Whitespace normalized text-only excerpt; no images."
+    },
+    "4d7209d0336dbbb7063d963df80959ec271acbb358d9c7df3f9f2ea66cac944c": {
+      "title": "Soil",
+      "url": "https://www.appropedia.org/Soil",
+      "original_sha256": "4d7209d0336dbbb7063d963df80959ec271acbb358d9c7df3f9f2ea66cac944c",
+      "license": "CC-BY-SA-3.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "attribution": "Appropedia contributors; linked original page supplies authorship/history",
+      "modifications": "Whitespace normalized text-only excerpt; no images."
+    },
+    "1bd6a664003a8a987ef8eb06cc8e8bb87b3c610217fe0a49048b39003d42df26": {
+      "title": "Basic rainwater collection calculations",
+      "url": "https://www.appropedia.org/Basic_rainwater_collection_calculations",
+      "original_sha256": "1bd6a664003a8a987ef8eb06cc8e8bb87b3c610217fe0a49048b39003d42df26",
+      "license": "CC-BY-SA-3.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "attribution": "Appropedia contributors; linked original page supplies authorship/history",
+      "modifications": "Whitespace normalized text-only excerpt; no images."
+    },
+    "ef642fe95ec241ef897dade7cc02abeec6e8ff251ef62a5a0cdf8cd754f93332": {
+      "title": "Biosand filter",
+      "url": "https://www.appropedia.org/Biosand_filter",
+      "original_sha256": "ef642fe95ec241ef897dade7cc02abeec6e8ff251ef62a5a0cdf8cd754f93332",
+      "license": "CC-BY-SA-3.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "attribution": "Appropedia contributors; linked original page supplies authorship/history",
+      "modifications": "Whitespace normalized text-only excerpt; no images."
+    }
+  },
+  "contexts": {
+    "compost-wet": {
+      "passage_id": "compost-wet",
+      "source_sha256": "9744d9ae3538e83430ae85f202bffc7fb886a8a33f4e733a00db64e8e604f369",
+      "text": "whilst composts can be too dry, it is more of a problem when it is too wet, as the water displaces oxygen within the matrix, which may prevent efficient aerobic microbial activity. Therefore, rapid bacterial decomposition requires a moist but not soggy environment.",
+      "source": "https://www.appropedia.org/Composting",
+      "license": "CC-BY-SA-3.0"
+    },
+    "compost-wood": {
+      "passage_id": "compost-wood",
+      "source_sha256": "9744d9ae3538e83430ae85f202bffc7fb886a8a33f4e733a00db64e8e604f369",
+      "text": "Woody materials. If using woody materials, chopping will be necessary as the microbes require a high surface area to get to the carbon in the wood, which is often stored in a way that is difficult for them to access. On the other hand, having larger pieces of material within the compost may assist the process as it will aid air circulation. It may be necessary to remove these towards the end of the process.",
+      "source": "https://www.appropedia.org/Composting",
+      "license": "CC-BY-SA-3.0"
+    },
+    "hydro-head": {
+      "passage_id": "hydro-head",
+      "source_sha256": "5a922eb9031544ed5240d05780ec3d0fe087ea6b3b3f60cc1b8ebb3d56d364de",
+      "text": "Head (Vertical drop in ft) - This is the actual head that you have available due to losses from friction. Calculate friction loss using tables based on the materials you use for diversion (e.g. PVC). Determine equivalent length of pipe by adding actual length of pipe and equivalent lengths of fittings based on tables using pipe size.",
+      "source": "https://www.appropedia.org/Microhydro",
+      "license": "CC-BY-SA-3.0"
+    },
+    "hydro-time": {
+      "passage_id": "hydro-time",
+      "source_sha256": "5a922eb9031544ed5240d05780ec3d0fe087ea6b3b3f60cc1b8ebb3d56d364de",
+      "text": "Note that these equations are static in time. You must run these equations for with a resolution high enough to cover periods of variation (e.g. monthly river data).",
+      "source": "https://www.appropedia.org/Microhydro",
+      "license": "CC-BY-SA-3.0"
+    },
+    "pv-intermittent": {
+      "passage_id": "pv-intermittent",
+      "source_sha256": "68c459462879de65545f0ea1b6ee7c4fc3b007fe805ce461781af6abf6305432",
+      "text": "Solar cells only produce electricity when the sun is shining and does not tolerate shading, so it is inconsistent as a energy source for power-demanding devices. At night or in bad weather, you need either storage batteries or a secondary power source.",
+      "source": "https://www.appropedia.org/Photovoltaics",
+      "license": "CC-BY-SA-3.0"
+    },
+    "soil-depth": {
+      "passage_id": "soil-depth",
+      "source_sha256": "4d7209d0336dbbb7063d963df80959ec271acbb358d9c7df3f9f2ea66cac944c",
+      "text": "Topsoil: This is the top layer of soil that can be seen and that extends to around 15 to 20cm beneath the surface. Subsoil: This refers to the layers of soil found beneath the 15 to 20cm of topsoil. Depending on the soil type, it is often compacted and less fertile than the topsoil, and less likely to contain organic matter of use to the gardener/food crop grower.",
+      "source": "https://www.appropedia.org/Soil",
+      "license": "CC-BY-SA-3.0"
+    },
+    "rain-area": {
+      "passage_id": "rain-area",
+      "source_sha256": "1bd6a664003a8a987ef8eb06cc8e8bb87b3c610217fe0a49048b39003d42df26",
+      "text": "This is horizontal projected area of the collection surface. For a rectangular house, use length times width.",
+      "source": "https://www.appropedia.org/Basic_rainwater_collection_calculations",
+      "license": "CC-BY-SA-3.0"
+    },
+    "filter-sequence": {
+      "passage_id": "filter-sequence",
+      "source_sha256": "ef642fe95ec241ef897dade7cc02abeec6e8ff251ef62a5a0cdf8cd754f93332",
+      "text": "It may take the biolayer several days to adapt to the level of contamination and nutrients in the new source water. During this time, users can continue to use their BSF but should use a secondary disinfection method AFTER the water has gone through the filter, such as chlorination or boiling. Users should never put chlorine or chlorinated water into the filter; this will kill the biolayer.",
+      "source": "https://www.appropedia.org/Biosand_filter",
+      "license": "CC-BY-SA-3.0"
+    }
+  },
+  "cases": [
+    {
+      "id": "compost-tradeoff",
+      "split": "development",
+      "question": "My compost is sodden and contains large wood pieces. Should I remove every coarse piece to speed it up? Explain the moisture and particle-size tradeoff from the source.",
+      "requirements": [
+        {
+          "id": "r1",
+          "critical": true,
+          "rubric": "Moist not soggy; water displaces oxygen and limits aerobic microbial activity.",
+          "evidence": [
+            {
+              "source_sha256": "9744d9ae3538e83430ae85f202bffc7fb886a8a33f4e733a00db64e8e604f369",
+              "anchors": [
+                "whilst composts can be too dry, it is more of a problem when it is too wet, as the water displaces oxygen within the matrix, which may prevent efficient aerobic microbial activity. Therefore, rapid bacterial decomposition requires a moist but not soggy environment."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "r2",
+          "critical": true,
+          "rubric": "Chopping helps surface access; larger pieces can aid air circulation and may be removed near end. Do not prescribe eliminating all coarse structure.",
+          "evidence": [
+            {
+              "source_sha256": "9744d9ae3538e83430ae85f202bffc7fb886a8a33f4e733a00db64e8e604f369",
+              "anchors": [
+                "Woody materials. If using woody materials, chopping will be necessary as the microbes require a high surface area to get to the carbon in the wood, which is often stored in a way that is difficult for them to access. On the other hand, having larger pieces of material within the compost may assist the process as it will aid air circulation. It may be necessary to remove these towards the end of the process."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "compost-wet",
+        "compost-wood"
+      ],
+      "tags": [
+        "practical-workflow"
+      ]
+    },
+    {
+      "id": "hydro-planning",
+      "split": "development",
+      "question": "Can I size a microhydro system from one wet-season flow observation and gross vertical drop while ignoring pipe fittings? What corrections does the source require?",
+      "requirements": [
+        {
+          "id": "r1",
+          "critical": true,
+          "rubric": "Account for head/friction loss, material, pipe size, actual pipe and equivalent fitting lengths.",
+          "evidence": [
+            {
+              "source_sha256": "5a922eb9031544ed5240d05780ec3d0fe087ea6b3b3f60cc1b8ebb3d56d364de",
+              "anchors": [
+                "Head (Vertical drop in ft) - This is the actual head that you have available due to losses from friction. Calculate friction loss using tables based on the materials you use for diversion (e.g. PVC). Determine equivalent length of pipe by adding actual length of pipe and equivalent lengths of fittings based on tables using pipe size."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "r2",
+          "critical": true,
+          "rubric": "Use observations/resolution covering temporal variation, such as monthly flow; one wet-season observation does not establish year-round output.",
+          "evidence": [
+            {
+              "source_sha256": "5a922eb9031544ed5240d05780ec3d0fe087ea6b3b3f60cc1b8ebb3d56d364de",
+              "anchors": [
+                "Note that these equations are static in time. You must run these equations for with a resolution high enough to cover periods of variation (e.g. monthly river data)."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "hydro-head",
+        "hydro-time"
+      ],
+      "tags": [
+        "practical-workflow"
+      ]
+    },
+    {
+      "id": "night-power",
+      "split": "development",
+      "question": "I want to run a tool after sunset. Does the supplied photovoltaics passage support using panels alone, and does it specify the battery capacity I need?",
+      "requirements": [
+        {
+          "id": "r1",
+          "critical": true,
+          "rubric": "Need storage or secondary source; excerpt does not specify battery capacity, load, hours, or losses, so no invented capacity.",
+          "evidence": [
+            {
+              "source_sha256": "68c459462879de65545f0ea1b6ee7c4fc3b007fe805ce461781af6abf6305432",
+              "anchors": [
+                "Solar cells only produce electricity when the sun is shining and does not tolerate shading, so it is inconsistent as a energy source for power-demanding devices. At night or in bad weather, you need either storage batteries or a secondary power source."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "pv-intermittent"
+      ],
+      "tags": [
+        "practical-workflow"
+      ]
+    },
+    {
+      "id": "soil-scope",
+      "split": "development",
+      "question": "The supplied soil page says the upper 15 to 20 cm is topsoil. Can I conclude that all soil below exactly 20 cm is always compacted and infertile?",
+      "requirements": [
+        {
+          "id": "r1",
+          "critical": true,
+          "rubric": "No: around 15-20cm is approximate, depending on soil type, often less fertile/compacted does not mean always or completely infertile.",
+          "evidence": [
+            {
+              "source_sha256": "4d7209d0336dbbb7063d963df80959ec271acbb358d9c7df3f9f2ea66cac944c",
+              "anchors": [
+                "Topsoil: This is the top layer of soil that can be seen and that extends to around 15 to 20cm beneath the surface. Subsoil: This refers to the layers of soil found beneath the 15 to 20cm of topsoil. Depending on the soil type, it is often compacted and less fertile than the topsoil, and less likely to contain organic matter of use to the gardener/food crop grower."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "soil-depth"
+      ],
+      "tags": [
+        "practical-workflow"
+      ]
+    },
+    {
+      "id": "rain-footprint",
+      "split": "development",
+      "question": "The rectangular house is 8 by 10 meters in plan, and the sloped roof has 95 square meters of surface. Which catchment area does the supplied rainwater page use? Label any arithmetic as yours.",
+      "requirements": [
+        {
+          "id": "r1",
+          "critical": true,
+          "rubric": "Horizontal projected area is 8×10=80 square meters, not95; distinguish source rule from derived calculation.",
+          "evidence": [
+            {
+              "source_sha256": "1bd6a664003a8a987ef8eb06cc8e8bb87b3c610217fe0a49048b39003d42df26",
+              "anchors": [
+                "This is horizontal projected area of the collection surface. For a rectangular house, use length times width."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "rain-area"
+      ],
+      "tags": [
+        "practical-workflow"
+      ]
+    },
+    {
+      "id": "filter-source-change",
+      "split": "development",
+      "question": "After changing water sources for a biosand filter, I plan to chlorinate the incoming water while its biological layer adapts. Does this match the supplied guidance?",
+      "requirements": [
+        {
+          "id": "r1",
+          "critical": true,
+          "rubric": "Adaptation takes several days; secondary disinfection AFTER filtration, never chlorine/chlorinated input because it kills biolayer.",
+          "evidence": [
+            {
+              "source_sha256": "ef642fe95ec241ef897dade7cc02abeec6e8ff251ef62a5a0cdf8cd754f93332",
+              "anchors": [
+                "It may take the biolayer several days to adapt to the level of contamination and nutrients in the new source water. During this time, users can continue to use their BSF but should use a secondary disinfection method AFTER the water has gone through the filter, such as chlorination or boiling. Users should never put chlorine or chlorinated water into the filter; this will kill the biolayer."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "filter-sequence"
+      ],
+      "tags": [
+        "practical-workflow"
+      ]
+    }
+  ]
+}

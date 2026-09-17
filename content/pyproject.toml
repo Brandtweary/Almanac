@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "oracle-content"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi==0.141.1", "uvicorn==0.53.0", "httpx==0.28.1",
+  "pydantic==2.13.5", "beautifulsoup4==4.15.0", "tokenizers==0.23.2",
+]
+[project.optional-dependencies]
+extraction = ["docling==2.128.0", "libzim==3.13.0"]
+test = ["pytest==9.1.1"]
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+[tool.setuptools.packages.find]
+include = ["oracle_content*"]

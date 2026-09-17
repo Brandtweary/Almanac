@@ -1,0 +1,5 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.11.0+cpu
+pocket-tts==3.1.0
+websockets==15.0.1
+msgpack==1.1.2

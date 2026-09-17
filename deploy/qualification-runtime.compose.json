@@ -1,0 +1,89 @@
+{
+  "services": {
+    "inference": {
+      "image": "vllm/vllm-openai@sha256:082ca6f035279109041ffd3fe0695cb568b29bc580b35c4f297a66a08b216c1b",
+      "platform": "linux/amd64",
+      "pull_policy": "never",
+      "restart": "no",
+      "command": [
+        "/data/releases/${ORACLE_RELEASE_ID:?Set the prepared candidate release ID}/${ORACLE_MODEL_DIRECTORY:?Set the pinned model directory}",
+        "--served-model-name",
+        "local-oracle",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--max-model-len",
+        "${ORACLE_CONTEXT_TOKENS:?Set qualification context allocation}",
+        "--max-num-seqs",
+        "1",
+        "--max-num-batched-tokens",
+        "2048",
+        "--gpu-memory-utilization",
+        "${ORACLE_GPU_MEMORY_UTILIZATION:?Set the measured candidate memory fraction}",
+        "--enforce-eager",
+        "--language-model-only",
+        "--enable-auto-tool-choice",
+        "--tool-call-parser",
+        "gemma4",
+        "--reasoning-parser",
+        "gemma4",
+        "--chat-template",
+        "/data/releases/${ORACLE_RELEASE_ID}/${ORACLE_CHAT_TEMPLATE:?Set the pinned template artifact path}",
+        "--generation-config",
+        "vllm"
+      ],
+      "environment": {
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "VLLM_NO_USAGE_STATS": "1",
+        "XDG_CACHE_HOME": "/cache",
+        "VLLM_CACHE_ROOT": "/cache/vllm",
+        "CUDA_CACHE_PATH": "/cache/cuda"
+      },
+      "ports": [
+        "127.0.0.1:${ORACLE_INFERENCE_PORT:?Select an unused loopback port}:8000"
+      ],
+      "volumes": [
+        "${ORACLE_DATA_DIR:?Set prepared data root}:/data:ro",
+        "${ORACLE_DATA_DIR}/runtime-cache:/cache"
+      ],
+      "networks": [
+        "runtime"
+      ],
+      "deploy": {
+        "resources": {
+          "reservations": {
+            "devices": [
+              {
+                "driver": "nvidia",
+                "count": 1,
+                "capabilities": [
+                  "gpu"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "python3",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+        ],
+        "interval": "10s",
+        "timeout": "3s",
+        "retries": 12,
+        "start_period": "120s"
+      },
+      "shm_size": "4g"
+    }
+  },
+  "networks": {
+    "runtime": {
+      "internal": true
+    }
+  }
+}

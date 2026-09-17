@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "status": "provisional-vllm-candidate-not-release",
+  "qualified": false,
+  "repo": "unsloth/GLM-4.7-Flash-NVFP4",
+  "revision": "98b0362133bda9ee3b1b875636636c07861f5947",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 8431,
+      "sha256": "d42ef346ae623422ecc043143b34931ffeadc536001b6aa92625c80d71838703",
+      "url": "https://huggingface.co/unsloth/GLM-4.7-Flash-NVFP4/resolve/98b0362133bda9ee3b1b875636636c07861f5947/README.md"
+    },
+    {
+      "path": "chat_template.jinja",
+      "bytes": 3120,
+      "sha256": "d63ad536c3c81880043e22ec7fd08db42b4d8fb7c89c7138bc562bfa25281375",
+      "url": "https://huggingface.co/unsloth/GLM-4.7-Flash-NVFP4/resolve/98b0362133bda9ee3b1b875636636c07861f5947/chat_template.jinja"
+    },
+    {
+      "path": "config.json",
+      "bytes": 6382,
+      "sha256": "c9a94c0b43288570173f7ad359a5ca2428f1c1d95857817f4af74deaa409efc4",
+      "url": "https://huggingface.co/unsloth/GLM-4.7-Flash-NVFP4/resolve/98b0362133bda9ee3b1b875636636c07861f5947/config.json"
+    },
+    {
+      "path": "generation_config.json",
+      "bytes": 215,
+      "sha256": "80b2a0d01dfb732996aedb98868fee474e9fc5f46553df3a3f5a97ad0fb2b68a",
+      "url": "https://huggingface.co/unsloth/GLM-4.7-Flash-NVFP4/resolve/98b0362133bda9ee3b1b875636636c07861f5947/generation_config.json"
+    },
+    {
+      "path": "model.safetensors",
+      "bytes": 18707900256,
+      "sha256": "321196f10d90e4bbf3c2401bb49a6a4062cbd99701673160fcdf78b56b8865f1",
+      "url": "https://huggingface.co/unsloth/GLM-4.7-Flash-NVFP4/resolve/98b0362133bda9ee3b1b875636636c07861f5947/model.safetensors"
+    },
+    {
+      "path": "model.safetensors.index.json",
+      "bytes": 3000068,
+      "sha256": "839906024a440f91db46ddc8898dde3cc5b5e148441bccfafd762d927624ce84",
+      "url": "https://huggingface.co/unsloth/GLM-4.7-Flash-NVFP4/resolve/98b0362133bda9ee3b1b875636636c07861f5947/model.safetensors.index.json"
+    },
+    {
+      "path": "model_mtp.safetensors",
+      "bytes": 2556215696,
+      "sha256": "6c5e76856a6f306161e17baefb92e226465aba0841d9638513dc056b8cfb39ff",
+      "url": "https://huggingface.co/unsloth/GLM-4.7-Flash-NVFP4/resolve/98b0362133bda9ee3b1b875636636c07861f5947/model_mtp.safetensors"
+    },
+    {
+      "path": "recipe.yaml",
+      "bytes": 719,
+      "sha256": "bbbf047be7500829b58dfde401c6d8ca926f45ea25a3dc8d115483491f99daef",
+      "url": "https://huggingface.co/unsloth/GLM-4.7-Flash-NVFP4/resolve/98b0362133bda9ee3b1b875636636c07861f5947/recipe.yaml"
+    },
+    {
+      "path": "special_tokens_map.json",
+      "bytes": 710,
+      "sha256": "946f6f7ed989038aa262abffbc134995e9a5e5d2aba596ba57769414ac8a25e4",
+      "url": "https://huggingface.co/unsloth/GLM-4.7-Flash-NVFP4/resolve/98b0362133bda9ee3b1b875636636c07861f5947/special_tokens_map.json"
+    },
+    {
+      "path": "tokenizer.json",
+      "bytes": 20217542,
+      "sha256": "fcce46e83a6ed162239b0a0b421d2ab3f148d3f1fd6839c0f82baf61b2284cdc",
+      "url": "https://huggingface.co/unsloth/GLM-4.7-Flash-NVFP4/resolve/98b0362133bda9ee3b1b875636636c07861f5947/tokenizer.json"
+    },
+    {
+      "path": "tokenizer_config.json",
+      "bytes": 785,
+      "sha256": "278c313bea224323f05aa03b8855c3f2b8bb744de6f5f9cc758970159b3715c8",
+      "url": "https://huggingface.co/unsloth/GLM-4.7-Flash-NVFP4/resolve/98b0362133bda9ee3b1b875636636c07861f5947/tokenizer_config.json"
+    }
+  ],
+  "artifact_bytes": 21287353924,
+  "weight_bytes": 21264115952,
+  "serving": {
+    "image": "vllm/vllm-openai@sha256:082ca6f035279109041ffd3fe0695cb568b29bc580b35c4f297a66a08b216c1b",
+    "version": "0.29.0",
+    "source_revision": "98dff2a81d747d1dba01a47f939f48c3526d4206",
+    "platform": "linux/amd64"
+  },
+  "proposed_measurement": {
+    "context_tokens": 8192,
+    "max_num_seqs": 1,
+    "max_num_batched_tokens": 2048,
+    "gpu_memory_utilization": 0.8,
+    "enforce_eager": true,
+    "speculative_decoding": false,
+    "environment": {
+      "HF_HUB_OFFLINE": "1",
+      "TRANSFORMERS_OFFLINE": "1",
+      "VLLM_ATTENTION_BACKEND": "TRITON_MLA"
+    },
+    "command": [
+      "/model",
+      "--served-model-name",
+      "glm47-flash-qualification",
+      "--host",
+      "0.0.0.0",
+      "--port",
+      "8000",
+      "--max-model-len",
+      "8192",
+      "--max-num-seqs",
+      "1",
+      "--max-num-batched-tokens",
+      "2048",
+      "--gpu-memory-utilization",
+      "0.80",
+      "--enforce-eager",
+      "--enable-auto-tool-choice",
+      "--tool-call-parser",
+      "glm47",
+      "--reasoning-parser",
+      "glm45",
+      "--kv-cache-dtype",
+      "auto",
+      "--chat-template",
+      "/model/chat_template.jinja",
+      "--generation-config",
+      "vllm"
+    ],
+    "mounts": [
+      {
+        "source": "prepared verified snapshot",
+        "target": "/model",
+        "read_only": true
+      }
+    ],
+    "network": "Internal-only inference network; inspect its container address, then forward that address through a dedicated SSH loopback listener to the source gateway. Internal-network Docker host port publishing is not assumed.",
+    "memory_gate": "Measure resident weights, KV, workspace and simultaneous active speech before increasing context or admitting a release.",
+    "disk_gate": "Reserve remaining corpus acquisition plus index/build/runtime writes before acquiring this complete snapshot; do not stage both candidates concurrently."
+  }
+}

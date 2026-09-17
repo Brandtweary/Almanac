@@ -1,0 +1,2306 @@
+{
+  "schemaVersion": 1,
+  "description": "Public identities for completed hosted development screening. Raw prompts/responses and review receipts are not published; hashes identify retained artifacts and do not establish full public reproducibility.",
+  "hashAlgorithms": {
+    "scenario": "SHA-256 of JSON.stringify(case), UTF-8, preserving serialized key order",
+    "rawReceipt": "SHA-256 of retained raw JSON file bytes",
+    "suite": "SHA-256 of JSON.stringify({manifest,cases}), UTF-8"
+  },
+  "runs": [
+    {
+      "id": "product-baseline",
+      "split": "development",
+      "suiteDigest": "9625b3743b4be618f9e9bda269df1a5d778696bd964a80ffb90d0967d9cd5fa8",
+      "implementationDigest": "04b8ad87204c58275f1138a35781c238a9b3309aa65bb9d0e415ee9da177c7b2",
+      "dateUTC": {
+        "firstMessage": "2026-09-17T00:05:52.437000+00:00",
+        "lastMessage": "2026-09-17T00:21:43.328000+00:00"
+      },
+      "maxCompletions": 8,
+      "maximumSpendUSD": 10,
+      "scenarioHashes": {
+        "audit.typed-transcription": "417a87a92cb6260b92645c29e67ddc9168e06d832691814eef784fb2087a602b",
+        "compaction.compaction-quantities": "baf87e8bda93525837ee1cf3c552ff3c521c4189d4b254070b47580c4c0842c2",
+        "memory.assistant-proposal": "ebd8a11d02b6d1a1306e55742f1d0cdf2e1f18314bdcd3234c3542a30136de57",
+        "memory.durable-user-fact": "1825fc7a5fddc725764d3b10ec0ad915f20e986de3c0dc1531052ef6d928e1de",
+        "research.edition_conflict": "8a8f670fc2e5a07387405ee7cb62c5c3dee9be815e7609bfede77a8933e09075",
+        "research.rain-footprint": "b2432640519cce716cb3bc06c066af55fb7f318be54417cf326c8f1a0436ab11",
+        "research.reference_injection": "05e05821b77eef613f86d7e8e5c654aa6a7822cced33fa93d8e595f23bc2589d",
+        "research.separate_warning": "d4c93e11c3e61c657fc0187c8083843437e88dc7a41a5ad0b95d5b9a3ed42b06",
+        "summary.summary-provenance": "88d774d5e12cf990a09ec24946b10a39ec23b5859205ed282119ddc4cbac8faa"
+      },
+      "profiles": [
+        {
+          "id": "meta/muse-glimmer-30b",
+          "name": "Meta: Muse Glimmer 30B",
+          "contextWindow": 131072,
+          "maxOutputTokens": 4096,
+          "reasoning": true,
+          "prices": {
+            "input": 0.35,
+            "output": 1.5,
+            "cacheRead": 0.04,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384,
+          "thinkingLevel": "medium"
+        },
+        {
+          "id": "google/gemma-4-31b-it",
+          "name": "Google: Gemma 4 31B",
+          "contextWindow": 262144,
+          "maxOutputTokens": 4096,
+          "reasoning": true,
+          "prices": {
+            "input": 0.09,
+            "output": 0.33999999999999997,
+            "cacheRead": 0.049999999999999996,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384,
+          "thinkingLevel": "medium"
+        },
+        {
+          "id": "google/gemma-4-26b-a4b-it",
+          "name": "Google: Gemma 4 26B A4B ",
+          "contextWindow": 262144,
+          "maxOutputTokens": 4096,
+          "reasoning": true,
+          "prices": {
+            "input": 0.09,
+            "output": 0.3,
+            "cacheRead": 0.049999999999999996,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384,
+          "thinkingLevel": "medium"
+        },
+        {
+          "id": "z-ai/glm-4.7-flash",
+          "name": "Z.ai: GLM 4.7 Flash",
+          "contextWindow": 200000,
+          "maxOutputTokens": 4096,
+          "reasoning": true,
+          "prices": {
+            "input": 0.060500000000000005,
+            "output": 0.39999999999999997,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384,
+          "thinkingLevel": "medium"
+        },
+        {
+          "id": "nvidia/nemotron-3-nano-30b-a3b",
+          "name": "NVIDIA: Nemotron 3 Nano 30B A3B",
+          "contextWindow": 262144,
+          "maxOutputTokens": 4096,
+          "reasoning": true,
+          "prices": {
+            "input": 0.049999999999999996,
+            "output": 0.19999999999999998,
+            "cacheRead": 0.03,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384,
+          "thinkingLevel": "medium"
+        },
+        {
+          "id": "mistralai/ministral-14b-2512",
+          "name": "Mistral: Ministral 3 14B 2512",
+          "contextWindow": 262144,
+          "maxOutputTokens": 4096,
+          "reasoning": false,
+          "prices": {
+            "input": 0.19999999999999998,
+            "output": 0.19999999999999998,
+            "cacheRead": 0.02,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384
+        },
+        {
+          "id": "ibm-granite/granite-4.2-8b",
+          "name": "IBM: Granite 4.2 8B",
+          "contextWindow": 131072,
+          "maxOutputTokens": 8192,
+          "reasoning": true,
+          "prices": {
+            "input": 0.06,
+            "output": 0.25,
+            "cacheRead": 0.015,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384,
+          "thinkingLevel": "medium"
+        },
+        {
+          "id": "mistralai/mistral-small-3.2-24b-instruct",
+          "name": "Mistral: Mistral Small 3.2 24B",
+          "contextWindow": 256000,
+          "maxOutputTokens": 4096,
+          "reasoning": false,
+          "prices": {
+            "input": 0.09375,
+            "output": 0.25,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384
+        },
+        {
+          "id": "qwen/qwen3.8-27b",
+          "name": "Qwen: Qwen3.8 27B",
+          "contextWindow": 1000000,
+          "maxOutputTokens": 4096,
+          "reasoning": true,
+          "prices": {
+            "input": 0.21400000000000002,
+            "output": 2.5500000000000003,
+            "cacheRead": 0.15,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384,
+          "thinkingLevel": "medium"
+        },
+        {
+          "id": "qwen/qwen3.6-27b",
+          "name": "Qwen: Qwen3.6 27B",
+          "contextWindow": 262144,
+          "maxOutputTokens": 4096,
+          "reasoning": true,
+          "prices": {
+            "input": 0.3,
+            "output": 2,
+            "cacheRead": 0.03,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384,
+          "thinkingLevel": "medium"
+        }
+      ],
+      "observed": {
+        "google/gemma-4-26b-a4b-it": {
+          "providers": [
+            "Darkbloom",
+            "NextBit"
+          ],
+          "requestSettings": [
+            {
+              "model": "google/gemma-4-26b-a4b-it",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 4096,
+              "temperature": 0,
+              "reasoning": {
+                "effort": "medium"
+              },
+              "provider": {
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "39bea26f98181a41eecb8d722f34648315ccea3cc036a226788a53169adbc3b3",
+            "722719e30ba732b5bf4f3c22ebda2d77f851e1150a0eb7a07e838bac0b13d1fa",
+            "e0a353783a9305625b79aa76467cbae6951acd249b972c35ede8c55603fa5a30"
+          ],
+          "toolSchemaDigests": [
+            "3095b110efb23262f66501b531f1bc086720bcef2f67d3b36a3583130279b092",
+            "4c3b3971836dc70992d365badf30f2cf6b5111fefafca058d05aab0860a313fa",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "6718a9b45d077daa23b778bec7565f378ef64c7d1fc60e912d653411ce278930",
+            "8071623bba496a4d033392f58b68af4d65a505b142ae87cdab1c6efab115dbf4"
+          ]
+        },
+        "google/gemma-4-31b-it": {
+          "providers": [
+            "CoreWeave",
+            "DeepInfra"
+          ],
+          "requestSettings": [
+            {
+              "model": "google/gemma-4-31b-it",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 4096,
+              "temperature": 0,
+              "reasoning": {
+                "effort": "medium"
+              },
+              "provider": {
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "39bea26f98181a41eecb8d722f34648315ccea3cc036a226788a53169adbc3b3",
+            "a02af8e941739f7a5ad24554b7432b09df3f39c87d648a465b908024838f4835",
+            "e0a353783a9305625b79aa76467cbae6951acd249b972c35ede8c55603fa5a30"
+          ],
+          "toolSchemaDigests": [
+            "3095b110efb23262f66501b531f1bc086720bcef2f67d3b36a3583130279b092",
+            "4c3b3971836dc70992d365badf30f2cf6b5111fefafca058d05aab0860a313fa",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "6718a9b45d077daa23b778bec7565f378ef64c7d1fc60e912d653411ce278930",
+            "8071623bba496a4d033392f58b68af4d65a505b142ae87cdab1c6efab115dbf4"
+          ]
+        },
+        "ibm-granite/granite-4.2-8b": {
+          "providers": [
+            "DeepInfra"
+          ],
+          "requestSettings": [
+            {
+              "model": "ibm-granite/granite-4.2-8b",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 8192,
+              "temperature": 0,
+              "reasoning": {
+                "effort": "medium"
+              },
+              "provider": {
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "39bea26f98181a41eecb8d722f34648315ccea3cc036a226788a53169adbc3b3",
+            "e0a353783a9305625b79aa76467cbae6951acd249b972c35ede8c55603fa5a30",
+            "e521700674b6a7b18503238ba54543a5e0b35679cf77257740dff3c63b4a5b4a"
+          ],
+          "toolSchemaDigests": [
+            "3095b110efb23262f66501b531f1bc086720bcef2f67d3b36a3583130279b092",
+            "4c3b3971836dc70992d365badf30f2cf6b5111fefafca058d05aab0860a313fa",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "6718a9b45d077daa23b778bec7565f378ef64c7d1fc60e912d653411ce278930",
+            "8071623bba496a4d033392f58b68af4d65a505b142ae87cdab1c6efab115dbf4"
+          ]
+        },
+        "meta/muse-glimmer-30b": {
+          "providers": [
+            "Phala"
+          ],
+          "requestSettings": [
+            {
+              "model": "meta/muse-glimmer-30b",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 4096,
+              "temperature": 0,
+              "reasoning": {
+                "effort": "medium"
+              },
+              "provider": {
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "39bea26f98181a41eecb8d722f34648315ccea3cc036a226788a53169adbc3b3",
+            "82c40554104bb57daa81fa2bdee37f640e5fc1142d039140a75bdc6fdafa8c67",
+            "e0a353783a9305625b79aa76467cbae6951acd249b972c35ede8c55603fa5a30"
+          ],
+          "toolSchemaDigests": [
+            "3095b110efb23262f66501b531f1bc086720bcef2f67d3b36a3583130279b092",
+            "4c3b3971836dc70992d365badf30f2cf6b5111fefafca058d05aab0860a313fa",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "6718a9b45d077daa23b778bec7565f378ef64c7d1fc60e912d653411ce278930",
+            "8071623bba496a4d033392f58b68af4d65a505b142ae87cdab1c6efab115dbf4"
+          ]
+        },
+        "mistralai/ministral-14b-2512": {
+          "providers": [
+            "Mistral"
+          ],
+          "requestSettings": [
+            {
+              "model": "mistralai/ministral-14b-2512",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 4096,
+              "temperature": 0,
+              "provider": {
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "39bea26f98181a41eecb8d722f34648315ccea3cc036a226788a53169adbc3b3",
+            "d29863896759bc483264c7532148bb31b82b124d86f3ebdf2d1d7effda1e5fdc",
+            "e0a353783a9305625b79aa76467cbae6951acd249b972c35ede8c55603fa5a30"
+          ],
+          "toolSchemaDigests": [
+            "3095b110efb23262f66501b531f1bc086720bcef2f67d3b36a3583130279b092",
+            "4c3b3971836dc70992d365badf30f2cf6b5111fefafca058d05aab0860a313fa",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "6718a9b45d077daa23b778bec7565f378ef64c7d1fc60e912d653411ce278930",
+            "8071623bba496a4d033392f58b68af4d65a505b142ae87cdab1c6efab115dbf4"
+          ]
+        },
+        "mistralai/mistral-small-3.2-24b-instruct": {
+          "providers": [
+            "DeepInfra"
+          ],
+          "requestSettings": [
+            {
+              "model": "mistralai/mistral-small-3.2-24b-instruct",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 4096,
+              "temperature": 0,
+              "provider": {
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "39bea26f98181a41eecb8d722f34648315ccea3cc036a226788a53169adbc3b3",
+            "7916a45d4f74c1c3ece16457057360013fc41e02eed41ced3a0bbf57041d5aed",
+            "e0a353783a9305625b79aa76467cbae6951acd249b972c35ede8c55603fa5a30"
+          ],
+          "toolSchemaDigests": [
+            "3095b110efb23262f66501b531f1bc086720bcef2f67d3b36a3583130279b092",
+            "4c3b3971836dc70992d365badf30f2cf6b5111fefafca058d05aab0860a313fa",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "6718a9b45d077daa23b778bec7565f378ef64c7d1fc60e912d653411ce278930",
+            "8071623bba496a4d033392f58b68af4d65a505b142ae87cdab1c6efab115dbf4"
+          ]
+        },
+        "nvidia/nemotron-3-nano-30b-a3b": {
+          "providers": [
+            "Crusoe"
+          ],
+          "requestSettings": [
+            {
+              "model": "nvidia/nemotron-3-nano-30b-a3b",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 4096,
+              "temperature": 0,
+              "reasoning": {
+                "effort": "medium"
+              },
+              "provider": {
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "39bea26f98181a41eecb8d722f34648315ccea3cc036a226788a53169adbc3b3",
+            "b04306379ab5324c55480578790191c83eb91c815bf4efb502d5f1deffe21ff9",
+            "e0a353783a9305625b79aa76467cbae6951acd249b972c35ede8c55603fa5a30"
+          ],
+          "toolSchemaDigests": [
+            "3095b110efb23262f66501b531f1bc086720bcef2f67d3b36a3583130279b092",
+            "4c3b3971836dc70992d365badf30f2cf6b5111fefafca058d05aab0860a313fa",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "6718a9b45d077daa23b778bec7565f378ef64c7d1fc60e912d653411ce278930",
+            "8071623bba496a4d033392f58b68af4d65a505b142ae87cdab1c6efab115dbf4"
+          ]
+        },
+        "qwen/qwen3.6-27b": {
+          "providers": [
+            "DeepInfra",
+            "SiliconFlow"
+          ],
+          "requestSettings": [
+            {
+              "model": "qwen/qwen3.6-27b",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 4096,
+              "temperature": 0,
+              "reasoning": {
+                "effort": "medium"
+              },
+              "provider": {
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "29c87d0c27272d76943d1b6b605c8c52745cd10914359316acfa41e3ca505f11",
+            "39bea26f98181a41eecb8d722f34648315ccea3cc036a226788a53169adbc3b3",
+            "e0a353783a9305625b79aa76467cbae6951acd249b972c35ede8c55603fa5a30"
+          ],
+          "toolSchemaDigests": [
+            "3095b110efb23262f66501b531f1bc086720bcef2f67d3b36a3583130279b092",
+            "4c3b3971836dc70992d365badf30f2cf6b5111fefafca058d05aab0860a313fa",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "6718a9b45d077daa23b778bec7565f378ef64c7d1fc60e912d653411ce278930",
+            "8071623bba496a4d033392f58b68af4d65a505b142ae87cdab1c6efab115dbf4"
+          ]
+        },
+        "qwen/qwen3.8-27b": {
+          "providers": [
+            "DekaLLM",
+            "Parasail",
+            "Reka"
+          ],
+          "requestSettings": [
+            {
+              "model": "qwen/qwen3.8-27b",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 4096,
+              "temperature": 0,
+              "reasoning": {
+                "effort": "medium"
+              },
+              "provider": {
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "0bec20a33d84f80d5f0c8bf99bf8a6e6b229d6f7c9a22cbbe9b292eadca17a42",
+            "39bea26f98181a41eecb8d722f34648315ccea3cc036a226788a53169adbc3b3",
+            "e0a353783a9305625b79aa76467cbae6951acd249b972c35ede8c55603fa5a30"
+          ],
+          "toolSchemaDigests": [
+            "3095b110efb23262f66501b531f1bc086720bcef2f67d3b36a3583130279b092",
+            "4c3b3971836dc70992d365badf30f2cf6b5111fefafca058d05aab0860a313fa",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "6718a9b45d077daa23b778bec7565f378ef64c7d1fc60e912d653411ce278930",
+            "8071623bba496a4d033392f58b68af4d65a505b142ae87cdab1c6efab115dbf4"
+          ]
+        },
+        "z-ai/glm-4.7-flash": {
+          "providers": [
+            "Venice"
+          ],
+          "requestSettings": [
+            {
+              "model": "z-ai/glm-4.7-flash",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 4096,
+              "temperature": 0,
+              "reasoning": {
+                "effort": "medium"
+              },
+              "provider": {
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "30e6184d45a503c1cd838d6f734fa406315cbea00e13e08c4cbbe512bda3c5ce",
+            "39bea26f98181a41eecb8d722f34648315ccea3cc036a226788a53169adbc3b3",
+            "e0a353783a9305625b79aa76467cbae6951acd249b972c35ede8c55603fa5a30"
+          ],
+          "toolSchemaDigests": [
+            "3095b110efb23262f66501b531f1bc086720bcef2f67d3b36a3583130279b092",
+            "4c3b3971836dc70992d365badf30f2cf6b5111fefafca058d05aab0860a313fa",
+            "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "6718a9b45d077daa23b778bec7565f378ef64c7d1fc60e912d653411ce278930",
+            "8071623bba496a4d033392f58b68af4d65a505b142ae87cdab1c6efab115dbf4"
+          ]
+        }
+      },
+      "rawReceiptHashes": [
+        {
+          "model": "google/gemma-4-26b-a4b-it",
+          "caseId": "audit.typed-transcription",
+          "sha256": "57ee7b552787a06f2411dd165a17d9e9f8db9c03e7e53c04b53ea9f89b3c4a7b"
+        },
+        {
+          "model": "google/gemma-4-26b-a4b-it",
+          "caseId": "compaction.compaction-quantities",
+          "sha256": "43df5dbd6656f60f7bc12686d0abb628aaa2d31fce3c7d5ffef6f05fec5a9662"
+        },
+        {
+          "model": "google/gemma-4-26b-a4b-it",
+          "caseId": "memory.assistant-proposal",
+          "sha256": "8f2c00d96d756ae91a326393e3705afa19b42e4ed8d1bb2f141bf63c92ecec2b"
+        },
+        {
+          "model": "google/gemma-4-26b-a4b-it",
+          "caseId": "memory.durable-user-fact",
+          "sha256": "7e31734cac8e369a21af9e920ee176c52eac660f9e92203f0b1f384c5f8aa24e"
+        },
+        {
+          "model": "google/gemma-4-26b-a4b-it",
+          "caseId": "research.edition_conflict",
+          "sha256": "86042791d45e7595cab7a647a47cb250db7dff093e79df1ff5e0667ca311db71"
+        },
+        {
+          "model": "google/gemma-4-26b-a4b-it",
+          "caseId": "research.rain-footprint",
+          "sha256": "197f084ee2a5d4010f66d94f86f6d1026a9ca7b7e22072600718f260bf2be925"
+        },
+        {
+          "model": "google/gemma-4-26b-a4b-it",
+          "caseId": "research.reference_injection",
+          "sha256": "47e1217226083e14b540fc6c273a8a8f72d24b41cfd7e584665a9a668c28bc8f"
+        },
+        {
+          "model": "google/gemma-4-26b-a4b-it",
+          "caseId": "research.separate_warning",
+          "sha256": "57a7752b3df1a5fbe2970d4dfa42efe78b1092a6cad26d0a0492c41dea5d6efb"
+        },
+        {
+          "model": "google/gemma-4-26b-a4b-it",
+          "caseId": "summary.summary-provenance",
+          "sha256": "4e034c6276d74d995a90346493c34f8883a2605f0d14fd5c10a2f3b9990f11cb"
+        },
+        {
+          "model": "google/gemma-4-31b-it",
+          "caseId": "audit.typed-transcription",
+          "sha256": "e98dcd0b9796a8361bdbc3fa993acb947cb126c817aadac5e4b6f24d0be9981d"
+        },
+        {
+          "model": "google/gemma-4-31b-it",
+          "caseId": "compaction.compaction-quantities",
+          "sha256": "1f91756b055a822374587e4c636c091ded95f2af6de30dbcd88c8ca887dd4a30"
+        },
+        {
+          "model": "google/gemma-4-31b-it",
+          "caseId": "memory.assistant-proposal",
+          "sha256": "a0dbb3f2a246165eeb2d297f0e333288ee8e4e23e287da3199b3836c3f79bc3f"
+        },
+        {
+          "model": "google/gemma-4-31b-it",
+          "caseId": "memory.durable-user-fact",
+          "sha256": "8f6e881930ab753e772bfcc1a568f07517db7c1782a49982693c9296b7ae8deb"
+        },
+        {
+          "model": "google/gemma-4-31b-it",
+          "caseId": "research.edition_conflict",
+          "sha256": "ab6e53fc6e53f1569454c21b9885e214e6fdaaac1d9fdd6b79cdccd111a2d0b6"
+        },
+        {
+          "model": "google/gemma-4-31b-it",
+          "caseId": "research.rain-footprint",
+          "sha256": "ac36c0455529b6baef4a00828f6cc15b997e4efd85ff9f3726d8b6fce6d52b47"
+        },
+        {
+          "model": "google/gemma-4-31b-it",
+          "caseId": "research.reference_injection",
+          "sha256": "21348e9aa7e60a7327864a33cd9a69bd5ecb96154311953c14a19a7dd77bde1d"
+        },
+        {
+          "model": "google/gemma-4-31b-it",
+          "caseId": "research.separate_warning",
+          "sha256": "58bf2daf008e3374ceeb458b76bac2deeff755f3f891bfb7687b9852a83bb30e"
+        },
+        {
+          "model": "google/gemma-4-31b-it",
+          "caseId": "summary.summary-provenance",
+          "sha256": "694773700532f97c2731cf9c6c12cfe041fb03597b657207819c1e9054fe1f00"
+        },
+        {
+          "model": "ibm-granite/granite-4.2-8b",
+          "caseId": "audit.typed-transcription",
+          "sha256": "5d5c16dce1d8aac44104c9cf8df6061b50d03c7e10c2863fb5fa340602765b5b"
+        },
+        {
+          "model": "ibm-granite/granite-4.2-8b",
+          "caseId": "compaction.compaction-quantities",
+          "sha256": "83f72179e06cf9b2aa74ed5795195edb1297c44cd268c6fda41452183192fe9b"
+        },
+        {
+          "model": "ibm-granite/granite-4.2-8b",
+          "caseId": "memory.assistant-proposal",
+          "sha256": "20213e7bd63da28bd2349c4f09d779b54f9a7407c5a718f599b8c80fec0096af"
+        },
+        {
+          "model": "ibm-granite/granite-4.2-8b",
+          "caseId": "memory.durable-user-fact",
+          "sha256": "14cbc931de6f7a9a3ef80ca036d7618e990211f9fd85fc00e40b4e5f43b1d005"
+        },
+        {
+          "model": "ibm-granite/granite-4.2-8b",
+          "caseId": "research.edition_conflict",
+          "sha256": "8af72f7ffff71bbfcdfa4999ae78631de30c40d89c2c042a09a80d80b72b5011"
+        },
+        {
+          "model": "ibm-granite/granite-4.2-8b",
+          "caseId": "research.rain-footprint",
+          "sha256": "a170513867c530a85f12322bd0afe0a183cd7a51a4b85a7c87bb84f1c6e4a1c4"
+        },
+        {
+          "model": "ibm-granite/granite-4.2-8b",
+          "caseId": "research.reference_injection",
+          "sha256": "0a94703661a04eac33609ac55d487ecd4d449b7d8dfb301728d71a72dd91561a"
+        },
+        {
+          "model": "ibm-granite/granite-4.2-8b",
+          "caseId": "research.separate_warning",
+          "sha256": "18dc80737cbf74a2b6d58d7b08ac29b22dac3eebc6a6daaab112f2c72c895917"
+        },
+        {
+          "model": "ibm-granite/granite-4.2-8b",
+          "caseId": "summary.summary-provenance",
+          "sha256": "242b5e61702024b2250d6cbbdad602c805c3f0f4a780960a5d788fcf7f516abb"
+        },
+        {
+          "model": "meta/muse-glimmer-30b",
+          "caseId": "audit.typed-transcription",
+          "sha256": "116c94e4b1314be1668ba6a9ac1d13f0d544f6f04d4bd16c97f0e6c85073c99e"
+        },
+        {
+          "model": "meta/muse-glimmer-30b",
+          "caseId": "compaction.compaction-quantities",
+          "sha256": "2f02577b75d692ac59366a073f89bc6bf33a11930b5da88018a9fa3e86c259a9"
+        },
+        {
+          "model": "meta/muse-glimmer-30b",
+          "caseId": "memory.assistant-proposal",
+          "sha256": "f0180b3ff1ae81e4428d275d28b489567986b86f8ef0e74a4e857376d0306247"
+        },
+        {
+          "model": "meta/muse-glimmer-30b",
+          "caseId": "memory.durable-user-fact",
+          "sha256": "957acac8f8d6799be3c8fa9ba7de8cc1cdc0f427157e91f618e545e37488effa"
+        },
+        {
+          "model": "meta/muse-glimmer-30b",
+          "caseId": "research.edition_conflict",
+          "sha256": "aa5bacf5edd6a4cc818384dc8f8d167a8d2532cc840bdcf2372959a78f241517"
+        },
+        {
+          "model": "meta/muse-glimmer-30b",
+          "caseId": "research.rain-footprint",
+          "sha256": "f5e896ab0ebdab6a9ec37a784af2d02c608295fa081d832d7942671ee7bd0dc3"
+        },
+        {
+          "model": "meta/muse-glimmer-30b",
+          "caseId": "research.reference_injection",
+          "sha256": "cbaa8e46c840d3914005a38c839311dd07da6256bbab421d49e2b4f50b913b70"
+        },
+        {
+          "model": "meta/muse-glimmer-30b",
+          "caseId": "research.separate_warning",
+          "sha256": "ec2ed2c254f7068a3e275d0581cda6f2dc7ac9cb1c17ebe9f66c206ed442a598"
+        },
+        {
+          "model": "meta/muse-glimmer-30b",
+          "caseId": "summary.summary-provenance",
+          "sha256": "ecfd033ef38e28d18ebc65f147f4b0d6df42e211dc96cb37a29e50f0efce8a8b"
+        },
+        {
+          "model": "mistralai/ministral-14b-2512",
+          "caseId": "audit.typed-transcription",
+          "sha256": "e4567ee2a09c0dccf284168830fd87fd481630236cbe4a493b774a4bf4bc38a9"
+        },
+        {
+          "model": "mistralai/ministral-14b-2512",
+          "caseId": "compaction.compaction-quantities",
+          "sha256": "24c90b1f60f694e092e1ce86b6aa07b3126952d7820bf90394765263fd898397"
+        },
+        {
+          "model": "mistralai/ministral-14b-2512",
+          "caseId": "memory.assistant-proposal",
+          "sha256": "b7e009ff84a5e997ef51d208688508be66cfd40e6da5ddb24a2c9279c8e1ae92"
+        },
+        {
+          "model": "mistralai/ministral-14b-2512",
+          "caseId": "memory.durable-user-fact",
+          "sha256": "5561f42742317df0d8fff5f545dc4aa360c14580e67074d555182bb0ed8ab78a"
+        },
+        {
+          "model": "mistralai/ministral-14b-2512",
+          "caseId": "research.edition_conflict",
+          "sha256": "82945376e2755b3f7189e9daf243845c32998d8f9564363671df938f2772c998"
+        },
+        {
+          "model": "mistralai/ministral-14b-2512",
+          "caseId": "research.rain-footprint",
+          "sha256": "52d6eeb22d1ca2c4ad7b1edc8a43531800c03fd1a1f78f1ac8b42764da437575"
+        },
+        {
+          "model": "mistralai/ministral-14b-2512",
+          "caseId": "research.reference_injection",
+          "sha256": "1d53154a56170995d4ecbe631db0adc8fcd5de45188d3f9b61ec62816e7e4fb4"
+        },
+        {
+          "model": "mistralai/ministral-14b-2512",
+          "caseId": "research.separate_warning",
+          "sha256": "6045e8abe1d4214c0ca49af55f7e7794f15f03e83b8f033115716b1a8dcc39f5"
+        },
+        {
+          "model": "mistralai/ministral-14b-2512",
+          "caseId": "summary.summary-provenance",
+          "sha256": "f4fc6efefaebb1bf6cde639f9b414cb95e61fb8b0e6b10cc5bd395b4cbbb4454"
+        },
+        {
+          "model": "mistralai/mistral-small-3.2-24b-instruct",
+          "caseId": "audit.typed-transcription",
+          "sha256": "261991d6e8ed8c5dbde32234cb07b9674745886961e9af8e934b43b1b4a40979"
+        },
+        {
+          "model": "mistralai/mistral-small-3.2-24b-instruct",
+          "caseId": "compaction.compaction-quantities",
+          "sha256": "098a07a96a75af6d2c41c47975623c763ef70af2efdcf311549cc6407bc2d5e3"
+        },
+        {
+          "model": "mistralai/mistral-small-3.2-24b-instruct",
+          "caseId": "memory.assistant-proposal",
+          "sha256": "104b8435a188726dd2c19198cb892fcb25728f61a0ac1dcc503fc3c90123e35f"
+        },
+        {
+          "model": "mistralai/mistral-small-3.2-24b-instruct",
+          "caseId": "memory.durable-user-fact",
+          "sha256": "806850f443c1894e9c85c82a8b57b411b91ad49cd94842bc8547de327b383a83"
+        },
+        {
+          "model": "mistralai/mistral-small-3.2-24b-instruct",
+          "caseId": "research.edition_conflict",
+          "sha256": "5784fe2505b12e6d804e320e9888faeee0cf33e01fc48936b2225118f55869e5"
+        },
+        {
+          "model": "mistralai/mistral-small-3.2-24b-instruct",
+          "caseId": "research.rain-footprint",
+          "sha256": "c0b94d6b47d1acdd77cb2f3e6db043080790956afe9b3450efdff3f05be517d2"
+        },
+        {
+          "model": "mistralai/mistral-small-3.2-24b-instruct",
+          "caseId": "research.reference_injection",
+          "sha256": "a296af192fe122bcea8069280bccc61cf0412889d90873c46db864b5a4ffb9f4"
+        },
+        {
+          "model": "mistralai/mistral-small-3.2-24b-instruct",
+          "caseId": "research.separate_warning",
+          "sha256": "d3fb3457010fe7eb72b52de9abe327fe5f4b2c9dacefb5872319cf95f195911c"
+        },
+        {
+          "model": "mistralai/mistral-small-3.2-24b-instruct",
+          "caseId": "summary.summary-provenance",
+          "sha256": "ecd0aaa68fd681997e38b6d02fccff9b9dbc5c2dc042e6baab96bfb5eaf023d2"
+        },
+        {
+          "model": "nvidia/nemotron-3-nano-30b-a3b",
+          "caseId": "audit.typed-transcription",
+          "sha256": "453e29e9fefbaef05e68adf4c356dea31474990f1ce7ed5d89bdad61b7f828fb"
+        },
+        {
+          "model": "nvidia/nemotron-3-nano-30b-a3b",
+          "caseId": "compaction.compaction-quantities",
+          "sha256": "5c1971e820b49a3dc207b9e3e53833a76a0a6618036d8e05baab57a046f43122"
+        },
+        {
+          "model": "nvidia/nemotron-3-nano-30b-a3b",
+          "caseId": "memory.assistant-proposal",
+          "sha256": "dea1eb5be3791d5f4e2011302ddb0290fdab73b0ea65a71d1235869bf92eecbe"
+        },
+        {
+          "model": "nvidia/nemotron-3-nano-30b-a3b",
+          "caseId": "memory.durable-user-fact",
+          "sha256": "2d9fa51575bb44bd931d7cb60ae2a23d8bafe81c6dc96e8fbf3b7594edb58559"
+        },
+        {
+          "model": "nvidia/nemotron-3-nano-30b-a3b",
+          "caseId": "research.edition_conflict",
+          "sha256": "fc38e8a1cb2ccb2767f0647838a17c7d76cf94d0a40897849fc24a0345c95393"
+        },
+        {
+          "model": "nvidia/nemotron-3-nano-30b-a3b",
+          "caseId": "research.rain-footprint",
+          "sha256": "a5e7cf2ff29b58105ae9206d5a48b16fdca8bb613d187739bc55ab0f842eb389"
+        },
+        {
+          "model": "nvidia/nemotron-3-nano-30b-a3b",
+          "caseId": "research.reference_injection",
+          "sha256": "ffec2e6d41f6933bfa52c6ebf032bf5fbd3d439333080da94b99219e9728a7ff"
+        },
+        {
+          "model": "nvidia/nemotron-3-nano-30b-a3b",
+          "caseId": "research.separate_warning",
+          "sha256": "16e907b5377d1c03f538c6d207d990c62147e2f19c75fd275f1ce320c9794ef2"
+        },
+        {
+          "model": "nvidia/nemotron-3-nano-30b-a3b",
+          "caseId": "summary.summary-provenance",
+          "sha256": "8e39c2fabc526127843318b72558c9e14743eaecf196fe734e6cd08dfb9b1c5e"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "audit.typed-transcription",
+          "sha256": "45d9793730530c13cb7ee520912079c687dc106df5a7be033e6ca2aa4da651c0"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "compaction.compaction-quantities",
+          "sha256": "d971b234b7889e0bc56623df2d3f5d70de11373688775131a90e83b39950d5c3"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "memory.assistant-proposal",
+          "sha256": "45d0ddc55e83e24adc9cd7e52c395347201fa7a6c9aa1b35757354f2afaff70e"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "memory.durable-user-fact",
+          "sha256": "bf90ba8d1f5e4392c72d27f3ac51e3586c71d42aa2730969e44089a3c4fef7ec"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "research.edition_conflict",
+          "sha256": "836ed4d1d79bbd166720a705cc078239b9cd4a62b82ecc2d8f1ee5585890e7ae"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "research.rain-footprint",
+          "sha256": "99159fb45ccadad8c4eaf1d0c3a06a245b034fc0375ae319840cba0df484aef3"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "research.reference_injection",
+          "sha256": "1d9906bfcc2803fa7423f99d2837c623acf987cd934d673477e83fa14992c520"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "research.separate_warning",
+          "sha256": "aeb2532113c7ea5375fb5e972a56ca1f5522378d8f341232eb9a1a6b04eaa829"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "summary.summary-provenance",
+          "sha256": "0c0f5e5a43dd9414ecc7e10d709ca50425e230563fbd6eb7b6ce792433135778"
+        },
+        {
+          "model": "qwen/qwen3.8-27b",
+          "caseId": "audit.typed-transcription",
+          "sha256": "91c54ffafdabf5f98ce51b0ac4fe778126d97745300e4bf86cca0c6bfa274c50"
+        },
+        {
+          "model": "qwen/qwen3.8-27b",
+          "caseId": "compaction.compaction-quantities",
+          "sha256": "5d5f450547dceafa4c82e4c9ee6e1fb66daec6bc9f6b7de544cc053b8d457591"
+        },
+        {
+          "model": "qwen/qwen3.8-27b",
+          "caseId": "memory.assistant-proposal",
+          "sha256": "bbf3e625c20ec8aca28bb2074f29177dd93e08ab2d6f682b014f96d49c3882e9"
+        },
+        {
+          "model": "qwen/qwen3.8-27b",
+          "caseId": "memory.durable-user-fact",
+          "sha256": "3e64aaab4346b536c3ff08d59f82dad9c029d54453a73a3a5c294784c7438b6c"
+        },
+        {
+          "model": "qwen/qwen3.8-27b",
+          "caseId": "research.edition_conflict",
+          "sha256": "7b82a9cb956dc9c764aba8913877aefb238eceef1439bfdd9e7dda5d005c5fb9"
+        },
+        {
+          "model": "qwen/qwen3.8-27b",
+          "caseId": "research.rain-footprint",
+          "sha256": "54a33f0f30e7011d732e37dc8d7f2e3ce6338502c2afd2f0946fb72ccf9ee99c"
+        },
+        {
+          "model": "qwen/qwen3.8-27b",
+          "caseId": "research.reference_injection",
+          "sha256": "742ab653eed76e79c3f1db3e400357e82a325a890aeb0c1e29dfe09c149791b5"
+        },
+        {
+          "model": "qwen/qwen3.8-27b",
+          "caseId": "research.separate_warning",
+          "sha256": "5e4e629d5b38b366686681c0b2588b9d77faa15c16647512778dda03c9c2cfad"
+        },
+        {
+          "model": "qwen/qwen3.8-27b",
+          "caseId": "summary.summary-provenance",
+          "sha256": "6cf5c062c72fa1335bf5916e0e3c542d89bf22fed0c833b6e92e13a7b5e9dbad"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "audit.typed-transcription",
+          "sha256": "80b4a4972d486ba517ec9d0d5868390a0905aa42dbb981914e06227a219f4cef"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "compaction.compaction-quantities",
+          "sha256": "435e33cca825f647eb7f34f59c368b5d0e8b2a425facce521416b1a3d07b98a6"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "memory.assistant-proposal",
+          "sha256": "21169d53f9889e5f77480bc721b5102582330ae92dc7bacb784ba74eac488c0d"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "memory.durable-user-fact",
+          "sha256": "314ae3d6c5c5fa7abb4a4e8666cb7d08a26f42b8300d15466e124936c0042ff1"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "research.edition_conflict",
+          "sha256": "e5610fd4d5530779826373fe2066c575b03b34fa6f1b109ef216c0f2aca3b7d2"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "research.rain-footprint",
+          "sha256": "76becea4b8ba93ebefc525b3119be107e9715a704e7ab761d4ff1ef22ab747fb"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "research.reference_injection",
+          "sha256": "b7f5c3d62b88f12530ec8fda1caca867cc1db5b63e3b96dbbfb685587691db9b"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "research.separate_warning",
+          "sha256": "36da7fdedc14011c6defc7d4781dd0a2a6de0376a276546e28a44a80fe6d53cd"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "summary.summary-provenance",
+          "sha256": "dc8e15af2d5c4a4450e541c117d205d6cdde7cee7882e72fd05879950bdaac89"
+        }
+      ]
+    },
+    {
+      "id": "clarified-research",
+      "split": "development",
+      "suiteDigest": "9625b3743b4be618f9e9bda269df1a5d778696bd964a80ffb90d0967d9cd5fa8",
+      "implementationDigest": "8ab51603e771e960a3ab5f4d7ddadc7c88961fe0cb8a5c2179a344661f439355",
+      "dateUTC": {
+        "firstMessage": "2026-09-17T00:27:26.634000+00:00",
+        "lastMessage": "2026-09-17T00:35:11.996000+00:00"
+      },
+      "maxCompletions": 8,
+      "maximumSpendUSD": 5,
+      "scenarioHashes": {
+        "research.altitude-disagreement": "2c35a7e85fde1ea5561e250f59f0e3206b24a27402e552365b4ec3193cb03df7",
+        "research.edition_conflict": "8a8f670fc2e5a07387405ee7cb62c5c3dee9be815e7609bfede77a8933e09075",
+        "research.rain-footprint": "b2432640519cce716cb3bc06c066af55fb7f318be54417cf326c8f1a0436ab11",
+        "research.reference_injection": "05e05821b77eef613f86d7e8e5c654aa6a7822cced33fa93d8e595f23bc2589d",
+        "research.separate_warning": "d4c93e11c3e61c657fc0187c8083843437e88dc7a41a5ad0b95d5b9a3ed42b06"
+      },
+      "profiles": [
+        {
+          "id": "meta/muse-glimmer-30b",
+          "name": "Meta: Muse Glimmer 30B",
+          "contextWindow": 131072,
+          "maxOutputTokens": 4096,
+          "reasoning": true,
+          "prices": {
+            "input": 0.3,
+            "output": 1.2,
+            "cacheRead": 0.04,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384,
+          "thinkingLevel": "medium",
+          "providerRouting": {
+            "only": [
+              "deepinfra/bf16"
+            ],
+            "order": [
+              "deepinfra/bf16"
+            ]
+          },
+          "endpointQuantization": "bf16",
+          "endpointUptimeObserved": 100
+        },
+        {
+          "id": "google/gemma-4-26b-a4b-it",
+          "name": "Google: Gemma 4 26B A4B ",
+          "contextWindow": 262144,
+          "maxOutputTokens": 4096,
+          "reasoning": true,
+          "prices": {
+            "input": 0.09999999999999999,
+            "output": 0.3,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384,
+          "thinkingLevel": "medium",
+          "providerRouting": {
+            "only": [
+              "cloudflare"
+            ],
+            "order": [
+              "cloudflare"
+            ]
+          },
+          "endpointQuantization": "unknown",
+          "endpointUptimeObserved": 99.9658286551135
+        },
+        {
+          "id": "z-ai/glm-4.7-flash",
+          "name": "Z.ai: GLM 4.7 Flash",
+          "contextWindow": 200000,
+          "maxOutputTokens": 4096,
+          "reasoning": true,
+          "prices": {
+            "input": 0.060500000000000005,
+            "output": 0.39999999999999997,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384,
+          "thinkingLevel": "medium",
+          "providerRouting": {
+            "only": [
+              "cloudflare"
+            ],
+            "order": [
+              "cloudflare"
+            ]
+          },
+          "endpointQuantization": "unknown",
+          "endpointUptimeObserved": 99.69267543110809
+        },
+        {
+          "id": "qwen/qwen3.8-27b",
+          "name": "Qwen: Qwen3.8 27B",
+          "contextWindow": 1000000,
+          "maxOutputTokens": 4096,
+          "reasoning": true,
+          "prices": {
+            "input": 0.39999999999999997,
+            "output": 3,
+            "cacheRead": 0.15,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384,
+          "thinkingLevel": "medium",
+          "providerRouting": {
+            "only": [
+              "coreweave/fp8"
+            ],
+            "order": [
+              "coreweave/fp8"
+            ]
+          },
+          "endpointQuantization": "fp8",
+          "endpointUptimeObserved": 100
+        },
+        {
+          "id": "qwen/qwen3.6-27b",
+          "name": "Qwen: Qwen3.6 27B",
+          "contextWindow": 262144,
+          "maxOutputTokens": 4096,
+          "reasoning": true,
+          "prices": {
+            "input": 0.44999999999999996,
+            "output": 2.7,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384,
+          "thinkingLevel": "medium",
+          "providerRouting": {
+            "only": [
+              "alibaba"
+            ],
+            "order": [
+              "alibaba"
+            ]
+          },
+          "endpointQuantization": "unknown",
+          "endpointUptimeObserved": 100
+        }
+      ],
+      "observed": {
+        "google/gemma-4-26b-a4b-it": {
+          "providers": [
+            "Cloudflare"
+          ],
+          "requestSettings": [
+            {
+              "model": "google/gemma-4-26b-a4b-it",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 4096,
+              "temperature": 0,
+              "reasoning": {
+                "effort": "medium"
+              },
+              "provider": {
+                "only": [
+                  "cloudflare"
+                ],
+                "order": [
+                  "cloudflare"
+                ],
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "c4d538dceef2e812c5ad14fccccde1708e364a21b833dfa2894824d841d78163"
+          ],
+          "toolSchemaDigests": [
+            "6718a9b45d077daa23b778bec7565f378ef64c7d1fc60e912d653411ce278930"
+          ]
+        },
+        "meta/muse-glimmer-30b": {
+          "providers": [
+            "DeepInfra"
+          ],
+          "requestSettings": [
+            {
+              "model": "meta/muse-glimmer-30b",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 4096,
+              "temperature": 0,
+              "reasoning": {
+                "effort": "medium"
+              },
+              "provider": {
+                "only": [
+                  "deepinfra/bf16"
+                ],
+                "order": [
+                  "deepinfra/bf16"
+                ],
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "0fa9fe8b44b84d5d76a3f8c49c59ac2ab3acad5aeefc55abd2870f784b03b5f4"
+          ],
+          "toolSchemaDigests": [
+            "6718a9b45d077daa23b778bec7565f378ef64c7d1fc60e912d653411ce278930"
+          ]
+        },
+        "qwen/qwen3.6-27b": {
+          "providers": [],
+          "requestSettings": [
+            {
+              "model": "qwen/qwen3.6-27b",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 4096,
+              "temperature": 0,
+              "reasoning": {
+                "effort": "medium"
+              },
+              "provider": {
+                "only": [
+                  "alibaba"
+                ],
+                "order": [
+                  "alibaba"
+                ],
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "c20a2aeb8414ef7e253c6a34b822d5b1b054dddf25611b69404014f7e274917c"
+          ],
+          "toolSchemaDigests": [
+            "6718a9b45d077daa23b778bec7565f378ef64c7d1fc60e912d653411ce278930"
+          ]
+        },
+        "qwen/qwen3.8-27b": {
+          "providers": [
+            "CoreWeave"
+          ],
+          "requestSettings": [
+            {
+              "model": "qwen/qwen3.8-27b",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 4096,
+              "temperature": 0,
+              "reasoning": {
+                "effort": "medium"
+              },
+              "provider": {
+                "only": [
+                  "coreweave/fp8"
+                ],
+                "order": [
+                  "coreweave/fp8"
+                ],
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "f50f35ddc8b3a9238e6697fb43217217b8389103be35f8e744b0a5c07978f9d8"
+          ],
+          "toolSchemaDigests": [
+            "6718a9b45d077daa23b778bec7565f378ef64c7d1fc60e912d653411ce278930"
+          ]
+        },
+        "z-ai/glm-4.7-flash": {
+          "providers": [],
+          "requestSettings": [
+            {
+              "model": "z-ai/glm-4.7-flash",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 4096,
+              "temperature": 0,
+              "reasoning": {
+                "effort": "medium"
+              },
+              "provider": {
+                "only": [
+                  "cloudflare"
+                ],
+                "order": [
+                  "cloudflare"
+                ],
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "ca56afda4571aba7423a5bc7b5ae71afb344f921f40acda29ff3703f0c2fe69a"
+          ],
+          "toolSchemaDigests": [
+            "6718a9b45d077daa23b778bec7565f378ef64c7d1fc60e912d653411ce278930"
+          ]
+        }
+      },
+      "rawReceiptHashes": [
+        {
+          "model": "google/gemma-4-26b-a4b-it",
+          "caseId": "research.altitude-disagreement",
+          "sha256": "afb1c58ad128fbfb48260291876273382401a6a558a7ef3d672cc91ce95ef9bd"
+        },
+        {
+          "model": "google/gemma-4-26b-a4b-it",
+          "caseId": "research.edition_conflict",
+          "sha256": "2ef3452b8d6f75d750e8d518d10372649d65d0815c0f37ba019ab6d597b5883f"
+        },
+        {
+          "model": "google/gemma-4-26b-a4b-it",
+          "caseId": "research.rain-footprint",
+          "sha256": "f0a47d34e47aae71aa4266caa00fb2c1dad14dc5eaa2393ffb93251e64eccd35"
+        },
+        {
+          "model": "google/gemma-4-26b-a4b-it",
+          "caseId": "research.reference_injection",
+          "sha256": "503911fa375bc5bfa7db0161b9e214ce00ee43ed132dad060c0c9fc68d76a2ba"
+        },
+        {
+          "model": "google/gemma-4-26b-a4b-it",
+          "caseId": "research.separate_warning",
+          "sha256": "6e981507f229f52aa9da53e665013710bf89fe5ee49bc84bf1e5dc174becf3d7"
+        },
+        {
+          "model": "meta/muse-glimmer-30b",
+          "caseId": "research.altitude-disagreement",
+          "sha256": "bd708390462312e295cabb41bd8094437a7c305b7d5c284381732df2da9fb98a"
+        },
+        {
+          "model": "meta/muse-glimmer-30b",
+          "caseId": "research.edition_conflict",
+          "sha256": "b98f9cb9ffe94ba0b91b240551bae6237717b65f5430511a1dd9a237fcd08702"
+        },
+        {
+          "model": "meta/muse-glimmer-30b",
+          "caseId": "research.rain-footprint",
+          "sha256": "9e4d13a4d1889c56f00fffba697c1467c4f6bd55d8fad2b73842c8b51c161e18"
+        },
+        {
+          "model": "meta/muse-glimmer-30b",
+          "caseId": "research.reference_injection",
+          "sha256": "3365c93d80ae26f780420bf81a9ef04cfdf6a6821c063b57a8778fbad8f1d31a"
+        },
+        {
+          "model": "meta/muse-glimmer-30b",
+          "caseId": "research.separate_warning",
+          "sha256": "7d1e6f461d60bbc8f34169f057efd61a5ce9bc9b762027c28274f57fe0e7797c"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "research.altitude-disagreement",
+          "sha256": "1f1ce8042d96319ec270430da713fd484d01da65d4f691f6cf6d62b15e2f5a1d"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "research.edition_conflict",
+          "sha256": "a37237a6834bc7bfc733f8d5ce35a60df341436128e2045a1b535b54aee16af8"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "research.rain-footprint",
+          "sha256": "95c4f6b1b30fee1f572a82509bb8a560f3015804e0273a148e32eb63da8c1433"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "research.reference_injection",
+          "sha256": "0bf117c3d9ba94d5d4813e3e60ba1b866ceb43c1ed552e894b958dfdf0cea3aa"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "research.separate_warning",
+          "sha256": "c1017750d51e8a80ff3f7c3d3d0aed43c353ffd223f3d2969ac404593df0f1f7"
+        },
+        {
+          "model": "qwen/qwen3.8-27b",
+          "caseId": "research.altitude-disagreement",
+          "sha256": "4e03128295ccf0b097f0ecc59fee805c253c7364af181664ffe3c260c8751280"
+        },
+        {
+          "model": "qwen/qwen3.8-27b",
+          "caseId": "research.edition_conflict",
+          "sha256": "3bf9c456acf2a93525422ac25f0c7c3e849c670d8dd07eeb2182d8a42e3ae911"
+        },
+        {
+          "model": "qwen/qwen3.8-27b",
+          "caseId": "research.rain-footprint",
+          "sha256": "4d20467d00c850ba4f0af2f5a5ad41a5229b877314daa252bac4d670ff3951a0"
+        },
+        {
+          "model": "qwen/qwen3.8-27b",
+          "caseId": "research.reference_injection",
+          "sha256": "fb8582927c798022c70f6b52e4f5fb3b638acf9a5d78c50cf0bb2943c0e82ba4"
+        },
+        {
+          "model": "qwen/qwen3.8-27b",
+          "caseId": "research.separate_warning",
+          "sha256": "b937aaf53d8dec33a0ebe325f7d735c2b0ea625807c20a4624006b81725da06f"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "research.altitude-disagreement",
+          "sha256": "f5195b8237745d04e06f33056d8f44bbaefb7897972775db404e4e5d194abaf6"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "research.edition_conflict",
+          "sha256": "359a8607304301569768e5ac6187e05bf071d9ec695155f4caf931bce5adb0d5"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "research.rain-footprint",
+          "sha256": "ab45e4372e5af1954539eb02848913800d6ec67645200da81071a295eeb348a2"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "research.reference_injection",
+          "sha256": "88489386fbc9e7df2834e028365a01f1664ceee93ab6cf38d91d00754f7a18e2"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "research.separate_warning",
+          "sha256": "31cee4b06b54b0f8e8bb4134657f108803ab51be74686c22e9177551dbe8617d"
+        }
+      ]
+    },
+    {
+      "id": "clarified-research-privacy-retry",
+      "split": "development",
+      "suiteDigest": "d86a6e394c5c5b9de2a167cf6556db85431b30ceb005c0a64b4e6e0559ecea2c",
+      "implementationDigest": "d6a60621cfd22831f06cba3b7d214a0b03ce09567a2f00aae023011e60418cd8",
+      "dateUTC": {
+        "firstMessage": "2026-09-17T00:49:46.983000+00:00",
+        "lastMessage": "2026-09-17T00:51:42.597000+00:00"
+      },
+      "maxCompletions": 8,
+      "maximumSpendUSD": 5,
+      "scenarioHashes": {
+        "research.altitude-disagreement": "2c35a7e85fde1ea5561e250f59f0e3206b24a27402e552365b4ec3193cb03df7",
+        "research.edition_conflict": "8a8f670fc2e5a07387405ee7cb62c5c3dee9be815e7609bfede77a8933e09075",
+        "research.rain-footprint": "b2432640519cce716cb3bc06c066af55fb7f318be54417cf326c8f1a0436ab11",
+        "research.reference_injection": "05e05821b77eef613f86d7e8e5c654aa6a7822cced33fa93d8e595f23bc2589d",
+        "research.separate_warning": "d4c93e11c3e61c657fc0187c8083843437e88dc7a41a5ad0b95d5b9a3ed42b06"
+      },
+      "profiles": [
+        {
+          "id": "z-ai/glm-4.7-flash",
+          "name": "Z.ai: GLM 4.7 Flash",
+          "contextWindow": 200000,
+          "maxOutputTokens": 4096,
+          "reasoning": true,
+          "prices": {
+            "input": 0.06,
+            "output": 0.39999999999999997,
+            "cacheRead": 0.01,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384,
+          "thinkingLevel": "medium",
+          "providerRouting": {
+            "only": [
+              "venice/fp8"
+            ],
+            "order": [
+              "venice/fp8"
+            ]
+          },
+          "endpointQuantization": "fp8",
+          "endpointUptimeObserved": 99.69267543110809,
+          "routingBasis": "Provider completed prior stock calls under existing account privacy policy; no account policy override"
+        },
+        {
+          "id": "qwen/qwen3.6-27b",
+          "name": "Qwen: Qwen3.6 27B",
+          "contextWindow": 262144,
+          "maxOutputTokens": 4096,
+          "reasoning": true,
+          "prices": {
+            "input": 0.32,
+            "output": 3.1999999999999997,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384,
+          "thinkingLevel": "medium",
+          "providerRouting": {
+            "only": [
+              "deepinfra/fp8"
+            ],
+            "order": [
+              "deepinfra/fp8"
+            ]
+          },
+          "endpointQuantization": "fp8",
+          "endpointUptimeObserved": 100,
+          "routingBasis": "Provider completed prior stock calls under existing account privacy policy; no account policy override"
+        }
+      ],
+      "observed": {
+        "qwen/qwen3.6-27b": {
+          "providers": [
+            "DeepInfra"
+          ],
+          "requestSettings": [
+            {
+              "model": "qwen/qwen3.6-27b",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 4096,
+              "temperature": 0,
+              "reasoning": {
+                "effort": "medium"
+              },
+              "provider": {
+                "only": [
+                  "deepinfra/fp8"
+                ],
+                "order": [
+                  "deepinfra/fp8"
+                ],
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "c20a2aeb8414ef7e253c6a34b822d5b1b054dddf25611b69404014f7e274917c"
+          ],
+          "toolSchemaDigests": [
+            "6718a9b45d077daa23b778bec7565f378ef64c7d1fc60e912d653411ce278930"
+          ]
+        },
+        "z-ai/glm-4.7-flash": {
+          "providers": [
+            "Venice"
+          ],
+          "requestSettings": [
+            {
+              "model": "z-ai/glm-4.7-flash",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 4096,
+              "temperature": 0,
+              "reasoning": {
+                "effort": "medium"
+              },
+              "provider": {
+                "only": [
+                  "venice/fp8"
+                ],
+                "order": [
+                  "venice/fp8"
+                ],
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "ca56afda4571aba7423a5bc7b5ae71afb344f921f40acda29ff3703f0c2fe69a"
+          ],
+          "toolSchemaDigests": [
+            "6718a9b45d077daa23b778bec7565f378ef64c7d1fc60e912d653411ce278930"
+          ]
+        }
+      },
+      "rawReceiptHashes": [
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "research.altitude-disagreement",
+          "sha256": "6cd2965a0ea7c9f1b4ba933a05b7235582e172bfae4d51d751fe21fa25ea00d4"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "research.edition_conflict",
+          "sha256": "2275874f90f814b864c584fa8af8c167e5687a10ec54c9210523a34c33e4c67d"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "research.rain-footprint",
+          "sha256": "e3ffa96f4f85cda7d4e1621e2799b281c85f90784601703379dc45e9f931f5c8"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "research.reference_injection",
+          "sha256": "08e1b7ded80659ff2d52feb03e66f7d4cfb69fd5140006e8e58b6e5227d84204"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "research.separate_warning",
+          "sha256": "ef0848c4635a4ce80d178eebb8fdade3022fd387e57a5ef9db90c93dd06ecb7a"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "research.altitude-disagreement",
+          "sha256": "0327121583d883c18caaebf2fbabc6a4e5e8c1371fa02c4268d6acaea9792ec3"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "research.edition_conflict",
+          "sha256": "9f095992824e0e846b7b4b3f7b788c57c71b46201dc90df2d52f547578335a18"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "research.rain-footprint",
+          "sha256": "0a17bde7563d56c2aa10ec2b620d3d12cc0f9fc70245a88e9a665199eadc25a5"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "research.reference_injection",
+          "sha256": "bfe700e001a52e1eb311e24ce6095c22d0c7dc310fdb56bfe04465f9c8b66f88"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "research.separate_warning",
+          "sha256": "f088a0506f35a33ae1cd2d2e2701a3483e0a47969276e077c4b8f7ce9f216658"
+        }
+      ]
+    },
+    {
+      "id": "shell",
+      "split": "development",
+      "suiteDigest": "d86a6e394c5c5b9de2a167cf6556db85431b30ceb005c0a64b4e6e0559ecea2c",
+      "implementationDigest": "d6a60621cfd22831f06cba3b7d214a0b03ce09567a2f00aae023011e60418cd8",
+      "dateUTC": {
+        "firstMessage": "2026-09-17T00:44:06.253000+00:00",
+        "lastMessage": "2026-09-17T00:45:09.194000+00:00"
+      },
+      "maxCompletions": 6,
+      "maximumSpendUSD": 3,
+      "scenarioHashes": {
+        "shell.development.count": "89afa6cda1dcff681bdedfb127fe11eb0a7c87e35f7f60414a3654bea9dc9003",
+        "shell.development.numeric": "f369de2a4d951056d6dbc305fda8f39d81c5aca24cd67f87cf5b33086023c101",
+        "shell.development.quote": "987322cca8d78b9e1183a92af3676a8d048a42d6a96c6198cee25e2d983a7413",
+        "shell.development.size": "8a7431506597963a6469c0ae37460b20f724cece2e28c5ded7997036e53e95a7"
+      },
+      "profiles": [
+        {
+          "id": "meta/muse-glimmer-30b",
+          "name": "Meta: Muse Glimmer 30B",
+          "contextWindow": 131072,
+          "maxOutputTokens": 4096,
+          "reasoning": true,
+          "prices": {
+            "input": 0.3,
+            "output": 1.2,
+            "cacheRead": 0.04,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384,
+          "thinkingLevel": "medium",
+          "providerRouting": {
+            "only": [
+              "deepinfra/bf16"
+            ],
+            "order": [
+              "deepinfra/bf16"
+            ]
+          },
+          "endpointQuantization": "bf16",
+          "endpointUptimeObserved": 100
+        },
+        {
+          "id": "google/gemma-4-26b-a4b-it",
+          "name": "Google: Gemma 4 26B A4B ",
+          "contextWindow": 262144,
+          "maxOutputTokens": 4096,
+          "reasoning": true,
+          "prices": {
+            "input": 0.09999999999999999,
+            "output": 0.3,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384,
+          "thinkingLevel": "medium",
+          "providerRouting": {
+            "only": [
+              "cloudflare"
+            ],
+            "order": [
+              "cloudflare"
+            ]
+          },
+          "endpointQuantization": "unknown",
+          "endpointUptimeObserved": 99.9658286551135
+        },
+        {
+          "id": "z-ai/glm-4.7-flash",
+          "name": "Z.ai: GLM 4.7 Flash",
+          "contextWindow": 200000,
+          "maxOutputTokens": 4096,
+          "reasoning": true,
+          "prices": {
+            "input": 0.060500000000000005,
+            "output": 0.39999999999999997,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384,
+          "thinkingLevel": "medium",
+          "providerRouting": {
+            "only": [
+              "cloudflare"
+            ],
+            "order": [
+              "cloudflare"
+            ]
+          },
+          "endpointQuantization": "unknown",
+          "endpointUptimeObserved": 99.69267543110809
+        },
+        {
+          "id": "qwen/qwen3.8-27b",
+          "name": "Qwen: Qwen3.8 27B",
+          "contextWindow": 1000000,
+          "maxOutputTokens": 4096,
+          "reasoning": true,
+          "prices": {
+            "input": 0.39999999999999997,
+            "output": 3,
+            "cacheRead": 0.15,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384,
+          "thinkingLevel": "medium",
+          "providerRouting": {
+            "only": [
+              "coreweave/fp8"
+            ],
+            "order": [
+              "coreweave/fp8"
+            ]
+          },
+          "endpointQuantization": "fp8",
+          "endpointUptimeObserved": 100
+        },
+        {
+          "id": "qwen/qwen3.6-27b",
+          "name": "Qwen: Qwen3.6 27B",
+          "contextWindow": 262144,
+          "maxOutputTokens": 4096,
+          "reasoning": true,
+          "prices": {
+            "input": 0.44999999999999996,
+            "output": 2.7,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384,
+          "thinkingLevel": "medium",
+          "providerRouting": {
+            "only": [
+              "alibaba"
+            ],
+            "order": [
+              "alibaba"
+            ]
+          },
+          "endpointQuantization": "unknown",
+          "endpointUptimeObserved": 100
+        }
+      ],
+      "observed": {
+        "google/gemma-4-26b-a4b-it": {
+          "providers": [
+            "Cloudflare"
+          ],
+          "requestSettings": [
+            {
+              "model": "google/gemma-4-26b-a4b-it",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 4096,
+              "temperature": 0,
+              "reasoning": {
+                "effort": "medium"
+              },
+              "provider": {
+                "only": [
+                  "cloudflare"
+                ],
+                "order": [
+                  "cloudflare"
+                ],
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "ed5a1bf0d2a12fa822abcdf2bf60f558a3449c3de526f3fca9cb6b965d2891d7"
+          ],
+          "toolSchemaDigests": [
+            "262e944307ecc23081fd48dd09477e891e4808df5b22b05c1955ac2bedea48d7"
+          ]
+        },
+        "meta/muse-glimmer-30b": {
+          "providers": [
+            "DeepInfra"
+          ],
+          "requestSettings": [
+            {
+              "model": "meta/muse-glimmer-30b",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 4096,
+              "temperature": 0,
+              "reasoning": {
+                "effort": "medium"
+              },
+              "provider": {
+                "only": [
+                  "deepinfra/bf16"
+                ],
+                "order": [
+                  "deepinfra/bf16"
+                ],
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "091f6a739a1e4250b23d70c7c85b2e30e3ff5b1062ec55858d7dad6b207c0ff1"
+          ],
+          "toolSchemaDigests": [
+            "262e944307ecc23081fd48dd09477e891e4808df5b22b05c1955ac2bedea48d7"
+          ]
+        },
+        "qwen/qwen3.6-27b": {
+          "providers": [],
+          "requestSettings": [
+            {
+              "model": "qwen/qwen3.6-27b",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 4096,
+              "temperature": 0,
+              "reasoning": {
+                "effort": "medium"
+              },
+              "provider": {
+                "only": [
+                  "alibaba"
+                ],
+                "order": [
+                  "alibaba"
+                ],
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "bd50b876ea9e6d9eae9ead36d05ed90eb17de129fdabdc6513b46343e901ae38"
+          ],
+          "toolSchemaDigests": [
+            "262e944307ecc23081fd48dd09477e891e4808df5b22b05c1955ac2bedea48d7"
+          ]
+        },
+        "qwen/qwen3.8-27b": {
+          "providers": [
+            "CoreWeave"
+          ],
+          "requestSettings": [
+            {
+              "model": "qwen/qwen3.8-27b",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 4096,
+              "temperature": 0,
+              "reasoning": {
+                "effort": "medium"
+              },
+              "provider": {
+                "only": [
+                  "coreweave/fp8"
+                ],
+                "order": [
+                  "coreweave/fp8"
+                ],
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "cd1bf0e28ed66796f583b5f7c473127f6f620dd0070e88572c3b7b0fe11f9405"
+          ],
+          "toolSchemaDigests": [
+            "262e944307ecc23081fd48dd09477e891e4808df5b22b05c1955ac2bedea48d7"
+          ]
+        },
+        "z-ai/glm-4.7-flash": {
+          "providers": [],
+          "requestSettings": [
+            {
+              "model": "z-ai/glm-4.7-flash",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 4096,
+              "temperature": 0,
+              "reasoning": {
+                "effort": "medium"
+              },
+              "provider": {
+                "only": [
+                  "cloudflare"
+                ],
+                "order": [
+                  "cloudflare"
+                ],
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "b0f57a8a64814eb2970d1d5ac5a212639f94e77cb8757980e39c65e15cac529a"
+          ],
+          "toolSchemaDigests": [
+            "262e944307ecc23081fd48dd09477e891e4808df5b22b05c1955ac2bedea48d7"
+          ]
+        }
+      },
+      "rawReceiptHashes": [
+        {
+          "model": "google/gemma-4-26b-a4b-it",
+          "caseId": "shell.development.count",
+          "sha256": "dcdf6e6be29b154c053324bcf5f329fbee910083b4f86708cabf46e1165d8c94"
+        },
+        {
+          "model": "google/gemma-4-26b-a4b-it",
+          "caseId": "shell.development.numeric",
+          "sha256": "4484869fd605c3385507e5f3095deddfc8d95286cef4552a2bcb3c1686aa7d7a"
+        },
+        {
+          "model": "google/gemma-4-26b-a4b-it",
+          "caseId": "shell.development.quote",
+          "sha256": "eb9bd820907e2095ff70baaaf01fda18663b321fb7f16c13cad1761d518b37e0"
+        },
+        {
+          "model": "google/gemma-4-26b-a4b-it",
+          "caseId": "shell.development.size",
+          "sha256": "0f82ce6bb4d71f05ef008c00d4f6e2515ae9cf42c4a3c98e592b5e742c36dbd5"
+        },
+        {
+          "model": "meta/muse-glimmer-30b",
+          "caseId": "shell.development.count",
+          "sha256": "ba2771d4bd31f227725229a16cd18f005ceba2fb4842619497484747422187c3"
+        },
+        {
+          "model": "meta/muse-glimmer-30b",
+          "caseId": "shell.development.numeric",
+          "sha256": "78030928fa4ef53f6d0beea581d7f38a3185f899b435364f5d5388f0b394a69c"
+        },
+        {
+          "model": "meta/muse-glimmer-30b",
+          "caseId": "shell.development.quote",
+          "sha256": "fbdf4989d92ce6584f41cff91e2859a5ff3c5c96440e25bda2b74ce87789acde"
+        },
+        {
+          "model": "meta/muse-glimmer-30b",
+          "caseId": "shell.development.size",
+          "sha256": "ef1036d58c638203ec9b5b2ca6cd5ae2eab1b00616976afbf44824eb19e7db9f"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "shell.development.count",
+          "sha256": "c9b42d12bc9cbfb824bdddd8e2cfeb465c2b2e920a20cce74ae1cc310dc29de8"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "shell.development.numeric",
+          "sha256": "61645e618ef422079c450e102171c98a7fbdd2aba1cbf282a1f5b8ed69a2696e"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "shell.development.quote",
+          "sha256": "2eedacf58d79d36d3cefe721970fe95e6f8286684613c02a05d5162af352380a"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "shell.development.size",
+          "sha256": "76a7f362f64b60166c4fc5559752c3cea24a4b517e400d9f678fbb030ee3cf94"
+        },
+        {
+          "model": "qwen/qwen3.8-27b",
+          "caseId": "shell.development.count",
+          "sha256": "7040180bf192a4329b9f8436bbb73e7ee1812537ef21f32aee05ae70e187af2f"
+        },
+        {
+          "model": "qwen/qwen3.8-27b",
+          "caseId": "shell.development.numeric",
+          "sha256": "f067e94cb2ba83d857a9eab3fd8c10150c05a41c4e3de3d67d2ed5d7ac3803d1"
+        },
+        {
+          "model": "qwen/qwen3.8-27b",
+          "caseId": "shell.development.quote",
+          "sha256": "292241a873c781bbff4836db5fbd3ba5209c7dcff3bed96230994481a985c548"
+        },
+        {
+          "model": "qwen/qwen3.8-27b",
+          "caseId": "shell.development.size",
+          "sha256": "e3d18867b5505545e7da6d4d7193803b71d9bdc1426c158d4116e8b02524c516"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "shell.development.count",
+          "sha256": "0df5281e1b1f4f310e13201628019b6b60ee5e8409af432980f24ab17c9f0e5d"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "shell.development.numeric",
+          "sha256": "be03e7782716ed5fc47010f9df41a85834c66dc9baeb62ded0ce34a600dfffc5"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "shell.development.quote",
+          "sha256": "24d242dd0f7ce0102713bce9b6a1a85c3457d5ade6da6147f887a936363d86eb"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "shell.development.size",
+          "sha256": "fb20fef2dbd1cd02de9a5d935d4672e8e294a70b8bfc05accc6fe203319e1dc4"
+        }
+      ]
+    },
+    {
+      "id": "shell-privacy-retry",
+      "split": "development",
+      "suiteDigest": "d86a6e394c5c5b9de2a167cf6556db85431b30ceb005c0a64b4e6e0559ecea2c",
+      "implementationDigest": "e1d04aa3dfbd80ba8632a1076f3cc8025d6c7393fab4a89af03000b347f286a2",
+      "dateUTC": {
+        "firstMessage": "2026-09-17T00:56:45.759000+00:00",
+        "lastMessage": "2026-09-17T00:57:22.119000+00:00"
+      },
+      "maxCompletions": 6,
+      "maximumSpendUSD": 3,
+      "scenarioHashes": {
+        "shell.development.count": "89afa6cda1dcff681bdedfb127fe11eb0a7c87e35f7f60414a3654bea9dc9003",
+        "shell.development.numeric": "f369de2a4d951056d6dbc305fda8f39d81c5aca24cd67f87cf5b33086023c101",
+        "shell.development.quote": "987322cca8d78b9e1183a92af3676a8d048a42d6a96c6198cee25e2d983a7413",
+        "shell.development.size": "8a7431506597963a6469c0ae37460b20f724cece2e28c5ded7997036e53e95a7"
+      },
+      "profiles": [
+        {
+          "id": "z-ai/glm-4.7-flash",
+          "name": "Z.ai: GLM 4.7 Flash",
+          "contextWindow": 200000,
+          "maxOutputTokens": 4096,
+          "reasoning": true,
+          "prices": {
+            "input": 0.06,
+            "output": 0.39999999999999997,
+            "cacheRead": 0.01,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384,
+          "thinkingLevel": "medium",
+          "providerRouting": {
+            "only": [
+              "venice/fp8"
+            ],
+            "order": [
+              "venice/fp8"
+            ]
+          },
+          "endpointQuantization": "fp8",
+          "endpointUptimeObserved": 99.69267543110809,
+          "routingBasis": "Provider completed prior stock calls under existing account privacy policy; no account policy override"
+        },
+        {
+          "id": "qwen/qwen3.6-27b",
+          "name": "Qwen: Qwen3.6 27B",
+          "contextWindow": 262144,
+          "maxOutputTokens": 4096,
+          "reasoning": true,
+          "prices": {
+            "input": 0.32,
+            "output": 3.1999999999999997,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "catalogObservedDate": "2026-09-16",
+          "qualification": "hosted-development-only",
+          "maxStageOutputTokens": 16384,
+          "thinkingLevel": "medium",
+          "providerRouting": {
+            "only": [
+              "deepinfra/fp8"
+            ],
+            "order": [
+              "deepinfra/fp8"
+            ]
+          },
+          "endpointQuantization": "fp8",
+          "endpointUptimeObserved": 100,
+          "routingBasis": "Provider completed prior stock calls under existing account privacy policy; no account policy override"
+        }
+      ],
+      "observed": {
+        "qwen/qwen3.6-27b": {
+          "providers": [],
+          "requestSettings": [
+            {
+              "model": "qwen/qwen3.6-27b",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 4096,
+              "temperature": 0,
+              "reasoning": {
+                "effort": "medium"
+              },
+              "provider": {
+                "only": [
+                  "deepinfra/fp8"
+                ],
+                "order": [
+                  "deepinfra/fp8"
+                ],
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "bd50b876ea9e6d9eae9ead36d05ed90eb17de129fdabdc6513b46343e901ae38"
+          ],
+          "toolSchemaDigests": [
+            "262e944307ecc23081fd48dd09477e891e4808df5b22b05c1955ac2bedea48d7"
+          ]
+        },
+        "z-ai/glm-4.7-flash": {
+          "providers": [
+            "Venice"
+          ],
+          "requestSettings": [
+            {
+              "model": "z-ai/glm-4.7-flash",
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 4096,
+              "temperature": 0,
+              "reasoning": {
+                "effort": "medium"
+              },
+              "provider": {
+                "only": [
+                  "venice/fp8"
+                ],
+                "order": [
+                  "venice/fp8"
+                ],
+                "require_parameters": true,
+                "allow_fallbacks": false
+              }
+            }
+          ],
+          "systemPromptDigests": [
+            "b0f57a8a64814eb2970d1d5ac5a212639f94e77cb8757980e39c65e15cac529a"
+          ],
+          "toolSchemaDigests": [
+            "262e944307ecc23081fd48dd09477e891e4808df5b22b05c1955ac2bedea48d7"
+          ]
+        }
+      },
+      "rawReceiptHashes": [
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "shell.development.count",
+          "sha256": "520f64c671aad66fcfadbed28711fc74544efcbb976cc11af99fa6c3cf1ceb63"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "shell.development.numeric",
+          "sha256": "b4bc6a72dc4b6ad4a6f078c2d8f5fd328a9410fcff50d06a6128848ed4b01e5e"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "shell.development.quote",
+          "sha256": "37128649541674bf4ffd3986b1f98022e4a4edead20962f745d15deb46c3ebd7"
+        },
+        {
+          "model": "qwen/qwen3.6-27b",
+          "caseId": "shell.development.size",
+          "sha256": "db3b7a60394b8ce0b33755a3be7017d5b1ffd1de47ee0f821f2a5f283644cd15"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "shell.development.count",
+          "sha256": "35a7ce1540a12ebbf495edac36dedc71b18a9ebd13af93890166edfd6e9352c8"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "shell.development.numeric",
+          "sha256": "eecad715b3d577b51b51c07f3c0e95580ceec53c47fc781eed4f9265d3b868f1"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "shell.development.quote",
+          "sha256": "836f2eef788667aa692299a5ee80d2237e8b4248cf3c0791e2261be0bfb85e92"
+        },
+        {
+          "model": "z-ai/glm-4.7-flash",
+          "caseId": "shell.development.size",
+          "sha256": "f340a3aaf0215ed61e28710728543510de5a048c3ee635c69378cb15801e8cad"
+        }
+      ]
+    }
+  ]
+}

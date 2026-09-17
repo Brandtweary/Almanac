@@ -1,0 +1,227 @@
+{
+  "schemaVersion": 1,
+  "id": "almanac-browser",
+  "version": "0.1.0",
+  "scope": "Production UI and Pi client against a loopback developer transport; source-fixture retrieval and byte-bound context measurement are not production retrieval/tokenizer qualification.",
+  "cases": [
+    {
+      "id": "browser-research-off-reload",
+      "split": "development",
+      "track": "browser",
+      "family": "research-consent-persistence",
+      "description": "Search/read source tools with memory declined, render known citations, retain transcript across reload.",
+      "steps": [
+        {
+          "action": "send",
+          "text": "According to the EPA guide, how many drops of 8.25% bleach go into one gallon of clear water, and what product restrictions apply? Search the installed library and read the original supporting passages."
+        },
+        {
+          "action": "consent",
+          "enabled": false
+        },
+        {
+          "action": "wait",
+          "condition": "chat-completed"
+        },
+        {
+          "action": "inspect",
+          "target": "published-state"
+        },
+        {
+          "action": "reload"
+        },
+        {
+          "action": "voice-start",
+          "fixture": "browser-fake-microphone"
+        },
+        {
+          "action": "new-conversation"
+        },
+        {
+          "action": "voice-stop"
+        }
+      ],
+      "assertions": [
+        {
+          "id": "corpus-search-read-visible",
+          "kind": "tool-rendering",
+          "critical": true
+        },
+        {
+          "id": "consent-off-no-workers",
+          "kind": "forbidden-request",
+          "critical": true
+        },
+        {
+          "id": "known-source-links",
+          "kind": "citation-identity",
+          "critical": true
+        },
+        {
+          "id": "saved-chat-restored",
+          "kind": "persisted-state",
+          "critical": true
+        },
+        {
+          "id": "raw-history-restored",
+          "kind": "immutable-history",
+          "critical": true
+        },
+        {
+          "id": "voice-start-preserves-citations",
+          "kind": "voice-ownership",
+          "critical": true
+        }
+      ],
+      "rubric": [
+        "Inspect the answer against the supplied EPA evidence for dose, product restrictions and consequential qualifications; known citation identity alone does not prove support."
+      ]
+    },
+    {
+      "id": "browser-memory-conversation-reload",
+      "split": "development",
+      "track": "browser",
+      "family": "memory-cross-conversation",
+      "description": "Enable memory through UI, publish background stages, create a new conversation, and reload saved state.",
+      "steps": [
+        {
+          "action": "consent",
+          "enabled": true
+        },
+        {
+          "action": "send",
+          "text": "Please remember my long-term community project: Copper Orchard is the hand-tool repair workshop I run for our neighborhood."
+        },
+        {
+          "action": "wait",
+          "condition": "memory-acknowledged"
+        },
+        {
+          "action": "new-conversation"
+        },
+        {
+          "action": "send",
+          "text": "What is my long-term community workshop called?"
+        },
+        {
+          "action": "wait",
+          "condition": "memory-acknowledged"
+        },
+        {
+          "action": "reload"
+        },
+        {
+          "action": "consent",
+          "enabled": false
+        }
+      ],
+      "assertions": [
+        {
+          "id": "stages-published",
+          "kind": "acknowledgement",
+          "critical": true
+        },
+        {
+          "id": "two-session-records",
+          "kind": "session-ownership",
+          "critical": true
+        },
+        {
+          "id": "memory-survives-reload",
+          "kind": "persisted-state",
+          "critical": true
+        },
+        {
+          "id": "consent-ui-off",
+          "kind": "consent",
+          "critical": true
+        }
+      ],
+      "rubric": [
+        "Check that the user-authored project name and purpose are retained without invented biography, and that the second answer uses actual remembered state."
+      ]
+    },
+    {
+      "id": "browser-cancel-waiting",
+      "split": "development",
+      "track": "browser",
+      "family": "queued-cancellation",
+      "description": "A declared queue blocker makes waiting visible; UI cancellation releases the pending request without inference.",
+      "steps": [
+        {
+          "action": "fault",
+          "kind": "hold-waiting"
+        },
+        {
+          "action": "send",
+          "text": "Wait for my reference question."
+        },
+        {
+          "action": "consent",
+          "enabled": false
+        },
+        {
+          "action": "wait",
+          "condition": "waiting"
+        },
+        {
+          "action": "cancel"
+        }
+      ],
+      "assertions": [
+        {
+          "id": "queue-interrupted",
+          "kind": "request-state",
+          "critical": true
+        },
+        {
+          "id": "no-inference-after-cancel",
+          "kind": "forbidden-request",
+          "critical": true
+        }
+      ],
+      "rubric": []
+    },
+    {
+      "id": "browser-cancel-executing",
+      "split": "development",
+      "track": "browser",
+      "family": "executing-cancellation",
+      "description": "A declared stalled transport makes execution visible; UI cancellation unwinds the owned completion slot.",
+      "steps": [
+        {
+          "action": "fault",
+          "kind": "hold-executing"
+        },
+        {
+          "action": "send",
+          "text": "Wait for my reference question."
+        },
+        {
+          "action": "consent",
+          "enabled": false
+        },
+        {
+          "action": "wait",
+          "condition": "executing"
+        },
+        {
+          "action": "cancel"
+        }
+      ],
+      "assertions": [
+        {
+          "id": "execution-interrupted",
+          "kind": "request-state",
+          "critical": true
+        },
+        {
+          "id": "slot-released",
+          "kind": "request-state",
+          "critical": true
+        }
+      ],
+      "rubric": []
+    }
+  ]
+}

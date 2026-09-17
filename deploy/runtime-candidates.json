@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "status": "qualification-candidates-not-release",
+  "serving": {
+    "image": "ghcr.io/ggml-org/llama.cpp@sha256:21aba5443fceabda9e9838a5389edac82400f828fd57b325bf28544f59e23124",
+    "source_revision": "930e2fa5995789efbf249a8bf61325bb626e417b",
+    "cuda": "12.8.1",
+    "platform": "linux/amd64",
+    "archive_sha256": null,
+    "archive_bytes": null
+  },
+  "candidates": [
+    {
+      "screening_id": "meta/muse-glimmer-30b",
+      "source": "meta-models/Muse-Glimmer-30B",
+      "source_revision": "a4e59da52a7bc87ae7251dd5545c0dd437c44b68",
+      "quant_repository": "meta-models/Muse-Glimmer-30B-GGUF",
+      "quant_revision": "70bf1b61ac09f91b24d39038091b41c582bc5d7a",
+      "path": "models/Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf",
+      "bytes": 16756683904,
+      "sha256": "4cc57c0f51040a226e5a72cc47b7613f7772950e460a665f7083de89f183f60e",
+      "url": "https://huggingface.co/meta-models/Muse-Glimmer-30B-GGUF/resolve/70bf1b61ac09f91b24d39038091b41c582bc5d7a/Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf",
+      "license": "apache-2.0",
+      "reference_template_sha256": "cfc67e5f349f37690dfd31ed1f18bc4442a9dd32fe39a648f993cb4eb3cae678",
+      "qualified": false
+    },
+    {
+      "screening_id": "google/gemma-4-31b-it",
+      "source": "google/gemma-4-31B-it",
+      "source_revision": "842da3794eaa0b77d5f08bae87a17459d91ff475",
+      "quant_repository": "google/gemma-4-31B-it-qat-q4_0-gguf",
+      "quant_revision": "59dde24573e7e61570dba08b18a2e1fe246955ed",
+      "path": "models/gemma-4-31B_q4_0-it.gguf",
+      "bytes": 17651001568,
+      "sha256": "179cfb99212709597eae5929112cfca677e1bbf566178b479ae1da0c4772874b",
+      "url": "https://huggingface.co/google/gemma-4-31B-it-qat-q4_0-gguf/resolve/59dde24573e7e61570dba08b18a2e1fe246955ed/gemma-4-31B_q4_0-it.gguf",
+      "license": "apache-2.0",
+      "reference_template_sha256": "ae53464bf3be25802b3a5b37def7fd89667067d7577049b3b2d74c4d8de4c6d4",
+      "qualified": false
+    },
+    {
+      "screening_id": "google/gemma-4-26b-a4b-it",
+      "source": "google/gemma-4-26B-A4B-it",
+      "source_revision": "4d7ae4984b7db7de8f8457170b3f1a419ee76d52",
+      "quant_repository": "google/gemma-4-26B-A4B-it-qat-q4_0-gguf",
+      "quant_revision": "d1c082be9cf3c8a514acf63b8761f4b41935842e",
+      "path": "models/gemma-4-26B_q4_0-it.gguf",
+      "bytes": 14439363584,
+      "sha256": "3eca3b8f6d7baf218a7dd6bba5fb59a56ee25fe2d567b6f5f589b4f697eca51d",
+      "url": "https://huggingface.co/google/gemma-4-26B-A4B-it-qat-q4_0-gguf/resolve/d1c082be9cf3c8a514acf63b8761f4b41935842e/gemma-4-26B_q4_0-it.gguf",
+      "license": "apache-2.0",
+      "reference_template_sha256": "ae53464bf3be25802b3a5b37def7fd89667067d7577049b3b2d74c4d8de4c6d4",
+      "qualified": false
+    },
+    {
+      "screening_id": "z-ai/glm-4.7-flash",
+      "source": "zai-org/GLM-4.7-Flash",
+      "source_revision": "7dd20894a642a0aa287e9827cb1a1f7f91386b67",
+      "quant_repository": "unsloth/GLM-4.7-Flash-GGUF",
+      "quant_revision": "0d32489ecb9db6d2a4fc93bd27ef01519f95474d",
+      "path": "models/GLM-4.7-Flash-Q4_K_M.gguf",
+      "bytes": 18312339808,
+      "sha256": "29837ed2c0fc5f51981adf8ac8083fcf80743c598381f13e9f06cbad0498b174",
+      "url": "https://huggingface.co/unsloth/GLM-4.7-Flash-GGUF/resolve/0d32489ecb9db6d2a4fc93bd27ef01519f95474d/GLM-4.7-Flash-Q4_K_M.gguf",
+      "license": "mit",
+      "reference_template_sha256": "d63ad536c3c81880043e22ec7fd08db42b4d8fb7c89c7138bc562bfa25281375",
+      "qualified": false
+    },
+    {
+      "screening_id": "nvidia/nemotron-3-nano-30b-a3b",
+      "source": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
+      "source_revision": "bf77c3174f68ad409e1c2aa60daeb46e32d1c606",
+      "quant_repository": "unsloth/Nemotron-3-Nano-30B-A3B-GGUF",
+      "quant_revision": "9ad8b366c308f931b2a96b9306f0b41aef9cd405",
+      "path": "models/Nemotron-3-Nano-30B-A3B-Q4_0.gguf",
+      "bytes": 18214716192,
+      "sha256": "32385f5c469d3a362758f942726d484362214345a9788f6b402d35c5eccb9da3",
+      "url": "https://huggingface.co/unsloth/Nemotron-3-Nano-30B-A3B-GGUF/resolve/9ad8b366c308f931b2a96b9306f0b41aef9cd405/Nemotron-3-Nano-30B-A3B-Q4_0.gguf",
+      "license": "other",
+      "reference_template_sha256": "ab7813c3abdd9cb655905a410728b26c7884eca45ddfab8d9f931553485a7862",
+      "qualified": false
+    },
+    {
+      "screening_id": "mistralai/ministral-14b-2512",
+      "source": "mistralai/Ministral-3-14B-Instruct-2512",
+      "source_revision": "29439f81c2be264d8d393273f99e7db9c0961120",
+      "quant_repository": "mistralai/Ministral-3-14B-Instruct-2512-GGUF",
+      "quant_revision": "74fac473c43357d7fb2671713608183cc72496d0",
+      "path": "models/Ministral-3-14B-Instruct-2512-Q4_K_M.gguf",
+      "bytes": 8239593024,
+      "sha256": "824e0f3373e69b84f2cae46fdcb9bd1ebc6ab3bfc7acc125d818b7b8178cc613",
+      "url": "https://huggingface.co/mistralai/Ministral-3-14B-Instruct-2512-GGUF/resolve/74fac473c43357d7fb2671713608183cc72496d0/Ministral-3-14B-Instruct-2512-Q4_K_M.gguf",
+      "license": "apache-2.0",
+      "reference_template_sha256": "2f545122222db8bb43ca0ea0c49e9185320a8670f7d35575b0da0eb48b1e8970",
+      "qualified": false
+    }
+  ]
+}

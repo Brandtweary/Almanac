@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "status": "local-image-capture-recipe-not-release",
+  "reservation_basis": "Five percent above inspected image Size for saved-archive metadata; validate actual archive bytes, no new expanded image-store allocation.",
+  "images": [
+    {
+      "image": "ghcr.io/ggml-org/llama.cpp@sha256:f96be8dfd1c1eb533e09f42fc4d92311150dc63ecd568284c9199cacae5a9e26",
+      "path": "images/orpheus-engine.tar",
+      "local_only": true,
+      "archive_reserve_bytes": 2712966295,
+      "image_store_reserve_bytes": 0,
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": "Exact retained installed image identity; dependency/source notices require separate release review.",
+        "notice": "notices/speech-runtime-images.txt"
+      }
+    },
+    {
+      "image": "orpheus-fastapi@sha256:85e7264b6f8e227c1978047967506986123e4677b8bdcef17739d3488cb8478e",
+      "path": "images/orpheus-decoder.tar",
+      "local_only": true,
+      "archive_reserve_bytes": 4649580711,
+      "image_store_reserve_bytes": 0,
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": "Exact retained installed image identity; dependency/source notices require separate release review.",
+        "notice": "notices/speech-runtime-images.txt"
+      }
+    },
+    {
+      "image": "serving-orpheus-bridge@sha256:8b974cea622cb07731b9a3bcce3a01f12fc4c2ac6c56e424bcd00c88cb812d8c",
+      "path": "images/speech-bridge.tar",
+      "local_only": true,
+      "archive_reserve_bytes": 53419863,
+      "image_store_reserve_bytes": 0,
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": "Exact retained installed image identity; dependency/source notices require separate release review.",
+        "notice": "notices/speech-runtime-images.txt"
+      }
+    },
+    {
+      "image": "fedirz/faster-whisper-server@sha256:0b64050ad0b9244745746b652473ee42a8d5454d501877a252c3e65f631ffc99",
+      "path": "images/whisper.tar",
+      "local_only": true,
+      "archive_reserve_bytes": 2639602444,
+      "image_store_reserve_bytes": 0,
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": "Exact retained installed image identity; dependency/source notices require separate release review.",
+        "notice": "notices/speech-runtime-images.txt"
+      }
+    }
+  ]
+}

@@ -4,6 +4,7 @@ import { html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { getAppStorage } from "../storage/app-storage.js";
 import type { SessionMetadata } from "../storage/types.js";
+import { validSessionMetadata } from "../storage/stores/sessions-store.js";
 import { formatUsage } from "../utils/format.js";
 import { i18n } from "../utils/i18n.js";
 
@@ -11,11 +12,10 @@ import { i18n } from "../utils/i18n.js";
 export class SessionListDialog extends DialogBase {
 	@state() private sessions: SessionMetadata[] = [];
 	@state() private loading = true;
+	@state() private error = "";
 
 	private onSelectCallback?: (sessionId: string) => void;
 	private onDeleteCallback?: (sessionId: string) => void;
-	private deletedSessions = new Set<string>();
-	private closedViaSelection = false;
 
 	protected modalWidth = "min(600px, 90vw)";
 	protected modalHeight = "min(700px, 90vh)";
@@ -35,10 +35,34 @@ export class SessionListDialog extends DialogBase {
 			this.sessions = await storage.sessions.getAllMetadata();
 		} catch (err) {
 			console.error("Failed to load sessions:", err);
+			this.error = `Saved conversations could not be read; their data has been retained. ${String(err)}`;
 			this.sessions = [];
 		} finally {
 			this.loading = false;
 		}
+	}
+
+	private async handleExport(id: string, event: Event) {
+		event.stopPropagation();
+		try {
+			const text = await getAppStorage().sessions.exportSession(id);
+			const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+			const link = document.createElement("a");
+			link.href = url; link.download = `conversation-${id}.json`; link.click();
+			setTimeout(() => URL.revokeObjectURL(url), 1000);
+		} catch (error) { this.error = String(error); }
+	}
+
+	private async handleImport(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+		try {
+			await getAppStorage().sessions.importSession(await file.text());
+			this.error = "";
+			await this.loadSessions();
+		} catch (error) { this.error = String(error); }
+		finally { input.value = ""; }
 	}
 
 	private async handleDelete(sessionId: string, event: Event) {
@@ -53,28 +77,16 @@ export class SessionListDialog extends DialogBase {
 			if (!storage.sessions) return;
 
 			await storage.sessions.deleteSession(sessionId);
+			// Invalidate an active conversation immediately, before another terminal save.
+			this.onDeleteCallback?.(sessionId);
 			await this.loadSessions();
-
-			// Track deleted session
-			this.deletedSessions.add(sessionId);
 		} catch (err) {
 			console.error("Failed to delete session:", err);
-		}
-	}
-
-	override close() {
-		super.close();
-
-		// Only notify about deleted sessions if dialog wasn't closed via selection
-		if (!this.closedViaSelection && this.onDeleteCallback && this.deletedSessions.size > 0) {
-			for (const sessionId of this.deletedSessions) {
-				this.onDeleteCallback(sessionId);
-			}
+			this.error = String(err);
 		}
 	}
 
 	private handleSelect(sessionId: string) {
-		this.closedViaSelection = true;
 		if (this.onSelectCallback) {
 			this.onSelectCallback(sessionId);
 		}
@@ -108,6 +120,8 @@ export class SessionListDialog extends DialogBase {
 						description: i18n("Load a previous conversation"),
 					})}
 
+					<label class="text-sm">Import conversation <input type="file" accept="application/json" @change=${(e: Event) => this.handleImport(e)} /></label>
+					${this.error ? html`<p role="alert">${this.error}</p>` : ""}
 					<div class="flex-1 overflow-y-auto mt-4 space-y-2">
 						${
 							this.loading
@@ -124,9 +138,12 @@ export class SessionListDialog extends DialogBase {
 													<div class="font-medium text-sm text-foreground truncate">${session.title}</div>
 													<div class="text-xs text-muted-foreground mt-1">${this.formatDate(session.lastModified)}</div>
 													<div class="text-xs text-muted-foreground mt-1">
-														${session.messageCount} ${i18n("messages")} · ${formatUsage(session.usage)}
+														${validSessionMetadata(session)
+															? html`${session.messageCount} ${i18n("messages")} · ${formatUsage(session.usage)}`
+															: html`<span role="alert">Saved metadata is invalid; export this chat to repair it.</span>`}
 													</div>
 												</div>
+												<button class="text-xs p-1" @click=${(e: Event) => this.handleExport(session.id, e)}>Export</button>
 												<button
 													class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 text-destructive transition-opacity"
 													@click=${(e: Event) => this.handleDelete(session.id, e)}

@@ -135,6 +135,16 @@ export class IndexedDBStorageBackend implements StorageBackend {
 	): Promise<T> {
 		return this.runTransaction(storeNames, mode, async (idbTx, request) => {
 			const storageTx: StorageTransaction = {
+				scan: async <T>(storeName: string, options: { prefix: string; after?: string; limit: number }) => {
+					if (!Number.isInteger(options.limit) || options.limit < 1 || options.limit > 100 ||
+						(options.after !== undefined && !options.after.startsWith(options.prefix))) throw new Error("Invalid indexed scan");
+					const range = IDBKeyRange.bound(options.after ?? options.prefix, options.prefix + "\uffff", options.after !== undefined);
+					const store = idbTx.objectStore(storeName);
+					const keys = await request(() => store.getAllKeys(range, options.limit + 1));
+					const values = await request(() => store.getAll(range, options.limit + 1));
+					const entries = keys.slice(0, options.limit).map((key, index) => ({ key: String(key), value: values[index] as T }));
+					return { entries, next: keys.length > options.limit ? entries.at(-1)!.key : null };
+				},
 				has: async (storeName, key) =>
 					(await request(() => idbTx.objectStore(storeName).getKey(key))) !== undefined,
 				get: async <T>(storeName: string, key: string) => {

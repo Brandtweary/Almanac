@@ -5,7 +5,7 @@
 
 import { depluralize, normalizeForMatch, stripPluralS, stemText, stemWord, tokenize } from "./stem";
 import { DESCRIPTION_WORD_CAP } from "./config";
-import { escapeRegExp } from "../regex-utils";
+import { PhraseIndex } from "./phrase-index";
 import { validVector, type GraphAsset, type TermMatch, type Thought } from "./types";
 
 interface TermEntry {
@@ -47,6 +47,8 @@ export class Graph {
 	// term-match indexes (built lazily)
 	private termSingle: Map<string, TermEntry[]> = new Map();
 	private termMulti: Array<[string, TermEntry]> = [];
+	private exactPhrases = new PhraseIndex<number>([]);
+	private stemmedPhrases = new PhraseIndex<number>([]);
 	private termIndexValid = false;
 
 	constructor(asset: GraphAsset) {
@@ -70,6 +72,7 @@ export class Graph {
 					!(raw.entity_type === null || typeof raw.entity_type === "string") ||
 					!Array.isArray(raw.aliases) || !raw.aliases.every(a => typeof a === "string" && a.trim()) ||
 					!Number.isSafeInteger(raw.hit_count) || raw.hit_count < 0 ||
+					(raw.hit_count_tool !== undefined && (!Number.isSafeInteger(raw.hit_count_tool) || raw.hit_count_tool < 0 || raw.hit_count_tool > raw.hit_count)) ||
 					!(raw.metadata === null || record(raw.metadata)) ||
 					(raw.metadata !== null && raw.metadata.no_stem !== undefined && typeof raw.metadata.no_stem !== "boolean") ||
 					[raw.created_at, raw.updated_at, raw.last_fired].some(v => v !== undefined && typeof v !== "string")) {
@@ -134,8 +137,9 @@ export class Graph {
 		t.updated_at = nowIso();
 	}
 
-	fire(t: Thought): void {
+	fire(t: Thought, source: "message" | "tool" = "message"): void {
 		t.hit_count = (t.hit_count ?? 0) + 1;
+		if (source === "tool") t.hit_count_tool = (t.hit_count_tool ?? 0) + 1;
 		t.last_fired = nowIso();
 	}
 
@@ -149,6 +153,8 @@ export class Graph {
 		this.termIndexValid = false;
 		this.termSingle = new Map();
 		this.termMulti = [];
+		this.exactPhrases = new PhraseIndex<number>([]);
+		this.stemmedPhrases = new PhraseIndex<number>([]);
 	}
 
 	private aliasOwner(surface: string, exceptId?: string): Thought | undefined {
@@ -268,6 +274,7 @@ export class Graph {
 			) survivor.aliases.push(alias);
 		}
 		survivor.hit_count = (survivor.hit_count ?? 0) + (loser.hit_count ?? 0);
+		if (survivor.hit_count_tool !== undefined || loser.hit_count_tool !== undefined) survivor.hit_count_tool = (survivor.hit_count_tool ?? 0) + (loser.hit_count_tool ?? 0);
 		this.touch(survivor);
 		this.invalidateTermIndex();
 		return true;
@@ -395,6 +402,8 @@ export class Graph {
 				this.termSingle.set(key, entries);
 			}
 		}
+		this.exactPhrases = new PhraseIndex(this.termMulti.flatMap(([key, data], index) => data.no_stem ? [[key, index] as const] : []));
+		this.stemmedPhrases = new PhraseIndex(this.termMulti.flatMap(([key, data], index) => !data.no_stem ? [[key, index] as const] : []));
 		this.termIndexValid = true;
 	}
 
@@ -447,8 +456,7 @@ export class Graph {
 			}
 		}
 
-		// Slow path: multi-word keys via regex.
-		let stemmedTextCache: string | null = null;
+		// Phrase indexes scan each normalized query once, including tool output.
 		// Tokens rejoined with single spaces (no depluralization) so a multi-word
 		// exact key ("apis mellifera") matches input typed with the internal
 		// punctuation ("apis-mellifera") — the tokenizer splits the punct, the
@@ -458,17 +466,13 @@ export class Graph {
 		// matches an S-pluralized phrase ("term stores") in the input.
 		const singularText = tokenize(lowercased).map((t) => depluralize(t)).join(" ");
 		const simpleText = normalizeWords(lowercased, stripPluralS);
-		for (const [preparedKey, data] of this.termMulti) {
-			const pattern = new RegExp(`(?<![\\p{L}\\p{N}_])${escapeRegExp(preparedKey)}(?![\\p{L}\\p{N}_])`, "u");
-			if (data.no_stem) {
-				if (pattern.test(lowercased) || pattern.test(rejoinedText) || pattern.test(singularText) || pattern.test(simpleText)) {
-					noteMatch(data);
-				}
-			} else {
-				if (stemmedTextCache === null) stemmedTextCache = stemText(lowercased);
-				if (pattern.test(stemmedTextCache)) noteMatch(data);
-			}
+		const phraseHits = new Set<number>();
+		for (const query of new Set([lowercased, rejoinedText, singularText, simpleText])) {
+			for (const index of this.exactPhrases.match(query)) phraseHits.add(index);
 		}
+		if (!this.stemmedPhrases.isEmpty) for (const index of this.stemmedPhrases.match(stemText(lowercased))) phraseHits.add(index);
+		// Preserve original route precedence when several indexed surfaces match.
+		for (const index of [...phraseHits].sort((a, b) => a - b)) noteMatch(this.termMulti[index][1]);
 
 		// Build results.
 		const results: TermMatch[] = [];

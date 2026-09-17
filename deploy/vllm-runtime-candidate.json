@@ -1,0 +1,79 @@
+{
+  "repo": "google/gemma-4-31B-it-qat-w4a16-ct",
+  "revision": "52f3f65bc7a02d555763bc923bd1d9094898219d",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 29380,
+      "sha256": "46bc522c1aaef71174fd93b842cbd86b6d4101bd92963fba31ca48cdf0c3d787",
+      "url": "https://huggingface.co/google/gemma-4-31B-it-qat-w4a16-ct/resolve/52f3f65bc7a02d555763bc923bd1d9094898219d/README.md"
+    },
+    {
+      "path": "chat_template.jinja",
+      "bytes": 18683,
+      "sha256": "ae53464bf3be25802b3a5b37def7fd89667067d7577049b3b2d74c4d8de4c6d4",
+      "url": "https://huggingface.co/google/gemma-4-31B-it-qat-w4a16-ct/resolve/52f3f65bc7a02d555763bc923bd1d9094898219d/chat_template.jinja"
+    },
+    {
+      "path": "config.json",
+      "bytes": 18711,
+      "sha256": "b100d85e571c25b688e82919d819253063a1defb0e6cee3b9b1c1fbad99bd0c2",
+      "url": "https://huggingface.co/google/gemma-4-31B-it-qat-w4a16-ct/resolve/52f3f65bc7a02d555763bc923bd1d9094898219d/config.json"
+    },
+    {
+      "path": "generation_config.json",
+      "bytes": 208,
+      "sha256": "70110aa886fa7ee25ce47346d102dd29ca5f967500490b4362fc72068e1db70a",
+      "url": "https://huggingface.co/google/gemma-4-31B-it-qat-w4a16-ct/resolve/52f3f65bc7a02d555763bc923bd1d9094898219d/generation_config.json"
+    },
+    {
+      "path": "model.safetensors",
+      "bytes": 23265352448,
+      "sha256": "1b9b1d622a93f02c0d33f98e502f233b5d707443af6ddc464ed0bf5498506c20",
+      "url": "https://huggingface.co/google/gemma-4-31B-it-qat-w4a16-ct/resolve/52f3f65bc7a02d555763bc923bd1d9094898219d/model.safetensors"
+    },
+    {
+      "path": "processor_config.json",
+      "bytes": 1689,
+      "sha256": "32bdf45d2ad4cc29a0822ddd157a182de76644f0419a6228d151495256e9813c",
+      "url": "https://huggingface.co/google/gemma-4-31B-it-qat-w4a16-ct/resolve/52f3f65bc7a02d555763bc923bd1d9094898219d/processor_config.json"
+    },
+    {
+      "path": "tokenizer.json",
+      "bytes": 32169626,
+      "sha256": "cc8d3a0ce36466ccc1278bf987df5f71db1719b9ca6b4118264f45cb627bfe0f",
+      "url": "https://huggingface.co/google/gemma-4-31B-it-qat-w4a16-ct/resolve/52f3f65bc7a02d555763bc923bd1d9094898219d/tokenizer.json"
+    },
+    {
+      "path": "tokenizer_config.json",
+      "bytes": 3728,
+      "sha256": "b8045a4576903e86903291d5cbdd4adfc8859e9ce3c98621bdbd957f73ed394b",
+      "url": "https://huggingface.co/google/gemma-4-31B-it-qat-w4a16-ct/resolve/52f3f65bc7a02d555763bc923bd1d9094898219d/tokenizer_config.json"
+    }
+  ],
+  "schema_version": 1,
+  "status": "provisional-vllm-candidate-not-release",
+  "qualified": false,
+  "serving": {
+    "image": "vllm/vllm-openai@sha256:082ca6f035279109041ffd3fe0695cb568b29bc580b35c4f297a66a08b216c1b",
+    "version": "0.29.0",
+    "source_revision": "98dff2a81d747d1dba01a47f939f48c3526d4206",
+    "cuda": "13.0.2",
+    "platform": "linux/amd64",
+    "archive_sha256": null,
+    "archive_bytes": null
+  },
+  "template": {
+    "url": "https://raw.githubusercontent.com/vllm-project/vllm/98dff2a81d747d1dba01a47f939f48c3526d4206/examples/tool_chat_template_gemma4.jinja",
+    "sha256": "afdbb2abe3667ccde95cc2f86919f05370339399bab5f750950a4390523b8927",
+    "bytes": 18653
+  },
+  "proposed_measurement": {
+    "context_tokens": 8192,
+    "max_num_seqs": 1,
+    "max_num_batched_tokens": 2048,
+    "gpu_memory_utilization": 0.8,
+    "language_model_only": true,
+    "enforce_eager": true
+  }
+}

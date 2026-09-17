@@ -1,3 +1,6 @@
+import { validatedTokenUsage } from "../token-usage.js";
+import { admitPayload, beginRequest } from "../oracle-runtime.js";
+import { releaseProfile, type OracleRole } from "../myriapod-model.js";
 // Shared machinery for the memory pipeline's LLM legs: the completion seam,
 // injected-context stripping, the existing-memory dump, and the thin-turn guard.
 // The agents themselves (prompts + tool loops) live in src/pipeline*.ts.
@@ -17,36 +20,29 @@ export type CompletionFn = (messages: ChatMessage[], signal?: AbortSignal) => Pr
 export interface CompletionOpts {
 	baseUrl: string; // OpenAI-compatible base, e.g. http://.../llm/v1
 	model: string;
-	apiKey?: string; // optional bearer; the local server ignores it
+	apiKey?: string; // Legacy caller compatibility; never transmitted.
+	role?: OracleRole;
+	conversationId?: string;
 	// Reports the call's token usage if the caller wants it (unused locally — there
 	// is no per-token cost to fold into the session total).
 	onUsage?: (usage: { promptTokens: number; completionTokens: number }) => void;
-	// OpenRouter reasoning effort (Kimi K3 accepts only "max"). Omit → thinking OFF
-	// (`reasoning: { enabled: false }`). The async pipeline agents set this: latency
-	// is free for a background job, so they think for quality.
-	reasoningEffort?: string;
+	reasoningEffort?: string; // Profile-owned provider reasoning configuration.
 }
 
-/** Build a one-shot, non-streaming completion against an OpenAI-compatible
- *  endpoint. `reasoningEffort` set → the model thinks at that effort and `message.content`
- *  holds the final answer (reasoning is a separate field, so content stays clean);
- *  omitted → `reasoning: { enabled: false }` (thinking off). OpenRouter honors the
- *  field; endpoints that don't simply ignore it. */
+/** One-shot completion through the same local admission path as chat. */
 export function makeCompletion(opts: CompletionOpts): CompletionFn {
 	return async (messages, signal) => {
+		const role = opts.role ?? "summary";
+		const profile = releaseProfile();
+		const thinking = profile.roles[role].thinkingLevel;
+		const payload = await admitPayload({ model: profile.model.id, messages, stream: false,
+			...(profile.model.reasoning && thinking ? { reasoning_effort: thinking } : {}),
+		}, role, signal);
+		const request = beginRequest(role, opts.conversationId ?? crypto.randomUUID(), signal);
+		try {
 		const res = await fetch(`${opts.baseUrl}/chat/completions`, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				...(opts.apiKey ? { Authorization: `Bearer ${opts.apiKey}` } : {}),
-			},
-			body: JSON.stringify({
-				model: opts.model,
-				messages,
-				stream: false,
-				reasoning: opts.reasoningEffort ? { effort: opts.reasoningEffort } : { enabled: false },
-			}),
-			signal,
+			method: "POST", headers: { "Content-Type": "application/json", ...request.headers },
+			body: JSON.stringify(payload), signal,
 		});
 		if (!res.ok) {
 			throw new Error(`completion failed: ${res.status} ${await res.text()}`);
@@ -59,11 +55,11 @@ export function makeCompletion(opts: CompletionOpts): CompletionFn {
 		if (choice.finish_reason !== "stop") {
 			throw new Error(`completion did not finish successfully: ${choice.finish_reason ?? "missing finish reason"}`);
 		}
-		const u = data?.usage;
-		if (u && opts.onUsage) {
-			opts.onUsage({ promptTokens: u.prompt_tokens ?? 0, completionTokens: u.completion_tokens ?? 0 });
-		}
+		const usage = validatedTokenUsage(data?.usage, "openai", true);
+		opts.onUsage?.({ promptTokens: usage.input, completionTokens: usage.output });
+		request.finish("complete");
 		return choice.message.content;
+		} catch (error) { request.finish(signal?.aborted ? "interrupted" : "failed"); throw error; }
 	};
 }
 
@@ -110,7 +106,7 @@ export function dumpExistingContext(graph: Graph): string {
 // -- Thin-turn guard ----------------------------------------------------------
 
 /** At least one non-stopword content token of length > 2. Skips "ok"/"thanks"-
- *  class turns to save a metered call. */
+ *  class turns that do not require memory work. */
 export function hasContentWords(text: string): boolean {
 	return tokenize(text).some((t) => t.length > 2 && !NLTK_ENGLISH_STOPWORDS.has(t));
 }

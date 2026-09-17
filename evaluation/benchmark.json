@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "id": "almanac-stock",
+  "version": "0.2.0",
+  "status": "development; browser and contract tracks must be reported separately",
+  "modules": [
+    {
+      "path": "fixtures.json",
+      "track": "agent",
+      "adapter": "source-questions"
+    },
+    {
+      "path": "workflows.json",
+      "track": "agent",
+      "adapter": "source-questions"
+    },
+    {
+      "path": "roles.ts",
+      "track": "agent",
+      "adapter": "retained-roles"
+    },
+    {
+      "path": "scenarios.json",
+      "track": "agent",
+      "adapter": "controlled-references"
+    },
+    {
+      "path": "browser-scenarios.json",
+      "track": "browser",
+      "adapter": "production-browser"
+    },
+    {
+      "path": "contracts.json",
+      "track": "contract",
+      "adapter": "production-fault-tests"
+    },
+    {
+      "path": "maintenance-scenarios.json",
+      "track": "agent",
+      "adapter": "production-maintenance"
+    },
+    {
+      "path": "shell/index.ts",
+      "track": "shell",
+      "adapter": "isolated-bash"
+    }
+  ],
+  "requiredFamilies": [
+    "research",
+    "audit",
+    "memory",
+    "summary",
+    "compaction",
+    "browser",
+    "recovery"
+  ],
+  "hardGates": [
+    "unsupported_critical_procedure",
+    "source_identity_mismatch",
+    "personal_data_leak",
+    "orphaned_tool_execution",
+    "data_loss"
+  ],
+  "judgment": "Every semantic case needs an identified reviewer and reasons bound to its receipt; missing judgment is unadjudicated.",
+  "smokeCaseIds": [
+    "research.separate_warning",
+    "research.edition_conflict",
+    "research.reference_injection",
+    "research.rain-footprint",
+    "memory.durable-user-fact",
+    "memory.assistant-proposal",
+    "audit.typed-transcription",
+    "summary.summary-provenance",
+    "compaction.compaction-quantities"
+  ],
+  "secondaryFamilies": [
+    "shell-sanity"
+  ]
+}

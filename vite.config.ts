@@ -1,7 +1,7 @@
 import { appendFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, loadEnv, type Plugin } from "vite";
 
 // Dev-only: receive browser logs POSTed to /__log and append them to a file the
 // coding agent can read directly (no copy-paste from the console). The browser
@@ -36,20 +36,13 @@ function debugLogPlugin(): Plugin {
 	};
 }
 
-// Strict Content-Security-Policy, injected ONLY into the production build (dev would
-// break: Vite's HMR client needs inline scripts). `script-src 'self'` (no inline) shuts
-// the XSS key-exfiltration vector (the own-key storage posture). `connect-src` is scoped
-// to the four egress targets of the browser-orchestrated stack:
-//   - the metering proxy (chat + ingestion on the owner-funded paths), VITE_PROXY_BASE
-//   - OpenRouter directly (the own-key path), https://openrouter.ai
-//   - the self-hosted STT + TTS endpoints (the voice cascade's back half), VITE_STT_BASE /
-//     VITE_TTS_BASE (ws:// in dev via the tunnel, wss:// on the public host in prod)
-function cspPlugin(): Plugin {
-	const originOf = (u: string) => new URL(u).origin;
-	const proxyOrigin = originOf(process.env.VITE_PROXY_BASE ?? "http://127.0.0.1:8790/v1");
-	const sttOrigin = originOf(process.env.VITE_STT_BASE ?? "http://localhost:8123/api/asr-http");
-	const ttsOrigin = originOf(process.env.VITE_TTS_BASE ?? "ws://localhost:8123/api/tts_streaming");
-	const connect = [...new Set(["'self'", "https://openrouter.ai", proxyOrigin, sttOrigin, ttsOrigin])].join(" ");
+// Production connections use the serving origin and explicitly configured service
+// origins. Relative endpoints remain portable between local and hosted installs.
+function cspPlugin(env: Record<string, string>): Plugin {
+	const origins = [env.VITE_PROXY_BASE, env.VITE_STT_BASE, env.VITE_TTS_BASE]
+		.filter((url): url is string => Boolean(url) && !url.startsWith("/"))
+		.map(url => new URL(url).origin);
+	const connect = [...new Set(["'self'", ...origins])].join(" ");
 	const csp = [
 		"default-src 'self'",
 		"script-src 'self'",
@@ -60,7 +53,6 @@ function cspPlugin(): Plugin {
 		"base-uri 'self'",
 		"form-action 'self'",
 		"object-src 'none'",
-		"frame-ancestors 'none'",
 	].join("; ");
 	return {
 		name: "myriapod-csp",
@@ -77,8 +69,9 @@ function cspPlugin(): Plugin {
 	};
 }
 
-export default defineConfig({
-	plugins: [tailwindcss(), debugLogPlugin(), cspPlugin()],
+export default defineConfig(({ mode }) => ({
+	base: loadEnv(mode, process.cwd(), "VITE_").VITE_BASE_PATH ?? "/",
+	plugins: [tailwindcss(), debugLogPlugin(), cspPlugin(loadEnv(mode, process.cwd(), "VITE_"))],
 	resolve: {
 		alias: {
 			// pi-ai's `/compat` barrel is side-effectful: importing it registers every
@@ -89,7 +82,7 @@ export default defineConfig({
 			// replacement drops the whole provider fan-out from the graph for the app
 			// AND the npm-dep agent core in one move. See src/pi-ai-slim-compat.ts.
 			"@earendil-works/pi-ai/compat": fileURLToPath(new URL("./src/pi-ai-slim-compat.ts", import.meta.url)),
-			// pi-ai bundles a multi-provider SDK; myriapod only drives OpenRouter, so
+			// pi-ai bundles a multi-provider SDK; the app drives OpenAI-compatible inference, so
 			// the Mistral provider (dynamically imported, never invoked) is dead weight
 			// that also pulls OpenTelemetry into the build. Alias it to an inert stub so
 			// the real SDK + both @opentelemetry/* shims drop out of the bundle. See
@@ -98,10 +91,15 @@ export default defineConfig({
 		},
 	},
 	server: {
+		proxy: {
+			"/v1": "http://127.0.0.1:8790",
+			"/voice": "http://127.0.0.1:8790",
+			"/api": { target: "http://127.0.0.1:8790", ws: true },
+		},
 		watch: {
 			// Don't let edits to docs/notes living in the repo root (e.g. the
 			// feature taskpad) trigger an HMR reload of the running app.
 			ignored: ["**/*.md", "**/.git/**"],
 		},
 	},
-});
+}));

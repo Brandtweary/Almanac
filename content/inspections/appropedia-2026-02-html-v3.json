@@ -1,0 +1,245 @@
+{
+  "source_sha256": "dcf200ba723c27397e1c9a2e4891ff91fa13993df1fa285315190d8525a53469",
+  "archive": "appropedia_en_all_maxi_2026-02.zim",
+  "extraction_revision": "html-structural-v3",
+  "selection_policy": "appropedia-explicit-open-english-v1",
+  "checked": true,
+  "scope": "Representative original HTML structure and explicit page declarations, not blanket redistribution clearance or factual/safety validation",
+  "observations": [
+    {
+      "path": "Composting",
+      "canonical_path": "Composting",
+      "policy": [
+        true,
+        null,
+        "CC-BY-SA-3.0"
+      ],
+      "blocks": 193,
+      "headings": [
+        [
+          "Purpose"
+        ],
+        [
+          "Inputs"
+        ],
+        [
+          "Outputs"
+        ],
+        [
+          "Outputs",
+          "Decomposers"
+        ],
+        [
+          "Compostable materials"
+        ],
+        [
+          "Compostable materials",
+          "Plant materials"
+        ],
+        [
+          "Compostable materials",
+          "Animal materials"
+        ],
+        [
+          "Compostable materials",
+          "Man-made materials"
+        ]
+      ],
+      "tables": 1,
+      "paragraph_prefix_sha256": "6af50e8448c23a0e84ed8d94b6727ed5525d75999783368ffa548dee770ba493",
+      "source_url": "https://www.appropedia.org/Composting"
+    },
+    {
+      "path": "Soil",
+      "canonical_path": "Soil",
+      "policy": [
+        true,
+        null,
+        "CC-BY-SA-3.0"
+      ],
+      "blocks": 55,
+      "headings": [
+        [
+          "Soil in agriculture"
+        ],
+        [
+          "Complexity of soil"
+        ],
+        [
+          "Soil structure"
+        ],
+        [
+          "Care of soils"
+        ],
+        [
+          "Soil conservation practices"
+        ],
+        [
+          "Soil in construction"
+        ],
+        [
+          "See also"
+        ],
+        [
+          "References"
+        ]
+      ],
+      "tables": 1,
+      "paragraph_prefix_sha256": "8fe548ac8c94d55ff599081206cc3b215bce319abc18c86ec692f511c1f35e30",
+      "source_url": "https://www.appropedia.org/Soil"
+    },
+    {
+      "path": "Microhydro",
+      "canonical_path": "Microhydro",
+      "policy": [
+        true,
+        null,
+        "CC-BY-SA-3.0"
+      ],
+      "blocks": 68,
+      "headings": [
+        [
+          "Hydropower Sizes"
+        ],
+        [
+          "Equation"
+        ],
+        [
+          "Water Wheels"
+        ],
+        [
+          "Impulse Turbines"
+        ],
+        [
+          "References"
+        ],
+        [
+          "Resources"
+        ],
+        [
+          "External links"
+        ]
+      ],
+      "tables": 4,
+      "paragraph_prefix_sha256": "ff17c8d03a59505160d331221cfc3d4d2a7009a612ab020786c094dab81e73ef",
+      "source_url": "https://www.appropedia.org/Microhydro"
+    },
+    {
+      "path": "Rainwater_harvesting",
+      "canonical_path": "Rainwater_harvesting",
+      "policy": [
+        true,
+        null,
+        "CC-BY-SA-3.0"
+      ],
+      "blocks": 142,
+      "headings": [
+        [
+          "Advantages"
+        ],
+        [
+          "Disadvantages"
+        ],
+        [
+          "Principles"
+        ],
+        [
+          "Systems"
+        ],
+        [
+          "Systems",
+          "Domestic rooftop rainwater systems"
+        ],
+        [
+          "Systems",
+          "Industrial systems"
+        ],
+        [
+          "Rainwater urban design and infrastructure"
+        ],
+        [
+          "Successful case studies"
+        ]
+      ],
+      "tables": 1,
+      "paragraph_prefix_sha256": "9f265f2aa9969d844641495ba2e498cc1edc8e2048a70ec01cd3eda8ebb57401",
+      "source_url": "https://www.appropedia.org/Rainwater_harvesting"
+    },
+    {
+      "path": "CD3WD",
+      "canonical_path": "CD3WD",
+      "policy": [
+        false,
+        "page_permission_exception",
+        null
+      ],
+      "blocks": 22,
+      "headings": [
+        [
+          "The Restart of the CD3WD Project"
+        ],
+        [
+          "Full List of Publications"
+        ],
+        [
+          "Done - ported to Appropedia"
+        ],
+        [
+          "To Do"
+        ],
+        [
+          "Maybe Later"
+        ],
+        [
+          "See also"
+        ],
+        [
+          "External Links"
+        ]
+      ],
+      "tables": 1,
+      "paragraph_prefix_sha256": "c64029a6a7020a8a772b7464f0d68c49e33cf78a877aaf371e8b34e50610acaf",
+      "source_url": "https://www.appropedia.org/CD3WD"
+    },
+    {
+      "path": "Air_powered_car/ja",
+      "canonical_path": "Air_powered_car/ja",
+      "policy": [
+        false,
+        "language_not_explicit_english",
+        null
+      ],
+      "blocks": 19,
+      "headings": [
+        [
+          "\u30b3\u30f3\u30c6\u30f3\u30c4"
+        ],
+        [
+          "\u52b9\u7387\u6027\u3068\u74b0\u5883\u3078\u306e\u5f71\u97ff"
+        ],
+        [
+          "\u6b74\u53f2"
+        ],
+        [
+          "\u30c6\u30af\u30ce\u30ed\u30b8\u30fc"
+        ],
+        [
+          "\u6b20\u70b9"
+        ],
+        [
+          "\u53c2\u8003\u6587\u732e"
+        ]
+      ],
+      "tables": 0,
+      "paragraph_prefix_sha256": "86377fa28305e5d0b05a6bb5317d9af5853c0e07d0cbd57cbbb32cd44a2583f3",
+      "source_url": "https://www.appropedia.org/Air_powered_car/ja"
+    }
+  ],
+  "checks": [
+    "Sibling heading sections retain independent ancestry; nested sections retain parent headings",
+    "Table blocks retain rows/cells and inspection flags; source images remain explicitly outside text-only interpretation",
+    "Article body lang identifies English independently of UI language",
+    "Explicit CC-BY-SA-3.0 Page data licenses retained; permission exception overrides generic declaration; untranslated Japanese excluded"
+  ],
+  "rights": "Archive acquisition and original redistribution remain separate. This receipt admits only the declared selected-text policy and does not clear third-party media."
+}

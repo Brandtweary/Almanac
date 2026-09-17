@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "dependencies": [
+    {
+      "name": "espeak-ng",
+      "role": "optional stateless phonetic hints",
+      "integration": "separate native process using stdin and stdout",
+      "bundled": false,
+      "installation": "distribution-managed espeak-ng executable and matching voice/data files",
+      "license": "GPL-3.0-or-later",
+      "license_url": "https://github.com/espeak-ng/espeak-ng/blob/1.52.0/COPYING",
+      "upstream_source": "https://github.com/espeak-ng/espeak-ng/tree/1.52.0",
+      "source_archive": "https://github.com/espeak-ng/espeak-ng/archive/refs/tags/1.52.0.tar.gz",
+      "runtime_identity": "GET /capabilities phonemizer.engine reports the actual installed version and en-us voice",
+      "deployment_receipt": "Record the distribution package version, binary/data digests, package source recipe, patches and dependency notices for the installed build.",
+      "redistribution": "No native binary is included in this application. A release that adds one must include its matching corresponding source and notices; the upstream source link alone does not identify a patched distribution build.",
+      "missing_behavior": "Return phonemizer_unavailable; corpus access and ordinary speech transcription remain independent."
+    }
+  ]
+}

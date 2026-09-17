@@ -5,6 +5,9 @@ import type { Model } from "@earendil-works/pi-ai";
  * Transaction interface for atomic operations across stores.
  */
 export interface StorageTransaction {
+	/** Bounded primary-key scan; cursor is exclusive and remains valid after deletion. */
+	scan?<T = unknown>(storeName: string, options: { prefix: string; after?: string; limit: number }): Promise<{ entries: Array<{ key: string; value: T }>; next: string | null }>;
+
 	/** Distinguish an absent key from a stored null or undefined value. */
 	has(storeName: string, key: string): Promise<boolean>;
 
@@ -163,8 +166,10 @@ export interface SessionData {
 	/** Last selected thinking level */
 	thinkingLevel: ThinkingLevel;
 
-	/** Full conversation history (with attachments inline) */
+	/** Active model context (with attachments inline). */
 	messages: AgentMessage[];
+	rawHistory?: import("../../conversation-history.js").ConversationArchive;
+	revision?: number;
 
 	/** ISO 8601 UTC timestamp of creation */
 	createdAt: string;

@@ -1,7 +1,8 @@
+import { sendWithAdmission } from "../../send-admission.js";
 import type { ToolResultMessage, Usage } from "@earendil-works/pi-ai";
 import { streamSimple } from "../../pi-ai-slim-compat.js";
 import { html, LitElement } from "lit";
-import { customElement, property, query } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 import { ModelSelector } from "../dialogs/ModelSelector.js";
 import type { MessageEditor } from "./MessageEditor.js";
 import "./MessageEditor.js";
@@ -21,6 +22,7 @@ import type { StreamingMessageContainer } from "./StreamingMessageContainer.js";
 export class AgentInterface extends LitElement {
 	// Optional external session: when provided, this component becomes a view over the session
 	@property({ attribute: false }) session?: Agent;
+	@property({ type: Boolean }) sendDisabled = false;
 	@property({ type: Boolean }) enableAttachments = true;
 	@property({ type: Boolean }) enableModelSelector = true;
 	@property({ type: Boolean }) enableThinkingSelector = true;
@@ -42,6 +44,7 @@ export class AgentInterface extends LitElement {
 
 	private _autoScroll = true;
 	private _sendingSessions = new WeakSet<Agent>();
+	@state() private _sendError = "";
 	private _lastScrollTop = 0;
 	private _lastClientHeight = 0;
 	private _scrollContainer?: HTMLElement;
@@ -93,6 +96,7 @@ export class AgentInterface extends LitElement {
 
 		// Re-subscribe when session property changes
 		if (changedProperties.has("session")) {
+			this._sendError = "";
 			this.setupSessionSubscription();
 		}
 	}
@@ -246,6 +250,7 @@ export class AgentInterface extends LitElement {
 	};
 
 	public async sendMessage(input: string, attachments?: Attachment[]) {
+		if (this.sendDisabled) return;
 		const submittedAttachments = attachments ? [...attachments] : [];
 		if (!input.trim() && submittedAttachments.length === 0) return;
 		const session = this.session;
@@ -253,8 +258,9 @@ export class AgentInterface extends LitElement {
 		if (!session.state.model) throw new Error("No model set on AgentInterface");
 		if (session.state.isStreaming || this._sendingSessions.has(session)) return;
 		this._sendingSessions.add(session);
+		this._sendError = "";
 		const editor = this._messageEditor;
-		const isCurrent = () => this.session === session && !session.state.isStreaming;
+		const isCurrent = () => this.session === session && !session.state.isStreaming && !this.sendDisabled;
 		try {
 			const provider = session.state.model.provider;
 			const apiKey = await getAppStorage().providerKeys.get(provider);
@@ -272,24 +278,25 @@ export class AgentInterface extends LitElement {
 				if (!isCurrent()) return;
 			}
 
-			// Only remove the submitted draft; edits made during preflight belong to
-			// the next send, including attachment changes on the same array instance.
-			if (editor && this._messageEditor === editor && editor.value === input &&
-				editor.attachments.length === submittedAttachments.length &&
-				editor.attachments.every((attachment, i) => attachment === submittedAttachments[i])) {
-				editor.value = "";
-				editor.attachments = [];
-			}
+			// Admission may await storage, tokenization or context preparation inside
+			// prompt(). Keep the draft until this exact user message is accepted.
+			const clearSubmittedDraft = () => {
+				if (this.session === session && !this.sendDisabled && editor &&
+					this._messageEditor === editor && editor.value === input &&
+					editor.attachments.length === submittedAttachments.length &&
+					editor.attachments.every((attachment, i) => attachment === submittedAttachments[i])) {
+					editor.value = "";
+					editor.attachments = [];
+				}
+			};
+			const message: AgentMessage = submittedAttachments.length > 0
+				? { role: "user-with-attachments", content: input, attachments: submittedAttachments, timestamp: Date.now() } satisfies UserMessageWithAttachments
+				: { role: "user", content: input, timestamp: Date.now() };
 			this._autoScroll = true;
-			if (submittedAttachments.length > 0) {
-				const message: UserMessageWithAttachments = {
-					role: "user-with-attachments", content: input,
-					attachments: submittedAttachments, timestamp: Date.now(),
-				};
-				await session.prompt(message);
-			} else {
-				await session.prompt(input);
-			}
+			await sendWithAdmission(session, message, clearSubmittedDraft);
+		} catch (error) {
+			if (this.session === session && !this.sendDisabled) this._sendError = `Message could not be sent: ${error instanceof Error ? error.message : String(error)}`;
+			throw error;
 		} finally {
 			this._sendingSessions.delete(session);
 		}
@@ -395,7 +402,9 @@ export class AgentInterface extends LitElement {
 				<!-- Input Area -->
 				<div class="shrink-0">
 					<div class="max-w-3xl mx-auto px-2">
+						${this._sendError ? html`<div role="alert" class="text-sm text-red-500 py-2">${this._sendError}</div>` : ""}
 						<message-editor
+							.disabled=${this.sendDisabled}
 							.isStreaming=${state.isStreaming}
 							.currentModel=${state.model}
 							.thinkingLevel=${state.thinkingLevel}
@@ -403,7 +412,7 @@ export class AgentInterface extends LitElement {
 							.showModelSelector=${this.enableModelSelector}
 							.showThinkingSelector=${this.enableThinkingSelector}
 							.onSend=${(input: string, attachments: Attachment[]) => {
-								this.sendMessage(input, attachments);
+								void this.sendMessage(input, attachments).catch(() => {});
 							}}
 							.onAbort=${() => session.abort()}
 							.onModelSelect=${() => {

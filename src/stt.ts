@@ -19,12 +19,13 @@
 // Uses the project's dbg/dbgWarn instrumentation rather than bare console.
 
 import { dbg, dbgWarn } from "./debug.js";
+import { appPath } from "./app-paths.js";
 
 // === Configuration ===========================================================
 
 // The Whisper ASR HTTP endpoint. Override via VITE_STT_BASE for deploy.
 const DEFAULT_STT_URL =
-	import.meta.env?.VITE_STT_BASE ?? "http://localhost:8123/api/asr-http";
+	import.meta.env?.VITE_STT_BASE ?? appPath("api/asr-http");
 
 // Optional bearer token for an auth-gated Whisper endpoint. Our faster-whisper has
 // none (undefined ⇒ no Authorization header); a self-hoster fronting Whisper with
@@ -313,7 +314,7 @@ async function getAudioWorkletNode(
 	try {
 		return new AudioWorkletNode(audioContext, name);
 	} catch {
-		await audioContext.audioWorklet.addModule(`/${name}.js`);
+		await audioContext.audioWorklet.addModule(appPath(`${name}.js`));
 		return new AudioWorkletNode(audioContext, name);
 	}
 }

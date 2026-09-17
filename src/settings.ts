@@ -1,17 +1,21 @@
 import { SettingsTab } from "./pi-web-ui/index.js";
 import { html, type TemplateResult } from "lit";
 import { state } from "lit/decorators.js";
-import { Input } from "@mariozechner/mini-lit/dist/Input.js";
+import type { MaintenanceDecision } from "./glossary-maintenance.js";
 import type { ReviewFlag } from "./pipeline-tools.js";
 
 export interface MemoryTabCallbacks {
 	isEnabled: () => boolean;
+	hasFailedWork: () => boolean;
+	retry: () => void;
 	setEnabled: (on: boolean) => Promise<void>;
 	onExport: () => void;
 	onImport: (file: File) => Promise<void>;
 	onDelete: () => Promise<void>;
 	// Unresolved review flags, newest first; resolution removes a handled item.
 	getFlags: () => ReviewFlag[];
+	getGlossaryDecisions?: () => MaintenanceDecision[];
+	forgetGlossaryDecision?: (ids: [string,string]) => Promise<void>;
 	resolveFlag: (flag: ReviewFlag) => Promise<void>;
 }
 
@@ -24,6 +28,7 @@ export interface MemoryTabCallbacks {
 // is broken upstream). main.ts supplies the callbacks since the live stores live there.
 export class MemoryTab extends SettingsTab {
 	@state() private enabled = false;
+	@state() private reviewMessage = "";
 
 	constructor(private readonly cbs: MemoryTabCallbacks) {
 		super();
@@ -59,7 +64,9 @@ export class MemoryTab extends SettingsTab {
 		return html`
 			<div class="flex flex-col gap-4 p-1">
 				<p class="text-sm text-muted-foreground">
-					Myriapod remembers your conversations as a personal memory, kept only in this browser.
+					Almanac remembers your conversations as a personal memory, kept only in this browser.
+					When enabled, relevant text is processed by the configured AI services, including bounded
+					pronunciation checks that do not store glossary or speech text on the backend.
 				</p>
 				<div class="flex items-center gap-3">
 					<button
@@ -72,9 +79,10 @@ export class MemoryTab extends SettingsTab {
 						Memory is <span class="text-primary">${this.enabled ? "on" : "off"}</span>.
 					</span>
 				</div>
+				${this.cbs.hasFailedWork() ? html`<p role="status">Memory paused after a failed update. Saved memory is intact. <button class="underline" @click=${() => { this.cbs.retry(); this.requestUpdate(); }}>Retry</button></p>` : null}
 				<hr class="border-border" />
 				<p class="text-sm text-muted-foreground">
-					Save your memory to a file you can re-import later or move to another browser.
+					Save your memory and its background work records to a file you can re-import later or move to another browser.
 				</p>
 				<div class="flex flex-wrap gap-3">
 					<button
@@ -97,8 +105,21 @@ export class MemoryTab extends SettingsTab {
 					</button>
 				</div>
 				${this.renderFlags()}
+				${this.renderGlossaryDecisions()}
 			</div>
 		`;
+	}
+
+	private renderGlossaryDecisions(): TemplateResult | null {
+		const decisions = (this.cbs.getGlossaryDecisions?.() ?? []).filter(row => row.verdict === "distinct" && !row.forgottenAt);
+		if (!decisions.length && !this.reviewMessage) return null;
+		return html`<hr class="border-border" /><details><summary class="text-sm">Terms kept separate (${decisions.length})</summary>
+		<p class="text-sm text-muted-foreground">These pairs stay separate unless you allow another review. Review resumes during a later conversation turn while memory is on.</p>
+		<ul>${decisions.map(row => html`<li class="text-xs my-2">${row.before.map(term => term.label).join(" / ")}: ${row.reason}
+		<button class="ml-2 underline" ?disabled=${!this.enabled} @click=${async () => {
+			try { await this.cbs.forgetGlossaryDecision?.(row.ids); this.reviewMessage = "Another review is allowed during a later conversation turn."; this.requestUpdate(); }
+			catch(error) { alert(`Could not allow another review: ${error}`); }
+		}}>Allow review</button></li>`)}</ul></details><p role="status" class="text-sm">${this.reviewMessage}</p>`;
 	}
 
 	// Human-review flags remain visible until resolved.
@@ -127,152 +148,4 @@ export class MemoryTab extends SettingsTab {
 
 if (!customElements.get("memory-tab")) {
 	customElements.define("memory-tab", MemoryTab);
-}
-
-// The Access tab: bring your own OpenRouter key, plus a quiet, discrete section to
-// apply a credit code (the privileged family tier — deliberately unbranded; normal
-// visitors aren't meant to know it exists).
-//
-// The key field is our own password-masked input (NOT the stock <provider-key-input>,
-// which renders a non-editable masked blob you can't clear). Clearing the field and
-// pressing Save removes the key in place — the convention, no separate delete button.
-// Storage lives in main.ts via the callbacks.
-export interface OpenRouterKeyTabCallbacks {
-	currentKey: string; // the OpenRouter key currently stored (may be "")
-	onSaveKey: (key: string) => Promise<void>; // empty string → remove the key
-	onRedeem: (code: string) => Promise<{ ok: boolean; error?: string }>;
-	// Remaining hosted credit for the readout; null on the own-key path.
-	getBalance: () => Promise<{ tier: string; remaining: number; grant: number } | null>;
-}
-
-export class OpenRouterKeyTab extends SettingsTab {
-	@state() private keyValue = "";
-	@state() private codeValue = "";
-	@state() private balance: { tier: string; remaining: number; grant: number } | null = null;
-	@state() private busy = false;
-
-	constructor(private readonly cbs: OpenRouterKeyTabCallbacks) {
-		super();
-		this.keyValue = cbs.currentKey ?? "";
-	}
-
-	async connectedCallback(): Promise<void> {
-		super.connectedCallback();
-		this.balance = await this.cbs.getBalance();
-	}
-
-	getTabName(): string {
-		return "Access";
-	}
-
-	render(): TemplateResult {
-		const saveKey = async () => {
-			if (this.busy) return;
-			this.busy = true;
-			try {
-				const key = this.keyValue.trim();
-				await this.cbs.onSaveKey(key);
-				alert(key ? "Key saved." : "Key removed — you're back on the free tier.");
-			} finally {
-				this.busy = false;
-			}
-		};
-		const redeem = async () => {
-			if (this.busy) return;
-			const code = this.codeValue.trim();
-			if (!code) return;
-			this.busy = true;
-			try {
-				const res = await this.cbs.onRedeem(code);
-				if (res.ok) {
-					this.codeValue = "";
-					// Refresh the readout — the captured balance is now stale post-redeem.
-					if (this.cbs.getBalance) this.balance = await this.cbs.getBalance();
-					alert("Credit applied! Start a new chat to use it.");
-				} else {
-					alert(`Could not apply code: ${res.error ?? "unknown error"}`);
-				}
-			} finally {
-				this.busy = false;
-			}
-		};
-		return html`
-			<div class="flex flex-col gap-4 p-1">
-				<p class="text-sm text-muted-foreground">
-					Optional: bring your own
-					<a
-						class="text-primary underline hover:opacity-80"
-						href="https://openrouter.ai/"
-						target="_blank"
-						rel="noreferrer"
-						>OpenRouter</a
-					>
-					API key to chat on your own credits. The key is stored only in this browser and is sent
-					directly to OpenRouter. Clear it and Save to remove it and return to the free credits.
-				</p>
-				<div class="flex items-center gap-2">
-					${Input({
-						type: "password",
-						value: this.keyValue,
-						placeholder: "sk-or-...",
-						className: "flex-1",
-						onInput: (e: Event) => {
-							this.keyValue = (e.target as HTMLInputElement).value;
-						},
-					})}
-					<button
-						class="rounded border border-primary px-3 py-1.5 text-sm text-primary hover:opacity-80 disabled:opacity-50"
-						?disabled=${this.busy}
-						@click=${saveKey}
-					>
-						Save
-					</button>
-				</div>
-				<hr class="border-border" />
-				<div class="flex flex-col gap-2">
-					<p class="text-sm text-muted-foreground">
-						Have a credit code? Apply it for hosted credits — no key needed.
-					</p>
-					<div class="flex items-center gap-2">
-						${Input({
-							type: "text",
-							value: this.codeValue,
-							placeholder: "credit code",
-							className: "flex-1",
-							onInput: (e: Event) => {
-								this.codeValue = (e.target as HTMLInputElement).value;
-							},
-						})}
-						<button
-							class="rounded border border-primary px-3 py-1.5 text-sm text-primary hover:opacity-80 disabled:opacity-50"
-							?disabled=${this.busy}
-							@click=${redeem}
-						>
-							Apply
-						</button>
-					</div>
-				</div>
-				${
-					this.balance
-						? html`
-							<hr class="border-border" />
-							<p class="text-sm text-muted-foreground">
-								${this.balance.tier === "family" ? "Credit" : "Free credit"}:
-								<span class="text-primary"
-									>$${Number.isFinite(this.balance.remaining) ? this.balance.remaining.toFixed(4) : "—"}</span
-								>
-								of $${Number.isFinite(this.balance.grant) ? this.balance.grant.toFixed(2) : "—"} remaining
-							</p>
-						`
-						: null
-				}
-			</div>
-		`;
-	}
-}
-
-// SettingsDialog renders tab instances directly into a lit template (`${tab}`), which
-// requires the element to be a defined custom element.
-if (!customElements.get("openrouter-key-tab")) {
-	customElements.define("openrouter-key-tab", OpenRouterKeyTab);
 }

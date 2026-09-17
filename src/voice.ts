@@ -11,6 +11,7 @@
 // starts recording; the next ends the turn (record-off = send). Turn-based by design.
 
 import { html, render } from "lit";
+import { mountEditorControl } from "./editor-controls.js";
 import { createElement, Mic, Square } from "lucide";
 import { MIC_AUDIO_CONSTRAINTS } from "./stt.js";
 
@@ -60,41 +61,18 @@ export class VoiceController {
 	private host: HTMLSpanElement;
 	private state: State = "idle";
 	private stream?: MediaStream;
-	private observer?: MutationObserver;
+	private unmountControl: () => void;
 	private generation = 0;
 
 	constructor(private seam: VoiceCaptureSeam) {
 		ensureStyles();
 		// The button lives in its own span so we can move/re-home it without
-		// disturbing the editor's own DOM. The editor re-renders every turn
-		// (Send <-> Stop), so a MutationObserver re-homes it after each render.
+		// disturbing the editor's own DOM. Its persistent slot survives Send/Stop changes.
 		this.host = document.createElement("span");
 		this.host.style.display = "inline-flex";
 		this.renderButton();
 		window.addEventListener("keydown", this.onKey);
-		this.observer = new MutationObserver(() => this.mount());
-		this.observer.observe(document.body, { childList: true, subtree: true });
-		this.mount();
-	}
-
-	// Re-home the button just before the editor's send/stop button. Idempotent:
-	// no-op if it's already the send button's previous sibling.
-	private mount(): void {
-		const editor = document.querySelector("message-editor");
-		if (!editor) return;
-		// The Send (and the Stop, while streaming) button is the LAST <button> in
-		// the editor's bottom-right group — the only buttons after it would be ours.
-		const buttons = [...editor.querySelectorAll("button")].filter((b) => b !== this.host.firstElementChild);
-		const sendBtn = buttons[buttons.length - 1];
-		if (!sendBtn || !sendBtn.parentElement) return;
-		if (sendBtn.previousElementSibling !== this.host) {
-			sendBtn.parentElement.insertBefore(this.host, sendBtn);
-		}
-		// Narrow the observer from document.body to the send button's own cluster (mirrors
-		// the memory / stop-audio buttons): re-home only when the editor swaps Send↔Stop,
-		// not on every DOM mutation during a streamed reply (which fires per repainted token).
-		this.observer?.disconnect();
-		this.observer?.observe(sendBtn.parentElement, { childList: true });
+		this.unmountControl = mountEditorControl(this.host, 2);
 	}
 
 	private onKey = (e: KeyboardEvent) => {
@@ -194,7 +172,7 @@ export class VoiceController {
 	}
 
 	destroy(): void {
-		this.observer?.disconnect();
+		this.unmountControl();
 		window.removeEventListener("keydown", this.onKey);
 		this.stop();
 		this.host.remove();

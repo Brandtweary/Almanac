@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "images": [
+    {
+      "image": "vllm/vllm-openai@sha256:082ca6f035279109041ffd3fe0695cb568b29bc580b35c4f297a66a08b216c1b",
+      "path": "images/vllm-0.29.0.tar",
+      "archive_reserve_bytes": 32212254720,
+      "image_store_reserve_bytes": 32212254720,
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": "https://github.com/vllm-project/vllm/blob/98dff2a81d747d1dba01a47f939f48c3526d4206/LICENSE",
+        "notice": "notices/vllm-license.txt"
+      }
+    }
+  ],
+  "status": "connected-preparation-recipe-not-release",
+  "reservation_basis": "30 GiB saved archive plus 30 GiB expanded store are conservative preparation reservations, not measured final sizes. Registry layers total 8674178554 bytes compressed. Reserve concurrent model downloads separately."
+}

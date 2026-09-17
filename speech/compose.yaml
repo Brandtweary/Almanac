@@ -1,0 +1,14 @@
+services:
+  speech:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8793:8793"
+    volumes:
+      - "${SPEECH_ASSETS:?Set the verified stock speech assets directory}:/assets:ro"
+    environment:
+      HF_HUB_OFFLINE: "1"
+      CUDA_VISIBLE_DEVICES: ""
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m

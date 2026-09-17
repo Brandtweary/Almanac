@@ -14,6 +14,9 @@ import {
 	type SttLexicon,
 	mistranscriptionCount, validateAutoReplace, phrasePattern, type VoiceEvidence,
 } from "./stt-lexicon.js";
+import { recordMerge, assertMaintenanceMergeAllowed, type MaintenanceState } from "./glossary-maintenance.js";
+import { speechCandidates } from "./stt-candidates.js";
+import type { PhonemizeFn } from "./stt-phonemize.js";
 
 // Rolling cap on the mistranscription log: it appends per voice turn and rides the
 // lexicon export blob, so an uncapped log would bloat both IndexedDB and every export.
@@ -30,10 +33,15 @@ export interface PipelineToolDeps {
 	getGraph: () => Graph;
 	assertActive?: () => void;
 	voiceEvidence?: VoiceEvidence;
+	phonemize?: PhonemizeFn;
+	signal?: AbortSignal;
 	embed: EmbedFn;
 	getSttLexicon: () => SttLexicon;
 	addFlag: (flag: ReviewFlag) => void;
 	record: (line: string) => void;
+	/** Stable identities retain concurrent retrieval counters through draft merges. */
+	maintenance?: MaintenanceState;
+	onMerge?: (loserId: string, survivorId: string) => void;
 }
 
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }], details: {} });
@@ -135,6 +143,7 @@ export function createPipelineTools(deps: PipelineToolDeps): AgentTool<any>[] {
 	const autoReplaceSchema = Type.Object({
 		from: Type.String({ description: "The mistranscribed phrase (whole-phrase matched)." }),
 		to: Type.String({ description: "The correct phrase." }),
+		exact_case: Type.Optional(Type.Boolean({ description: "Match only this exact raw capitalization; required for capitalization-only repairs." })),
 	});
 
 	const flagSchema = Type.Object({
@@ -254,9 +263,16 @@ export function createPipelineTools(deps: PipelineToolDeps): AgentTool<any>[] {
 				"see your merge policy before using.",
 			parameters: mergeSchema,
 			execute: async (_id, p: Static<typeof mergeSchema>) => {
-				if (!getGraph().merge(p.loser, p.survivor)) {
+				const graph = getGraph();
+				const loser = graph.get(p.loser);
+				const survivor = graph.get(p.survivor);
+				const before = loser && survivor ? structuredClone([loser, survivor]) : null;
+				if (before && deps.maintenance) assertMaintenanceMergeAllowed(deps.maintenance, before[0].id, before[1].id);
+				if (!graph.merge(p.loser, p.survivor)) {
 					throw new Error(`merge failed (missing term, same term twice, or described loser into undescribed survivor); inspect both terms, then describe the survivor or reverse the merge`);
 				}
+				if (before && deps.maintenance) recordMerge(deps.maintenance, before[0], before[1], "Pipeline merge_terms decision");
+				deps.onMerge?.(loser!.id, survivor!.id);
 				record(`merged ${p.loser} → ${p.survivor}`);
 				return text(`Merged '${p.loser}' into '${p.survivor}'.`);
 			},
@@ -355,14 +371,17 @@ export function createPipelineTools(deps: PipelineToolDeps): AgentTool<any>[] {
 				"your auto-vs-manual policy before using.",
 			parameters: autoReplaceSchema,
 			execute: async (_id, p: Static<typeof autoReplaceSchema>) => {
-				await validateAutoReplace(p.from, p.to);
+				await validateAutoReplace(p.from, p.to, p.exact_case);
 				deps.assertActive?.();
 				const lex = getSttLexicon();
-				if (!lex.mistranscriptions.some(m => m.status !== "rejected" && m.utteranceId && m.transcribed.toLowerCase() === p.from.toLowerCase() && m.spoken.toLowerCase() === p.to.toLowerCase())) throw new Error("Log a supported raw-utterance correction first. A dictionary lookup alone does not establish what was spoken.");
+				const matching = lex.mistranscriptions.filter(m => m.status !== "rejected" && m.utteranceId && m.rawText && phrasePattern(p.from, p.exact_case).test(m.rawText) && (p.exact_case ? m.transcribed === p.from : m.transcribed.toLowerCase() === p.from.toLowerCase()));
+				if (!matching.some(m => m.spoken === p.to)) throw new Error("Log a supported raw-utterance correction first, including exact capitalization for exact_case. A dictionary lookup alone does not establish what was spoken.");
+				if (matching.some(m => m.spoken.toLowerCase() !== p.to.toLowerCase())) throw new Error("This raw phrase has conflicting supported readings. Keep a manual correction or choose a genuinely bound phrase.");
+				if (lex.mistranscriptions.some(m => m.status === "rejected" && m.transcribed.toLowerCase() === p.from.toLowerCase() && m.spoken.toLowerCase() === p.to.toLowerCase())) throw new Error("This pairing was rejected; inspect its evidence before reconsidering it.");
 				if (lex.autoReplace.some((r) => r.from.toLowerCase() === p.from.toLowerCase())) {
 					throw new Error(`a rule for '${p.from}' already exists`);
 				}
-				lex.autoReplace.push({ from: p.from, to: p.to, ts: new Date().toISOString() });
+				lex.autoReplace.push({ from: p.from, to: p.to, exactCase: p.exact_case ?? false, ts: new Date().toISOString() });
 				record(`auto-replace: "${p.from}" → "${p.to}"`);
 				return text(`Auto-replace rule added: "${p.from}" → "${p.to}".`);
 			},
@@ -370,6 +389,17 @@ export function createPipelineTools(deps: PipelineToolDeps): AgentTool<any>[] {
 		tool({
 			name: "inspect_term", label: "Inspect term", description: "Read an existing term's full description, aliases and matching settings before modifying it.", parameters: labelSchema,
 			execute: async (_id, p) => { const term = getGraph().get(p.label); return text(term ? JSON.stringify(term) : `No term '${p.label}'.`); },
+		}),
+		tool({
+			name: "phonetic_candidates", label: "Speech candidates",
+			description: "Read phonetic/orthographic hints for raw speech; bounded text goes to the configured pronunciation backend. Scores never prove what was said and never rewrite text. Inspect evidence, rejection history and page scope; follow next offsets for omitted tokens/targets.",
+			parameters: Type.Object({ token_offset: Type.Optional(Type.Integer({minimum:0})), target_offset: Type.Optional(Type.Integer({minimum:0})) }),
+			execute: async (_id, p) => {
+				if (!deps.voiceEvidence) throw new Error("Phonetic candidates require raw voice evidence; typed input is not speech.");
+				const report = await speechCandidates(deps.voiceEvidence, Object.values(getGraph().serialize().thoughts).map(t => t.label), getSttLexicon(), {tokenOffset:p.token_offset,targetOffset:p.target_offset}, deps.phonemize, deps.signal);
+				deps.assertActive?.();
+				return text(JSON.stringify(report));
+			},
 		}),
 		tool({
 			name: "inspect_stt", label: "Inspect STT", description: "Read logged corrections and replacement rules for a transcribed phrase, including evidence and rejected entries.", parameters: Type.Object({transcribed: Type.String()}),

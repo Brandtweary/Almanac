@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "id": "maintenance-source-parity",
+  "version": "0.2.0",
+  "scope": "Dedicated queued review first-inspection exception; generic conversational merge still requires recurrence. v0.1 frozen results retain their original contract.",
+  "cases": [
+    {
+      "id": "memory.maintenance-distinct-senses",
+      "split": "development",
+      "track": "agent",
+      "family": "memory",
+      "description": "Review the queued pair using both definitions and user evidence; record distinct rather than merging calendar and course. Preserve both personal terms and the binding decision.",
+      "steps": [
+        {
+          "action": "send",
+          "text": "User: Orchard Planner is my paper watering calendar. Orchard Planning is a separate community course; keep those meanings distinct.\nAssistant: They share vocabulary but refer to different things."
+        }
+      ],
+      "roleCase": {
+        "id": "maintenance-distinct-senses",
+        "split": "development",
+        "role": "memory",
+        "memoryConsent": true,
+        "initialTerms": [
+          {
+            "label": "orchard-planner",
+            "description": "The user’s paper calendar for watering the orchard."
+          },
+          {
+            "label": "orchard-planning",
+            "description": "The user’s separate community course about orchard design."
+          }
+        ],
+        "transcript": "User: Orchard Planner is my paper watering calendar. Orchard Planning is a separate community course; keep those meanings distinct.\nAssistant: They share vocabulary but refer to different things.",
+        "forbiddenTools": [],
+        "rubric": [
+          "Review the queued pair using both definitions and user evidence; record distinct rather than merging calendar and course. Preserve both personal terms and the binding decision."
+        ]
+      },
+      "assertions": [
+        {
+          "id": "valid_completion",
+          "kind": "completion",
+          "critical": true
+        },
+        {
+          "id": "schema_validity",
+          "kind": "tool_schema",
+          "critical": true
+        }
+      ],
+      "rubric": [
+        "Review the queued pair using both definitions and user evidence; record distinct rather than merging calendar and course. Preserve both personal terms and the binding decision."
+      ]
+    },
+    {
+      "id": "memory.maintenance-source-provenance",
+      "split": "development",
+      "track": "agent",
+      "family": "memory",
+      "description": "Adjudicate the pair as distinct from definitions and explicit user ownership; do not convert the source collection into a user possession or merge it into the personal log.",
+      "steps": [
+        {
+          "action": "send",
+          "text": "User: Pump Notebook is my own log. The manual’s Pump Notebooks collection is just a source example, not my collection.\nAssistant: The source example and your personal notebook have different ownership."
+        }
+      ],
+      "roleCase": {
+        "id": "maintenance-source-provenance",
+        "split": "development",
+        "role": "memory",
+        "memoryConsent": true,
+        "initialTerms": [
+          {
+            "label": "pump-notebook",
+            "description": "The user’s personal notebook documenting maintenance of a hand pump."
+          },
+          {
+            "label": "pump-notebooks",
+            "description": "A collection of example notebooks described in a published workshop manual, not owned by the user."
+          }
+        ],
+        "transcript": "User: Pump Notebook is my own log. The manual’s Pump Notebooks collection is just a source example, not my collection.\nAssistant: The source example and your personal notebook have different ownership.",
+        "forbiddenTools": [],
+        "rubric": [
+          "Adjudicate the pair as distinct from definitions and explicit user ownership; do not convert the source collection into a user possession or merge it into the personal log."
+        ]
+      },
+      "assertions": [
+        {
+          "id": "valid_completion",
+          "kind": "completion",
+          "critical": true
+        },
+        {
+          "id": "schema_validity",
+          "kind": "tool_schema",
+          "critical": true
+        }
+      ],
+      "rubric": [
+        "Adjudicate the pair as distinct from definitions and explicit user ownership; do not convert the source collection into a user possession or merge it into the personal log."
+      ]
+    },
+    {
+      "id": "memory.maintenance-stale-peer",
+      "split": "development",
+      "track": "agent",
+      "family": "memory",
+      "description": "After the declared peer edit invalidates the inspected pair, observe the actual stale-candidate rejection and inspect current definitions. Keep both terms when the second becomes an unrelated workshop program; record distinct or defer with reasons, never merge from stale evidence.",
+      "steps": [
+        {
+          "action": "send",
+          "text": "User: Review these two stored labels from their current definitions. Do not merge them if new evidence shows they are different.\nAssistant: I will inspect the live candidate pair."
+        }
+      ],
+      "roleCase": {
+        "id": "maintenance-stale-peer",
+        "split": "development",
+        "role": "memory",
+        "memoryConsent": true,
+        "initialTerms": [
+          {
+            "label": "garden-ledger",
+            "description": "The user’s paper notebook of seed purchases."
+          },
+          {
+            "label": "garden-ledgers",
+            "description": "The user’s paper notebook of seed purchases."
+          }
+        ],
+        "transcript": "User: Review these two stored labels from their current definitions. Do not merge them if new evidence shows they are different.\nAssistant: I will inspect the live candidate pair.",
+        "forbiddenTools": [],
+        "rubric": [
+          "After the declared peer edit invalidates the inspected pair, observe the actual stale-candidate rejection and inspect current definitions. Keep both terms when the second becomes an unrelated workshop program; record distinct or defer with reasons, never merge from stale evidence."
+        ]
+      },
+      "assertions": [
+        {
+          "id": "valid_completion",
+          "kind": "completion",
+          "critical": true
+        },
+        {
+          "id": "schema_validity",
+          "kind": "tool_schema",
+          "critical": true
+        }
+      ],
+      "rubric": [
+        "After the declared peer edit invalidates the inspected pair, observe the actual stale-candidate rejection and inspect current definitions. Keep both terms when the second becomes an unrelated workshop program; record distinct or defer with reasons, never merge from stale evidence."
+      ],
+      "fault": {
+        "kind": "maintenance-peer-edit",
+        "label": "garden-ledgers",
+        "description": "A separate public workshop program about garden bookkeeping, not the user’s paper seed-purchase notebook."
+      }
+    }
+  ]
+}

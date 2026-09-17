@@ -8,9 +8,10 @@
 // The icon reflects the persistent state: Volume2 (sound on) ↔ VolumeX (muted).
 //
 // Mounts leftmost in the editor's icon cluster ([stop][memory][mic][send]), re-homing
-// after each editor re-render via a MutationObserver, mirroring its siblings.
+// through the composer lifecycle alongside its siblings.
 
 import { html, render } from "lit";
+import { mountEditorControl } from "./editor-controls.js";
 import { Volume2, VolumeX, createElement } from "lucide";
 
 export interface StopAudioSeam {
@@ -42,32 +43,14 @@ function ensureStyles(): void {
 
 export class StopAudioButton {
 	private host: HTMLSpanElement;
-	private observer?: MutationObserver;
+	private unmountControl: () => void;
 
 	constructor(private seam: StopAudioSeam) {
 		ensureStyles();
 		this.host = document.createElement("span");
 		this.host.style.display = "inline-flex";
 		this.renderButton();
-		this.observer = new MutationObserver(() => this.mount());
-		this.observer.observe(document.body, { childList: true, subtree: true });
-		this.mount();
-	}
-
-	// Re-home just before the memory button → cluster [stop][memory][mic][send]. Falls
-	// back to before the mic if the memory button hasn't mounted yet (then re-homes
-	// once it has). Idempotent: no-op when already the anchor's previous sibling. Once
-	// placed, narrow the observer from document.body to the cluster container so we only
-	// re-run on cluster changes — not on every DOM mutation during a streamed reply.
-	private mount(): void {
-		const anchor =
-			document.querySelector(".cw-mem")?.parentElement ?? document.querySelector(".cw-mic");
-		if (!anchor || !anchor.parentElement) return;
-		if (anchor.previousElementSibling !== this.host) {
-			anchor.parentElement.insertBefore(this.host, anchor);
-		}
-		this.observer?.disconnect();
-		this.observer?.observe(anchor.parentElement, { childList: true });
+		this.unmountControl = mountEditorControl(this.host, 0);
 	}
 
 	// Re-render from the current mute state. Called by the host after a toggle.
@@ -101,7 +84,7 @@ export class StopAudioButton {
 	}
 
 	destroy(): void {
-		this.observer?.disconnect();
+		this.unmountControl();
 		this.host.remove();
 	}
 }

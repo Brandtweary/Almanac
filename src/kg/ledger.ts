@@ -17,6 +17,12 @@ export class InjectedLedger {
 		this.terms.set(key, description);
 	}
 
+	clone(): InjectedLedger {
+		const copy = new InjectedLedger();
+		copy.terms = new Map(this.terms);
+		return copy;
+	}
+
 	get sizes(): { terms: number } {
 		return { terms: this.terms.size };
 	}

@@ -3,6 +3,7 @@ import { PipelineRuntime, PIPELINE_STATE_KEY, PIPELINE_STORE, type PipelineDeps 
 import { Graph } from "../src/kg/graph.ts";
 import { makeCompletion } from "../src/kg/ingest.ts";
 
+const completed = () => [{ role: "assistant", content: [], stopReason: "stop", usage: { input: 1, output: 1 } }] as any;
 const deferred = () => { let resolve!: () => void; const promise = new Promise<void>((r) => { resolve = r; }); return { promise, resolve }; };
 function setup(loop?: PipelineDeps["runLoop"], summary = "[NO_ENTRY]") {
   const values = new Map<string, unknown>(); let consent = "granted"; let graph = Graph.empty();
@@ -13,11 +14,21 @@ function setup(loop?: PipelineDeps["runLoop"], summary = "[NO_ENTRY]") {
     async delete(store: string, key: string) { values.delete(`${store}/${key}`); },
     async transaction<T>(_stores: string[], _mode: string, callback: (tx: any) => Promise<T>) { return callback(this); },
   };
-  const runtime = new PipelineRuntime({ backend, getGraph: () => graph, saveGraph: async () => { saves++; },
+  const runtime = new PipelineRuntime({ backend, getGraph: () => graph, setGraph: value => { graph = value; }, publishMemory: async (asset, snapshot) => {
+      await backend.transaction(["lexicon", "pipeline"], "readwrite", async tx => {
+        await tx.set("lexicon", "terms", asset); await tx.set(PIPELINE_STORE, PIPELINE_STATE_KEY, snapshot);
+      });
+      if (snapshot.jobs?.some(j => Object.values(j.stages).every(s => s === "complete"))) saves++;
+    },
+    measureContext: async () => 1, getRoleInputBudget: () => 1000000, getRoleOutputBudget: () => 1000000,
     embed: async () => null, getModel: () => ({} as any), getBaseUrl: () => "invalid", getModelId: () => "test",
     getAuth: () => "", getConsent: () => consent, addCost: (_a, _b, session) => costs.push(session),
     onStateChange: () => {}, onActivity: () => {},
-    completion: () => async () => summary, runLoop: loop ?? (async () => []),
+    completion: options => async () => { options.onUsage?.({promptTokens:1,completionTokens:1}); return summary; }, runLoop: async (...args) => {
+      const output = await (loop ?? (async () => completed()))(...args);
+      await args[1].tools!.find(tool => tool.name === "memory_finish")!.execute("finish", { outcome: "completed", reason: "Fixture completed" }, undefined, undefined);
+      return output;
+    },
   });
   return { runtime, backend, values, costs, get saves() { return saves; },
     consent(value: string) { consent = value; }, replaceGraph() { graph = Graph.empty(); }, graph: () => graph };
@@ -31,7 +42,7 @@ const message = (text: string) => [{ role: "user", content: text, timestamp: 1 }
   const h = setup(async (messages) => {
     transcripts.push(String((messages[0] as any).content));
     if (first) { first = false; entered.resolve(); await release.promise; }
-    return [];
+    return completed();
   });
   await h.runtime.init(); h.runtime.startSession("one");
   h.runtime.onTurnEnd(() => message("first"), false); await entered.promise;
@@ -39,8 +50,9 @@ const message = (text: string) => [{ role: "user", content: text, timestamp: 1 }
   h.runtime.startSession("two"); h.runtime.onTurnEnd(() => message("third"), false);
   release.resolve(); await h.runtime.whenIdle();
   assert.equal(transcripts.length, 6); assert(transcripts[2].includes("second"));
-  assert.deepEqual(h.costs, ["one", "one", "one", "one", "two", "two"]);
-  assert.equal(h.saves, 3);
+  assert.deepEqual(h.costs, ["one", "one", "one", "one", "one", "one", "two", "two", "two"]);
+  assert.equal(h.runtime.snapshot().jobs?.length, 3);
+  assert(h.runtime.snapshot().jobs?.every(j => Object.values(j.stages).every(s => s === "complete")));
 }
 // A revoked active loop cannot write via a previously captured tool; queued ticks disappear.
 {
@@ -50,7 +62,7 @@ const message = (text: string) => [{ role: "user", content: text, timestamp: 1 }
     const add = context.tools!.find((t) => t.name === "add_term")!;
     try { await add.execute("id", { label: "orchard", description: "Fruit cultivation." }, undefined, undefined); }
     catch { rejected = true; }
-    return [];
+    return completed();
   });
   await h.runtime.init(); h.runtime.startSession("one");
   h.runtime.onTurnEnd(() => message("first"), false); await entered.promise;
@@ -59,7 +71,7 @@ const message = (text: string) => [{ role: "user", content: text, timestamp: 1 }
   assert(rejected); assert.equal(calls, 1); assert.equal(h.graph().thoughts.size, 0); assert.equal(h.saves, 0);
   h.runtime.onTurnEnd(() => message("third"), false); await h.runtime.whenIdle(); assert.equal(calls, 1);
 }
-// Successful tool actions survive a later failed provider call.
+// A failed provider call discards its entire private stage draft.
 {
   let calls = 0;
   const h = setup(async (_messages, context) => {
@@ -67,11 +79,12 @@ const message = (text: string) => [{ role: "user", content: text, timestamp: 1 }
       await context.tools!.find((t) => t.name === "add_term")!.execute("id", { label: "orchard", description: "Fruit cultivation." }, undefined, undefined);
       throw new Error("synthetic provider failure");
     }
-    return [];
+    return completed();
   });
   await h.runtime.init(); h.runtime.startSession("one"); h.runtime.onTurnEnd(() => message("first"), false);
-  await h.runtime.whenIdle(); assert(h.runtime.snapshot().buffers.audit[0].actions.length);
-  assert.equal(h.graph().thoughts.size, 1);
+  await h.runtime.whenIdle(); assert.equal(h.runtime.snapshot().buffers.audit.length, 0);
+  assert.equal(h.graph().thoughts.size, 0);
+  assert.equal(h.runtime.snapshot().jobs?.[0].stages.audit, "failed");
   assert(h.values.has(`${PIPELINE_STORE}/${PIPELINE_STATE_KEY}`));
 }
 // A failed load cannot replace recoverable persisted state with defaults.
@@ -92,11 +105,19 @@ const message = (text: string) => [{ role: "user", content: text, timestamp: 1 }
 {
   const original = globalThis.fetch;
   try {
+    const { loadReleaseProfile } = await import("../src/myriapod-model.js");
+    const budget = { maxInputTokens: 100, maxOutputTokens: 50, maxStageOutputTokens: 500 };
+    globalThis.fetch = async () => new Response(JSON.stringify({ ready: true, profile: {
+      id: "fixture", model: { id: "fixture", name: "Fixture", contextWindow: 200, maxTokens: 50, reasoning: false, input: ["text"] },
+      roles: { chat: budget, audit: budget, memory: budget, summary: budget, compaction: budget },
+      limits: { queueTimeoutMs: 1000, executionTimeoutMs: 1000 },
+    }}));
+    await loadReleaseProfile();
     for (const body of [{}, { choices: [{ finish_reason: "length", message: { content: "partial" } }] }, { choices: [{ finish_reason: "stop", message: {} }] }]) {
-      globalThis.fetch = async () => new Response(JSON.stringify(body), { status: 200 });
+      globalThis.fetch = async url => new Response(JSON.stringify(String(url).endsWith("/tokenize") ? { tokens: 1 } : body), { status: 200 });
       await assert.rejects(() => makeCompletion({ baseUrl: "https://invalid", model: "test" })([]));
     }
-    globalThis.fetch = async () => new Response(JSON.stringify({ choices: [{ finish_reason: "stop", message: { content: "valid" } }] }));
+    globalThis.fetch = async url => new Response(JSON.stringify(String(url).endsWith("/tokenize") ? { tokens: 1 } : { choices: [{ finish_reason: "stop", message: { content: "valid" } }], usage: {prompt_tokens:1,completion_tokens:1} }));
     assert.equal(await makeCompletion({ baseUrl: "https://invalid", model: "test" })([]), "valid");
   } finally { globalThis.fetch = original; }
 }

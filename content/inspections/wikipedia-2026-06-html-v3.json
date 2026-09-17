@@ -1,0 +1,301 @@
+{
+  "archive_uuid": "c22094d0-6ad1-6360-36b7-dab953595143",
+  "archive_bytes": 52690706555,
+  "entry_count": 19707079,
+  "article_count_including_redirects": 19191219,
+  "native_fulltext": true,
+  "counter": "application/javascript=4;application/pdf=37;font/ttf=1;image/png=4;image/svg+xml=23;image/svg+xml; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/SVG/1.0.0\"=515748;text/css=39;text/html=8516991;text/html; charset=iso-8859-1=1;text/javascript=3",
+  "observations": [
+    {
+      "path": "Water",
+      "canonical_path": "Water",
+      "title": "Water",
+      "html_bytes": 664013,
+      "blocks": 603,
+      "lead_characters": 2721,
+      "lead_sha256": "ff99dc8ab32b727be297ce22755d30f80946ea6ca1298ba67561b52e04ec103c",
+      "headings": [
+        [
+          "Etymology"
+        ],
+        [
+          "History"
+        ],
+        [
+          "History",
+          "On Earth"
+        ],
+        [
+          "Properties"
+        ],
+        [
+          "Properties",
+          "States"
+        ],
+        [
+          "Properties",
+          "States",
+          "Density"
+        ],
+        [
+          "Properties",
+          "States",
+          "Magnetism"
+        ],
+        [
+          "Properties",
+          "States",
+          "Phase transitions"
+        ]
+      ],
+      "tables": 6,
+      "flags": [
+        "merged_cells_inspect_original"
+      ],
+      "source_url": "https://en.wikipedia.org/wiki/Water"
+    },
+    {
+      "path": "Electricity",
+      "canonical_path": "Electricity",
+      "title": "Electricity",
+      "html_bytes": 275853,
+      "blocks": 243,
+      "lead_characters": 1932,
+      "lead_sha256": "ddb039c9260044b3e17ac32b4a1c78dfd765a4b23ca954fee7f1939c750d460d",
+      "headings": [
+        [
+          "History"
+        ],
+        [
+          "Concepts"
+        ],
+        [
+          "Concepts",
+          "Electric charge"
+        ],
+        [
+          "Concepts",
+          "Electric current"
+        ],
+        [
+          "Concepts",
+          "Electric field"
+        ],
+        [
+          "Concepts",
+          "Electric potential"
+        ],
+        [
+          "Concepts",
+          "Electromagnets"
+        ],
+        [
+          "Concepts",
+          "Electric circuits"
+        ]
+      ],
+      "tables": 4,
+      "flags": [
+        "merged_cells_inspect_original"
+      ],
+      "source_url": "https://en.wikipedia.org/wiki/Electricity"
+    },
+    {
+      "path": "Crop_rotation",
+      "canonical_path": "Crop_rotation",
+      "title": "Crop rotation",
+      "html_bytes": 139120,
+      "blocks": 146,
+      "lead_characters": 1030,
+      "lead_sha256": "57ffb3371c511e85e194b5d5ae61cb7bb4bcf2b3d24c59ea9a7a18cb78e75a22",
+      "headings": [
+        [
+          "History"
+        ],
+        [
+          "History",
+          "Two-field systems"
+        ],
+        [
+          "History",
+          "Three-field systems"
+        ],
+        [
+          "History",
+          "Four-field rotations"
+        ],
+        [
+          "History",
+          "Modern developments"
+        ],
+        [
+          "Crop choice"
+        ],
+        [
+          "Crop choice",
+          "Row crops"
+        ],
+        [
+          "Crop choice",
+          "Legumes"
+        ]
+      ],
+      "tables": 3,
+      "flags": [
+        "merged_cells_inspect_original"
+      ],
+      "source_url": "https://en.wikipedia.org/wiki/Crop_rotation"
+    },
+    {
+      "path": "First_aid",
+      "canonical_path": "First_aid",
+      "title": "First aid",
+      "html_bytes": 347418,
+      "blocks": 263,
+      "lead_characters": 1163,
+      "lead_sha256": "a52b57721316c446880352a9c22aba20783588e1a1a40b23456069dcd7d73a6b",
+      "headings": [
+        [
+          "Early history and warfare"
+        ],
+        [
+          "Early history and warfare",
+          "Formalization of life saving treatments"
+        ],
+        [
+          "Common emergences that require first aid in humans"
+        ],
+        [
+          "Common emergences that require first aid in humans",
+          "Bleeding"
+        ],
+        [
+          "Common emergences that require first aid in humans",
+          "Cardiac arrest (total stop of heartbeat)"
+        ],
+        [
+          "Common emergences that require first aid in humans",
+          "Choking"
+        ],
+        [
+          "Common emergences that require first aid in humans",
+          "Diabetes, hyperglycemia"
+        ],
+        [
+          "Common emergences that require first aid in humans",
+          "Diabetes, hypoglycemia"
+        ]
+      ],
+      "tables": 6,
+      "flags": [
+        "merged_cells_inspect_original"
+      ],
+      "source_url": "https://en.wikipedia.org/wiki/First_aid"
+    },
+    {
+      "path": "Photosynthesis",
+      "canonical_path": "Photosynthesis",
+      "title": "Photosynthesis",
+      "html_bytes": 476553,
+      "blocks": 317,
+      "lead_characters": 4096,
+      "lead_sha256": "de6555c8717dd24d3c11529c123d0a559c035b93a4195c509e2c07697df6603d",
+      "headings": [
+        [
+          "Overview"
+        ],
+        [
+          "Photosynthetic membranes and organelles"
+        ],
+        [
+          "Light-dependent reactions"
+        ],
+        [
+          "Light-dependent reactions",
+          "Z scheme"
+        ],
+        [
+          "Light-dependent reactions",
+          "Water photolysis"
+        ],
+        [
+          "Light-independent reactions"
+        ],
+        [
+          "Light-independent reactions",
+          "Calvin cycle"
+        ],
+        [
+          "Light-independent reactions",
+          "Carbon concentrating mechanisms"
+        ]
+      ],
+      "tables": 7,
+      "flags": [
+        "merged_cells_inspect_original",
+        "table_headers_unverified"
+      ],
+      "source_url": "https://en.wikipedia.org/wiki/Photosynthesis"
+    },
+    {
+      "path": "Wikipedia",
+      "canonical_path": "Wikipedia",
+      "title": "Wikipedia",
+      "html_bytes": 1004569,
+      "blocks": 852,
+      "lead_characters": 1980,
+      "lead_sha256": "25055f629b28c8a71a266ccc870166a443d3771c91e488166e2ad162a62e4eb6",
+      "headings": [
+        [
+          "History"
+        ],
+        [
+          "History",
+          "Nupedia"
+        ],
+        [
+          "History",
+          "Launch and growth"
+        ],
+        [
+          "History",
+          "Sister projects"
+        ],
+        [
+          "History",
+          "Milestones"
+        ],
+        [
+          "History",
+          "Impacts of generative AI on Wikipedia views"
+        ],
+        [
+          "Collaborative editing"
+        ],
+        [
+          "Collaborative editing",
+          "Restrictions"
+        ]
+      ],
+      "tables": 11,
+      "flags": [
+        "merged_cells_inspect_original",
+        "table_headers_unverified"
+      ],
+      "source_url": "https://en.wikipedia.org/wiki/Wikipedia"
+    }
+  ],
+  "source_sha256": "441a56d9e05b2d98f8ae9acb7986a513ed47904d73852c92dc6b7d50baa122e5",
+  "archive": "wikipedia_en_all_nopic_2026-06.zim",
+  "extraction_revision": "html-structural-v3",
+  "selection_policy": "canonical-html",
+  "checked": true,
+  "scope": "Representative original native article HTML extraction; full native lexical index; title/lead semantic scope explicitly excludes later body text",
+  "checks": [
+    "Sibling/nested heading ancestry inspected across six exact native articles",
+    "Tables retain merged-cell/header validation flags",
+    "Full body remains readable independently of title/lead extraction",
+    "Native archive UUID/size/Counter inspected after installer full SHA-256 verification"
+  ],
+  "rights": "Wikipedia article text attribution remains with contributors under CC-BY-SA-4.0 and page-specific exceptions. Original source URLs and license are preserved; image/third-party content rights remain separate."
+}

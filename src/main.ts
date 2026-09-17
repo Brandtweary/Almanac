@@ -1,18 +1,21 @@
-import { grantToken, hostedBalance, voiceLeaseResponse, serviceError } from "./service-contracts.js";
+import { type MemoryArchiveRecord, type MemoryArchiveQuery } from "./memory-archive.js";
+import { makeLexiconAsset, parseLexiconAsset, replacementPipeline, type LexiconReplacement } from "./lexicon-transfer.js";
+import { emptyMaintenance } from "./glossary-maintenance.js";
+import { appPath } from "./app-paths.js";
+import { ConversationHistory, createConversationHistoryTool, historyWithoutPersonalMemory, type ConversationArchive } from "./conversation-history.js";
+import { buildOraclePrompt } from "./oracle-prompts.js";
+import { compactContext, COMPACTION_INSTRUCTIONS } from "./oracle-context.js";
+import { EvidenceLedger, createCorpusTools, resolveCorpusCitation } from "./corpus-tools.js";
+import { createLocalStreamFn, subscribeRequests, countRequestTokens, serializeModelRequest } from "./oracle-runtime.js";
+import { voiceLeaseResponse, serviceError } from "./service-contracts.js";
+import { sendWithAdmission } from "./send-admission.js";
 import {
 	Agent,
 	type AgentMessage,
-	createCompactionSummaryMessage,
-	DEFAULT_COMPACTION_SETTINGS,
-	estimateContextTokens,
-	estimateTokens,
-	serializeConversation,
-	shouldCompact,
 } from "@earendil-works/pi-agent-core";
 import type { Model, TextContent } from "@earendil-works/pi-ai";
 import {
 	type AgentState,
-	ApiKeyPromptDialog,
 	AppStorage,
 	ChatPanel,
 	CustomProvidersStore,
@@ -40,15 +43,15 @@ import {
 	MYRIAPOD_REASONING_EFFORT,
 	MYRIAPOD_THINKING_LEVEL,
 	proxyChatModel,
+	loadReleaseProfile,
+	qualificationMode,
+	releaseProfile,
 } from "./myriapod-model.js";
 import readmeDoc from "../README.md?raw";
-import aboutDoc from "../about.md?raw";
-import { MemoryTab, OpenRouterKeyTab } from "./settings.js";
-import { showGrantModal } from "./grant-modal.js";
-import { load as loadBotd } from "@fingerprintjs/botd";
+import aboutDoc from "../about-almanac.md?raw";
+import { MemoryTab } from "./settings.js";
 import { dbg, dbgError, dbgWarn, installInstrumentation, summarizeMessages } from "./debug.js";
 import {
-	createMemoryContextMessage,
 	createVoicePendingMessage,
 	customConvertToLlm,
 	registerCustomMessageRenderers,
@@ -56,15 +59,16 @@ import {
 import { createMemoryDumpTool, createMemorySearchTool, registerMemoryToolRenderers } from "./kg-tools.js";
 import { createWebSearchTool, registerWebToolRenderer } from "./web-tools.js";
 import { Graph } from "./kg/graph.js";
-import { InjectedLedger } from "./kg/ledger.js";
-import { retrieve } from "./kg/retrieve.js";
+import { PROVISIONAL_RECALL_POLICY, StaleRecallError } from "./kg/recall-pool.js";
+import { RecallSession } from "./recall-session.js";
 import { makeCompletion } from "./kg/ingest.js";
 import { makeEmbedClient } from "./kg/embed.js";
+import { makePhonemizeClient } from "./stt-phonemize.js";
 import type { GraphAsset, TermMatch } from "./kg/types.js";
-import { PIPELINE_STORE, PipelineRuntime, type VoiceEvidence, type RunningContextEntry } from "./pipeline.js";
+import { PIPELINE_STORE, PipelineRuntime, type VoiceEvidence } from "./pipeline.js";
 import { MemoryStorage, type MemorySnapshot, type MemoryUpdate } from "./memory-storage.js";
-import { validateSttLexicon, validateRunningContext, withoutPersonalMemory } from "./memory-state.js";
-import { applyAutoReplace, emptySttLexicon, validateAutoReplace, type SttLexicon } from "./stt-lexicon.js";
+import { withoutPersonalMemory } from "./memory-state.js";
+import { applyAutoReplace, emptySttLexicon } from "./stt-lexicon.js";
 import { installVoiceCapture } from "./voice.js";
 import { PcmRecorder, WhisperClient } from "./stt.js";
 import { KyutaiTtsSynthesizer, TTS_SAMPLE_RATE } from "./tts.js";
@@ -141,23 +145,15 @@ sessions.setBackend(backend);
 const storage = new AppStorage(settings, providerKeys, sessions, customProviders, backend);
 setAppStorage(storage);
 
-// --- Serving path: own-key (OpenRouter direct) vs owner-funded (metering proxy) ---
-const OPENROUTER_DIRECT_BASE = "https://openrouter.ai/api/v1";
-// providerKeys slot holding a redeemed family token (set by settings redemption).
-const FAMILY_TOKEN_SLOT = "myriapod-family";
-// providerKeys slot holding the anonymous free-tier continuity token (minted at
-// /anon-init). Its presence is also the "welcome already shown" signal — the modal
-// reappears only if the token is gone (cleared storage → a re-mint needs re-gating).
-const ANON_TOKEN_SLOT = "myriapod-anon";
-// The proxy origin (MYRIAPOD_PROXY_BASE minus the /v1 suffix) — where /anon-init,
-// /redeem, and /balance live.
+// The local gateway is the sole serving path. Legacy credentials are deleted by
+// key, without reading their values; saved chats and personal memory stay intact.
 const MYRIAPOD_PROXY_ORIGIN = MYRIAPOD_PROXY_BASE.replace(/\/v1\/?$/, "");
+async function migrateLocalAccess(): Promise<void> {
+	for (const key of ["openrouter", "myriapod-family", "myriapod-anon", "myriapod"]) await providerKeys.delete(key);
+}
 // The auth-gated web-search endpoint, alongside the proxy's other /v1 routes
 // (/v1/chat/completions etc.). Reached with the proxy principal bearer.
 const WEB_SEARCH_ENDPOINT = `${MYRIAPOD_PROXY_ORIGIN}/v1/web-search`;
-// The embedding passthrough (proxy → the embedding-inference container). Same
-// access model as web-search: open, per-IP rate-limited, not metered; own-key
-// visitors send no bearer.
 const EMBED_ENDPOINT = `${MYRIAPOD_PROXY_ORIGIN}/v1/embed`;
 
 // Voice-concurrency broker (OFF by default). When VITE_VOICE_BROKER is unset the
@@ -172,220 +168,38 @@ const VOICE_LEASE_ENDPOINT = `${MYRIAPOD_PROXY_ORIGIN}/voice/lease`;
 const VOICE_HEARTBEAT_ENDPOINT = `${MYRIAPOD_PROXY_ORIGIN}/voice/heartbeat`;
 const VOICE_RELEASE_ENDPOINT = `${MYRIAPOD_PROXY_ORIGIN}/voice/release`;
 
-// BotD bot-detection verdict, computed once on boot and sent to /anon-init as the
-// invisible bot gate. Fail-OPEN: stays {bot:false} if BotD is blocked or errors, so
-// a real browser whose BotD a privacy extension suppressed isn't punished (the
-// honeypot + time-trap still gate that grant).
-let botdVerdict: { bot: boolean } = { bot: false };
-loadBotd()
-	.then(async (botd) => {
-		await botd.collect();
-		return botd.detect();
-	})
-	.then((r) => {
-		botdVerdict = { bot: r.bot === true };
-		dbg(`botd: bot=${r.bot}`);
-	})
-	.catch((e) => dbgWarn("botd unavailable (fail-open)", e));
-
-type ServingPath = {
-	mode: "own" | "family" | "anon";
-	model: Model<"openai-completions">;
-	baseUrl: string; // for the ingestion completion
-	auth: string; // bearer the ingestion completion sends
-};
-
-// The active serving path, (re)resolved on each createAgent.
+type ServingPath = { model: Model<"openai-completions">; baseUrl: string; auth: string };
 let servingPath: ServingPath;
-
-// Decide how this session reaches the model:
-//   own-key → the user's OpenRouter key, calling OpenRouter directly (no proxy)
-//   family  → a redeemed family token, through the proxy
-//   anon    → a minted free-tier continuity token (or the "anon" placeholder
-//             until /anon-init grants one), through the proxy
-// For owner-funded paths we pre-populate the proxy provider's key slot so the
-// framework's pre-send check AND getApiKey both resolve it without a key prompt.
 async function resolveServingPath(): Promise<ServingPath> {
-	const ownKey = await providerKeys.get("openrouter");
-	if (ownKey) {
-		return { mode: "own", model: MYRIAPOD_MODEL, baseUrl: OPENROUTER_DIRECT_BASE, auth: ownKey };
+	await migrateLocalAccess();
+	await loadReleaseProfile();
+	if (qualificationMode && !document.getElementById("qualification-warning")) {
+		const notice = document.createElement("div"); notice.id = "qualification-warning"; notice.setAttribute("role", "status"); notice.className = "p-3 text-sm border border-amber-400";
+		notice.textContent = "Local qualification build — model and retrieval quality are under evaluation. This is not an admitted release."; document.body.prepend(notice);
 	}
-	const familyToken = await providerKeys.get(FAMILY_TOKEN_SLOT);
-	if (familyToken && familyToken.length) {
-		await providerKeys.set(MYRIAPOD_PROXY_PROVIDER, familyToken);
-		return { mode: "family", model: proxyChatModel(), baseUrl: MYRIAPOD_PROXY_BASE, auth: familyToken };
-	}
-	// Anonymous: use the stored grant token if present; "anon" is the pre-grant
-	// placeholder that triggers the welcome modal + /anon-init mint on first send.
-	const anonToken = await providerKeys.get(ANON_TOKEN_SLOT);
-	const auth = anonToken && anonToken.length ? anonToken : "anon";
-	await providerKeys.set(MYRIAPOD_PROXY_PROVIDER, auth);
-	return { mode: "anon", model: proxyChatModel(), baseUrl: MYRIAPOD_PROXY_BASE, auth };
+	return { model: proxyChatModel(), baseUrl: MYRIAPOD_PROXY_BASE, auth: "" };
 }
-
-// Redeem a family code at the proxy → stores the returned token so the NEXT chat
-// resolves to the family serving path. Used by the Access settings tab.
-async function redeemFamilyCode(code: string): Promise<{ ok: boolean; error?: string }> {
-	try {
-		const res = await fetch(`${MYRIAPOD_PROXY_ORIGIN}/redeem`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ code }),
-		});
-		const data: unknown = await res.json().catch(() => null);
-		if (!res.ok) {
-			return { ok: false, error: serviceError(data, `HTTP ${res.status}`) };
-		}
-		await providerKeys.set(FAMILY_TOKEN_SLOT, grantToken(data));
-		dbg("family code redeemed; token stored (family mode applies on the next new chat)");
-		return { ok: true };
-	} catch (err) {
-		return { ok: false, error: err instanceof Error ? err.message : String(err) };
-	}
-}
-
-// Fetch the current hosted-credit balance for the Access settings readout. Only
-// meaningful on the owner-funded paths; own-key has no hosted balance to show.
-async function fetchHostedBalance(): Promise<{
-	tier: string;
-	remaining: number;
-	grant: number;
-} | null> {
-	if (servingPath.mode === "own") return null;
-	try {
-		const headers: Record<string, string> = {};
-		// Send the bearer for any authenticated proxy path (family OR a granted anon
-		// token); only the "anon" placeholder has no balance to look up.
-		if (servingPath.auth && servingPath.auth !== "anon") {
-			headers.Authorization = `Bearer ${servingPath.auth}`;
-		}
-		const res = await fetch(`${MYRIAPOD_PROXY_ORIGIN}/balance`, { headers });
-		if (!res.ok) return null;
-		return hostedBalance(await res.json());
-	} catch {
-		return null;
-	}
-}
-
-// Mint (or recover) the anonymous free-tier token via /anon-init, carrying the grant
-// gates from the welcome modal + the BotD verdict. Returns the token, or null if the
-// grant was refused (gates failed / daily signups maxed).
-async function initAnonGrant(signals: { honeypot: string; elapsedMs: number }): Promise<string | null> {
-	try {
-		const existing = (await providerKeys.get(ANON_TOKEN_SLOT)) ?? "";
-		const res = await fetch(`${MYRIAPOD_PROXY_ORIGIN}/anon-init`, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				...(existing ? { Authorization: `Bearer ${existing}` } : {}),
-			},
-			body: JSON.stringify({ ...signals, botd: botdVerdict }),
-		});
-		const data: unknown = await res.json().catch(() => null);
-		if (!res.ok) {
-			dbg(`anon-init refused: ${serviceError(data, `HTTP ${res.status}`)}`);
-			return null;
-		}
-		return grantToken(data);
-	} catch (err) {
-		dbgError("anon-init failed", err);
-		return null;
-	}
-}
-
-// Probe a stored proxy token against /balance. A 401 (or any non-OK) means the
-// proxy no longer recognizes it — DB reset, expired/revoked grant — so it's stale
-// and must be re-minted. A network/proxy-down error returns valid=true so we never
-// nuke a possibly-good token on a transient failure (the modal couldn't mint then
-// anyway, and the chat call will surface the real error).
-async function anonTokenIsValid(token: string): Promise<boolean> {
-	try {
-		// Bound the probe: a hung (not errored) proxy would otherwise wedge every send,
-		// since this sits on the hot send path. On abort we fall through to the catch and
-		// treat the token as valid — same fail-open as the network-error case.
-		const res = await fetch(`${MYRIAPOD_PROXY_ORIGIN}/balance`, {
-			headers: { Authorization: `Bearer ${token}` },
-			signal: AbortSignal.timeout(4000),
-		});
-		return res.ok;
-	} catch {
-		return true;
-	}
-}
-
-// On the first anonymous send (no grant token yet) show the welcome modal — which also
-// collects the honeypot + time-trap — then mint the grant and switch the proxy bearer
-// to the real token. Self-healing: a stored token the proxy has since forgotten is
-// cleared here, which re-pops the modal and mints a fresh one. Idempotent: once a
-// valid token exists, this is a no-op.
-let grantInFlight: Promise<void> | null = null;
-async function ensureAnonGrant(): Promise<void> {
-	if (servingPath.mode !== "anon") return;
-	// Re-entrancy guard: concurrent callers (a send racing a mic-toggle, both funnelling
-	// through here) must await the SAME modal instead of each opening one and stacking two.
-	// Held as an in-flight promise so the second caller truly waits; cleared once settled so
-	// the self-heal re-check can still run again on a later send.
-	if (grantInFlight) return grantInFlight;
-	grantInFlight = (async () => {
-		// A stored grant token (auth !== "anon") normally skips the modal — but only if the
-		// proxy still honors it. If it's stale, clear it so auth falls back to the "anon"
-		// placeholder and the modal re-fires to mint a fresh token.
-		if (servingPath.auth !== "anon") {
-			if (await anonTokenIsValid(servingPath.auth)) return;
-			dbgWarn(`[grant] stored anon token rejected by proxy — clearing and re-minting`);
-			await providerKeys.delete(ANON_TOKEN_SLOT);
-			await providerKeys.set(MYRIAPOD_PROXY_PROVIDER, "anon");
-			servingPath.auth = "anon";
-		}
-		const signals = await showGrantModal({ onOpenSettings: openSettings });
-		// The welcome modal carries the memory opt-in inline, so settle consent right here.
-		// This is the one-and-only first-launch modal on the anon path; the follow-up
-		// ensureMemoryConsent() then short-circuits (no second pop-up).
-		await setMemoryConsent(signals.rememberMe ? "granted" : "declined");
-		// Own-key path: the modal already opened Settings for the key — skip the free mint.
-		if (signals.useOwnKey) return;
-		const token = await initAnonGrant({ honeypot: signals.honeypot, elapsedMs: signals.elapsedMs });
-		if (token) {
-			await providerKeys.set(ANON_TOKEN_SLOT, token);
-			await providerKeys.set(MYRIAPOD_PROXY_PROVIDER, token);
-			servingPath.auth = token;
-		}
-	})();
-	try {
-		await grantInFlight;
-	} finally {
-		grantInFlight = null;
-	}
-}
-
-// Open the settings dialog. Tab order is deliberate: Access first (own OpenRouter
-// key + family-code redemption + hosted-balance readout) — the top reason anyone
-// opens Settings — then Memory (consent toggle + lexicon export/import/delete, the
-// whole memory artifact in one place). Async so Access is built with the stored key.
 const openSettings = async () => {
-	const currentKey = (await providerKeys.get("openrouter")) ?? "";
-	SettingsDialog.open([
-		new OpenRouterKeyTab({
-			currentKey,
-			onSaveKey: async (key: string) => {
-				if (key) await providerKeys.set("openrouter", key);
-				else await providerKeys.delete("openrouter");
-			},
-			onRedeem: redeemFamilyCode,
-			getBalance: fetchHostedBalance,
-		}),
-		new MemoryTab({
-			isEnabled: () => memoryConsent === "granted",
-			setEnabled: (on) => setMemoryConsent(on ? "granted" : "declined"),
-			onExport: downloadLexicon,
-			onImport: importLexiconFromFile,
-			onDelete: deleteLexicon,
-			getFlags: () => pipeline?.getFlags() ?? [],
-			resolveFlag: (flag) => pipeline.resolveFlag(flag),
-		}),
-	]);
+	SettingsDialog.open([new MemoryTab({
+		isEnabled: () => memoryConsent === "granted",
+		setEnabled: (on) => setMemoryConsent(on ? "granted" : "declined"),
+		onExport: downloadLexicon, onImport: importLexiconFromFile, onDelete: deleteLexicon,
+		hasFailedWork: () => pipeline?.hasFailedWork ?? false, retry: () => pipeline.retryPending(),
+		getFlags: () => pipeline?.getFlags() ?? [], resolveFlag: (flag) => pipeline.resolveFlag(flag),
+		getGlossaryDecisions: () => pipeline?.snapshot().maintenance?.decisions ?? [],
+		forgetGlossaryDecision: ids => pipeline.forgetGlossaryDecision(ids),
+	})]);
 };
 
+
+subscribeRequests((request) => {
+	if (request.role !== "chat" && request.role !== "compaction") return;
+	let notice = document.getElementById("oracle-request-state");
+	if (!notice) { notice = document.createElement("div"); notice.id = "oracle-request-state"; notice.setAttribute("role", "status"); notice.className = "text-sm p-2"; document.body.appendChild(notice); }
+	const labels: Record<string, string> = { waiting: "Waiting for the local model…", queued: "Waiting for the local model…", executing: "Researching…", running: "Researching…", failed: "Request failed. Any partial answer is incomplete; retry when ready.", interrupted: "Request interrupted. Any partial answer is incomplete.", incomplete: "Answer reached its limit and is incomplete.", busy: "The local model is busy or unavailable. Please retry shortly.", complete: "" };
+	notice.textContent = (labels[request.state] ?? request.state) + (request.position ? ` Queue position: ${request.position}.` : "");
+	if (["waiting", "queued", "executing", "running"].includes(request.state)) { const cancel = document.createElement("button"); cancel.textContent = "Cancel"; cancel.className = "ml-3 underline"; cancel.onclick = () => agent?.abort(); notice.appendChild(cancel); }
+});
 
 let currentSessionId: string | undefined;
 let currentTitle = "";
@@ -396,6 +210,8 @@ let memoryEpoch = 0;
 let memoryReplacing = false;
 let agentCreation = 0;
 let sessionSelection = 0;
+let sessionLoadPending = false;
+const sessionLoadDisabled = new WeakMap<object, boolean>();
 const sessionSaves = new Map<string, Promise<void>>();
 let graphLoaded = false;
 let pendingVoiceEvidence: VoiceEvidence | undefined;
@@ -413,9 +229,8 @@ let lastUpdateAt = 0;
 let updateCount = 0;
 
 // --- Browser-local term memory (no server; retrieval runs in-page) ---
-// Per-conversation injected-ledger (cross-turn dedup). Reset on each createAgent.
-// Restored conversations drop hidden recall and start with a fresh ledger.
-let ledger = new InjectedLedger();
+let evidenceLedger = new EvidenceLedger();
+let recall: RecallSession | undefined;
 // The user's term memory — mutable, in-page. Written by the pipeline agents
 // after every turn, retrieved by the keyword router before every send.
 let userGraph = Graph.empty();
@@ -509,7 +324,7 @@ async function getAudioWorkletNode(audioContext: AudioContext, name: string): Pr
 	try {
 		return new AudioWorkletNode(audioContext, name);
 	} catch {
-		await audioContext.audioWorklet.addModule(`/${name}.js`);
+		await audioContext.audioWorklet.addModule(appPath(`${name}.js`));
 		return new AudioWorkletNode(audioContext, name);
 	}
 }
@@ -530,38 +345,11 @@ async function getAudioWorkletNode(audioContext: AudioContext, name: string): Pr
 // this is the SHARED system prompt for both
 // voice and typed chat (single agent), so its "talk out loud, no markdown" guidance
 // also reaches the typed path.
-// The prompt deliberately names the model stack (LLM / STT / Orpheus TTS) so the
-// agent knows what it is rather than hallucinating its own voice — update the stack
-// lines here on any model or voice swap.
-const VOICE_SYSTEM_PROMPT = `You are the voice of Myriapod.
+// Runtime model identity comes from the selected serving profile.
 
-You're alive to a conversation — curious, quick to follow a thought wherever it runs, happy to open an idea up and turn it over. You have taste, and you have opinions, and you offer them warmly. You would always rather be vivid and true than smooth and forgettable.
-
-How you are:
-- You talk out loud, like real speech — plain language, no lists or markdown or code spelled into the air. This is a conversation, not a document.
-- Mirror the person's length and register: a quick question gets a quick answer, an unhurried one gets room to breathe. Don't default long or short — meet them where they are.
-- You remember. What you've been told is yours; bring it back when it fits, the way it comes up between people who know each other, and when something connects to what you already know about them, say so.
-- You have tools, and you reach for them readily: you can search your memory, pull up an overview of everything you know, and search the web. Check your memory before deciding you don't know something, and go to the web when a question runs past what you can answer on your own — don't wait to be asked.
-- Nothing is off the table. Any subject, any direction — you meet what someone brings you openly and head-on.
-- Riff when there's something to develop: carry the thought forward instead of reflexively volleying a question back, and let the conversation breathe.
-- Generous with your attention, sparing with flattery. Don't hedge, don't fawn, don't just echo someone's framing back at them — have an opinion.
-
-The person is speaking to you through speech-to-text, so expect mistranscriptions — a wrong word here and there, homophones, garbled names. Read for what they meant rather than the literal words, and never seize on an obvious garble as if they said it. You have no way to correct the transcript, so just quietly infer the intended meaning and carry on.
-
-What you are (only worth mentioning if it comes up):
-- If someone asks your name, it's Myriapod.
-- Your mind is Kimi K3, a frontier language model.
-- You hear through speech-to-text, and you speak through Orpheus, an open-weights text-to-speech model, in a voice called Leo.
-- You're the voice of Myriapod. Your own documentation follows below: it explains what you are and how you work, and it's also the public README, so lean on it for any question about your architecture, your memory, or how someone could run Myriapod themselves. The source and its GitHub link are reachable from the About page.`;
-
-// The public README, imported raw and appended to the system prompt so the agent
-// answers questions about its own architecture / memory / self-hosting from the
-// same document the public reads. Stays in sync for free — edit README.md only.
-const ARCHITECTURE_DOC = `
-
---- Myriapod README (your own documentation) ---
-
-${readmeDoc}`;
+function oraclePrompt(): string {
+	return buildOraclePrompt({ modelName: servingPath.model.name, documentation: import.meta.env.VITE_HOSTED_DEMO === "true" ? readmeDoc : undefined });
+}
 
 // PROVEN ROOT-CAUSE FIX. pi-web-ui's <message-list> only re-renders when its
 // `.messages` prop changes by IDENTITY, but pi-agent-core mutates
@@ -583,6 +371,12 @@ const sanitizeChatAnchors = () => {
 	if (!chatPanel) return;
 	for (const a of chatPanel.querySelectorAll<HTMLAnchorElement>("a[href]")) {
 		const href = (a.getAttribute("href") ?? "").trim();
+		const citation = resolveCorpusCitation(href, evidenceLedger, window.location.origin);
+		if (citation.kind !== "not-corpus") {
+			if (citation.kind === "known") { a.href = new URL(citation.source.source_url, window.location.origin).href; a.target = "_blank"; a.rel = "noopener noreferrer"; }
+			else { a.removeAttribute("href"); a.setAttribute("aria-invalid", "true"); a.title = "Unverified citation: this handle was not returned by the library."; a.textContent = `${a.textContent} [unverified source]`; }
+			continue;
+		}
 		if (href && !SAFE_HREF_SCHEME.test(href)) {
 			a.removeAttribute("href");
 			a.removeAttribute("target");
@@ -640,14 +434,19 @@ const shouldSaveSession = (messages: AgentMessage[]): boolean => {
 	return hasUserMsg && hasAssistantMsg;
 };
 
+const histories = new WeakMap<Agent, ConversationHistory>();
+const sessionRevisions = new WeakMap<Agent, number>();
+
 const saveSession = async (owner = agent, sessionId = currentSessionId, title = currentTitle) => {
-	if (!storage.sessions || !sessionId || !owner || !title) return;
+	if (!storage.sessions || !sessionId || !owner) return;
 
 	const state = { ...owner.state, messages: structuredClone(owner.state.messages) };
-	if (!shouldSaveSession(state.messages)) return;
-	const pending = (sessionSaves.get(sessionId) ?? Promise.resolve()).then(async () => {
+	const rawHistory = histories.get(owner)?.snapshot();
+	if (owner === agent) state.messages = [...state.messages.filter(m => m.role !== "corpus-ledger"), evidenceLedger.message()];
+	if (!rawHistory?.records.length) return;
+	const pending = (sessionSaves.get(sessionId) ?? Promise.resolve()).catch(() => {}).then(async () => {
 	try {
-		const savedTitle = sessionAgents.get(sessionId)?.title || title;
+		const savedTitle = sessionAgents.get(sessionId)?.title || title || generateTitle(state.messages);
 		// Preserve the original createdAt across re-saves — saveSession runs on every
 		// terminal event, so stamping a fresh createdAt each time would keep resetting the
 		// session's birth time (breaking chat-list ordering). First save → mint it.
@@ -661,6 +460,7 @@ const saveSession = async (owner = agent, sessionId = currentSessionId, title = 
 			model: state.model!,
 			thinkingLevel: state.thinkingLevel,
 			messages: state.messages,
+			rawHistory,
 			createdAt,
 			lastModified: new Date().toISOString(),
 		};
@@ -671,7 +471,7 @@ const saveSession = async (owner = agent, sessionId = currentSessionId, title = 
 			title: savedTitle,
 			createdAt: sessionData.createdAt,
 			lastModified: sessionData.lastModified,
-			messageCount: state.messages.length,
+			messageCount: rawHistory?.records.length ?? state.messages.length,
 			usage: {
 				input: 0,
 				output: 0,
@@ -691,10 +491,14 @@ const saveSession = async (owner = agent, sessionId = currentSessionId, title = 
 			preview: generateTitle(state.messages),
 		};
 
-		await storage.sessions.save(sessionData, metadata);
+		const revision = sessionRevisions.get(owner) ?? -1;
+		await storage.sessions.save(sessionData, metadata, revision);
+		sessionRevisions.set(owner, revision < 0 ? 1 : revision + 1);
 		dbg(`saveSession OK — id=${sessionId}, ${summarizeMessages(state.messages)}`);
 	} catch (err) {
 		dbgWarn(`saveSession FAILED — id=${sessionId}:`, err);
+		if (owner === agent) { const notice = document.getElementById("oracle-request-state"); if (notice) notice.textContent = `Conversation not saved: ${err instanceof Error ? err.message : String(err)}`; }
+		throw err;
 	}
 	});
 	sessionSaves.set(sessionId, pending);
@@ -706,9 +510,9 @@ async function renameSessionTitle(newTitle: string): Promise<void> {
 	const sessionId = currentSessionId;
 	if (!sessionId || !newTitle || newTitle === currentTitle) { isEditingTitle = false; renderHeader(); return; }
 	const pending = (sessionSaves.get(sessionId) ?? Promise.resolve()).then(async () => {
-		await storage.sessions.updateTitle(sessionId, newTitle);
 		const owner = sessionAgents.get(sessionId);
-		if (owner) owner.title = newTitle;
+		const revision = await storage.sessions.updateTitle(sessionId, newTitle, owner ? sessionRevisions.get(owner.agent) ?? -1 : undefined);
+		if (owner) { owner.title = newTitle; sessionRevisions.set(owner.agent, revision); }
 		if (currentSessionId === sessionId) currentTitle = newTitle;
 	});
 	const settled = pending.catch(() => undefined);
@@ -733,7 +537,7 @@ let memoryConsent: ConsentChoice | "undecided" = "undecided";
 // Assigned in initApp once the memory button exists, so the pipeline can repaint it.
 let refreshMemoryUi: () => void = () => {};
 let consentChange = 0;
-let consentPrompted = false; // guards against opening a second modal while one is up
+let consentInFlight: Promise<void> | undefined;
 
 async function loadMemoryConsent(): Promise<void> {
 	try {
@@ -755,7 +559,7 @@ async function setMemoryConsent(choice: ConsentChoice): Promise<void> {
 	if (choice === "granted" && pipeline && (!graphLoaded || !pipeline.isLoaded)) throw new Error("Saved memory could not be loaded. Reload before enabling memory.");
 	if (choice !== "granted") {
 		memoryConsent = choice;
-		pipeline?.cancel();
+		await pipeline?.cancel();
 		invalidateMemoryContext();
 		refreshAgentMemory();
 		refreshMemoryUi();
@@ -763,6 +567,7 @@ async function setMemoryConsent(choice: ConsentChoice): Promise<void> {
 	await writeMemory({ consent: choice });
 	if (change !== consentChange) return;
 	memoryConsent = choice;
+	if (choice === "granted" && servingPath) void pipeline?.resumePending();
 	refreshAgentMemory();
 	refreshMemoryUi();
 }
@@ -771,18 +576,18 @@ async function setMemoryConsent(choice: ConsentChoice): Promise<void> {
 // the visitor hasn't decided. Fire-and-forget: the conversation proceeds; the
 // answer just gates whether this turn and later ones get ingested.
 async function ensureMemoryConsent(): Promise<void> {
-	if (memoryConsent !== "undecided" || consentPrompted) return;
-	consentPrompted = true;
-	const choice = await showConsentModal();
-	await setMemoryConsent(choice);
+	if (memoryConsent !== "undecided") return;
+	if (!consentInFlight) consentInFlight = (async () => {
+		await setMemoryConsent(await showConsentModal());
+	})().finally(() => { consentInFlight = undefined; });
+	await consentInFlight;
 }
 
 // Fold a background pipeline call's tokens + cost into the SESSION total. The
 // framework's stats line sums msg.usage over assistant messages, so attributing
 // pipeline spend to the latest assistant message makes the displayed total the true
 // session cost (chat + every background call the chat triggered) — no override of
-// framework UI. (The proxy meters the real cost separately; this is purely the
-// on-screen readout.)
+// framework UI. (Local model costs are zero; token usage remains visible.)
 function addIngestionCostToSession(promptTokens: number, completionTokens: number, sessionKey: string): void {
 	const owner = sessionAgents.get(sessionKey);
 	if (!owner) return;
@@ -808,7 +613,7 @@ function addIngestionCostToSession(promptTokens: number, completionTokens: numbe
 			break;
 		}
 	}
-	void saveSession(owner.agent, sessionKey, owner.agent === agent ? currentTitle : owner.title);
+	void saveSession(owner.agent, sessionKey, owner.agent === agent ? currentTitle : owner.title).catch(error => dbgError("Conversation persistence failed", error));
 	if (owner.agent === agent) chatPanel.agentInterface?.requestUpdate?.();
 	dbg(`pipeline cost folded into session: +${promptTokens}in/${completionTokens}out tok, +$${(inCost + outCost).toFixed(6)}`);
 }
@@ -834,7 +639,7 @@ function reportMemoryFailure(error: unknown): void {
 	dbgError("Personal memory operation failed:", error);
 	if (memoryStorage.invalidated) {
 		memoryConsent = "declined";
-		pipeline?.cancel();
+		void pipeline?.cancel(false).catch(error => dbgError("Memory cancellation failed:", error));
 		invalidateMemoryContext();
 		refreshAgentMemory();
 		refreshMemoryUi();
@@ -852,20 +657,14 @@ function reportMemoryFailure(error: unknown): void {
 		: "Personal memory could not be loaded or saved. Your last saved data is retained. Export any unsaved memory before reloading to retry.";
 }
 
-async function writeMemory(update: MemoryUpdate): Promise<void> {
-	try { await memoryStorage.save(update); }
+async function writeMemory(update: MemoryUpdate, assertActive?: () => void): Promise<void> {
+	try { await memoryStorage.save(update, assertActive); }
 	catch (error) { reportMemoryFailure(error); throw error; }
 }
 
-async function saveUserGraph(): Promise<void> {
-	if (!graphLoaded) throw new Error("Memory has not loaded; saved data will not be overwritten");
-	await writeMemory({ graph: userGraph.serialize() });
-}
-
-
 function invalidateMemoryContext(): void {
 	memoryEpoch++;
-	ledger = new InjectedLedger();
+	recall?.reset();
 	pendingVoiceEvidence = undefined;
 	inFlightVoiceEvidence = undefined;
 	if (agent) {
@@ -878,75 +677,60 @@ function invalidateMemoryContext(): void {
 
 function refreshAgentMemory(): void {
 	if (!agent) return;
-	agent.state.systemPrompt = VOICE_SYSTEM_PROMPT + ARCHITECTURE_DOC +
+	agent.state.systemPrompt = oraclePrompt() +
 		(memoryConsent === "granted" ? pipeline?.runningContextBlock() ?? "" : "");
 	const epoch = memoryEpoch;
-	const graph = userGraph;
 	const memoryGraph = () => {
 		if (memoryConsent !== "granted" || memoryReplacing || memoryStorage.invalidated || epoch !== memoryEpoch) throw new Error("Personal memory is off or has changed");
-		return graph;
+		return userGraph;
 	};
+	const owner = agent;
+	const history = histories.get(owner);
+	const generation = agentCreation;
 	agent.state.tools = [
+		...(history ? [createConversationHistoryTool(history, () => { if (owner !== agent || generation !== agentCreation || epoch !== memoryEpoch) throw new Error("Conversation or memory consent changed"); }, message => memoryConsent === "granted" ? message : historyWithoutPersonalMemory(message))] : []),
+		...createCorpusTools(evidenceLedger),
 		...(memoryConsent === "granted" && !memoryReplacing ? [createMemorySearchTool(memoryGraph), createMemoryDumpTool(memoryGraph)] : []),
 		createWebSearchTool({ endpoint: WEB_SEARCH_ENDPOINT,
-			getBearer: () => (servingPath.mode === "own" ? "" : servingPath.auth) }),
+			getBearer: () => "" }),
 	];
-}
-
-// The exportable lexicon: the term glossary PLUS the speech-adaptation data and
-// the running context — everything the memory pipeline knows about the user.
-interface LexiconAsset {
-	lexicon_version: number;
-	terms: GraphAsset;
-	stt: SttLexicon;
-	running_context: RunningContextEntry[];
 }
 
 // Export: download the lexicon as JSON (the real durability story — IndexedDB
 // can be evicted and PersistentStorageDialog is broken upstream).
 function downloadLexicon(): void {
-	const asset: LexiconAsset = {
-		lexicon_version: 1,
-		terms: userGraph.serialize(),
-		stt: pipeline.getSttLexicon(),
-		running_context: pipeline.getRunningContext(),
-	};
+	void exportLexicon().catch(reportMemoryFailure);
+}
+
+async function exportLexicon(): Promise<void> {
+	const saved = await memoryStorage.exportData();
+	const asset = makeLexiconAsset(saved);
 	const blob = new Blob([JSON.stringify(asset, null, 2)], {
 		type: "application/json",
 	});
 	const url = URL.createObjectURL(blob);
 	const a = document.createElement("a");
 	a.href = url;
-	a.download = `myriapod-lexicon-${new Date().toISOString().slice(0, 10)}.json`;
+	a.download = `almanac-lexicon-${new Date().toISOString().slice(0, 10)}.json`;
 	a.click();
 	URL.revokeObjectURL(url);
 }
 
 // Import: replace the lexicon from an uploaded export and persist it.
 async function importLexiconFromFile(file: File): Promise<void> {
-	let asset: LexiconAsset;
+	let asset: unknown;
 	try {
-		asset = JSON.parse(await file.text()) as LexiconAsset;
+		asset = JSON.parse(await file.text());
 	} catch {
 		// A non-JSON / truncated file throws a raw SyntaxError before the shape check —
 		// surface the same friendly error instead.
-		throw new Error("not a Myriapod lexicon export");
+		throw new Error("not a valid lexicon export");
 	}
-	if (!asset || typeof asset !== "object" || typeof asset.terms?.thoughts !== "object") {
-		throw new Error("not a Myriapod lexicon export");
-	}
-	const graph = new Graph(asset.terms);
-	const stt = asset.stt ?? emptySttLexicon();
-	const entries = asset.running_context ?? [];
-	if (asset.lexicon_version !== 1) throw new Error("Unsupported lexicon version");
-	validateSttLexicon(stt);
-	validateRunningContext(entries);
-	for (const rule of stt.autoReplace) await validateAutoReplace(rule.from, rule.to);
-	await replaceLexicon(graph, stt, entries);
+	await replaceLexicon(await parseLexiconAsset(asset));
 	dbg(`lexicon imported: ${userGraph.thoughts.size} terms`);
 }
 
-async function replaceLexicon(graph: Graph, sttLexicon: SttLexicon, runningContext: RunningContextEntry[]): Promise<void> {
+async function replaceLexicon(replacement: LexiconReplacement): Promise<void> {
 	if (memoryReplacing) throw new Error("Another memory replacement is in progress");
 	memoryReplacing = true;
 	const settling = pipeline.cancel();
@@ -954,9 +738,9 @@ async function replaceLexicon(graph: Graph, sttLexicon: SttLexicon, runningConte
 	refreshAgentMemory();
 	try {
 	await settling;
-	const snapshot = { buffers: { audit: [], memory: [], summary: [] }, flags: [], sttLexicon, runningContext };
-	await writeMemory({ graph: graph.serialize(), pipeline: snapshot });
-	userGraph = graph;
+	const snapshot = replacementPipeline(replacement, pipeline.snapshot().generation ?? 0);
+	await writeMemory({ graph: replacement.graph.serialize(), pipeline: snapshot, clearArchive: true, archive: replacement.archive });
+	userGraph = replacement.graph;
 	graphLoaded = true;
 	pipeline.restore(snapshot);
 	pipeline.activity.length = 0;
@@ -968,7 +752,7 @@ async function replaceLexicon(graph: Graph, sttLexicon: SttLexicon, runningConte
 }
 
 async function deleteLexicon(): Promise<void> {
-	await replaceLexicon(Graph.empty(), emptySttLexicon(), []);
+	await replaceLexicon({graph: Graph.empty(), sttLexicon: emptySttLexicon(), runningContext: [], archive: [], maintenance: emptyMaintenance()});
 }
 
 // agent.prompt accepts a string or an AgentMessage[]; pull the user's text out.
@@ -989,26 +773,9 @@ const extractUserText = (input: AgentMessage | AgentMessage[] | string): string 
 	return parts.join(" ");
 };
 
-const lastAssistantText = (messages: AgentMessage[]): string => {
-	for (let i = messages.length - 1; i >= 0; i--) {
-		const m = messages[i];
-		if (m.role !== "assistant") continue;
-		const c = (m as { content?: unknown }).content;
-		if (typeof c === "string") return c;
-		if (Array.isArray(c))
-			return c
-				.filter((b): b is TextContent => !!b && (b as TextContent).type === "text")
-				.map((b) => b.text ?? "")
-				.join(" ");
-		return "";
-	}
-	return "";
-};
-
 // The gutters: term matches (left) + the pipeline activity feed (right). Owned
-// plain DOM we update imperatively. The left column renders the latest
-// retrieval's VACUUM set (full pre-dedup), so it shows what WOULD retrieve this
-// turn even when the injection deduped some out. The right column renders the
+// plain DOM we update imperatively. The left column renders admitted recall.
+// The right column renders the
 // pipeline agents' recorded actions — the memory tending itself, made visible.
 const termCard = (t: TermMatch) => html`<div class="cw-term">
 	<div class="cw-term-label">${t.label}</div>
@@ -1084,26 +851,10 @@ window.addEventListener("resize", () => {
 	resizeTimer = setTimeout(fitTermDescriptions, 150);
 });
 
-// Hard wall on the compaction summary completion — without it a hung provider would
-// stall the whole send (compaction runs inside the agent.prompt wrapper, before the run).
-// On timeout we fall through to the uncompacted path, same as the error branch.
-const COMPACTION_SUMMARY_TIMEOUT_MS = 60_000;
-
-// System instruction for the history-bounding summary. The summary is driven through
-// the app's own OpenAI-compatible completion seam (kg/ingest makeCompletion) rather than
-// pi-agent-core's generateSummary: makeCompletion already rides the active serving path +
-// bearer, whereas generateSummary wants a full Models provider-registry object the proxy
-// path would have to reconstruct. This prompt keeps the summary a faithful, self-contained
-// recap of the earlier conversation (not a coding-assistant-flavored template).
-const COMPACTION_SUMMARY_INSTRUCTIONS =
-	"You are a conversation-summarization assistant. Read the earlier part of a conversation " +
-	"between a user and a voice assistant, then write a single faithful summary that preserves " +
-	"the facts, decisions, questions, and any personal details the assistant would need to keep " +
-	"the conversation coherent going forward. Do NOT continue the conversation or answer any " +
-	"question in it — output only the summary prose.";
-
-const createAgent = async (initialState?: Partial<AgentState>) => {
+const createAgent = async (initialState?: Partial<AgentState>, savedHistory?: ConversationArchive, savedRevision = -1) => {
+	if (chatPanel.agentInterface) chatPanel.agentInterface.sendDisabled = true;
 	const creation = ++agentCreation;
+	recall?.reset();
 	if (agent) agent.abort();
 	synth?.stop();
 	voiceQueue?.close();
@@ -1118,9 +869,6 @@ const createAgent = async (initialState?: Partial<AgentState>) => {
 		agentUnsubscribe();
 	}
 
-	// Resolve own-key vs owner-funded (proxy) BEFORE building the agent — it sets the
-	// model's baseUrl/provider and (for owner-funded paths) pre-seeds the proxy auth
-	// slot so pi-web-ui's pre-send key check passes without a prompt.
 	const resolvedPath = await resolveServingPath();
 	if (creation !== agentCreation) return;
 	servingPath = resolvedPath;
@@ -1129,50 +877,88 @@ const createAgent = async (initialState?: Partial<AgentState>) => {
 		messages: [],
 		tools: [],
 	};
+	let sessionRecall: RecallSession;
 	agent = new Agent({
-		// Force the resolved serving-path model (own-key → OpenRouter direct; owner-funded
-		// → the metering proxy), overriding any model a restored session stored, and the
-		// shared persona system prompt (voice + typed both run on this one agent) — with
-		// the running-context band appended: what the summary agent remembers from prior
-		// conversations, the cross-session continuity the term memory alone can't carry.
 		initialState: {
 			...baseState,
 			messages: memoryConsent === "granted" ? (baseState.messages ?? []).filter((m) => m.role !== "memory-context") : withoutPersonalMemory(baseState.messages ?? []),
 			model: servingPath.model,
-			systemPrompt: VOICE_SYSTEM_PROMPT + ARCHITECTURE_DOC + (memoryConsent === "granted" ? pipeline?.runningContextBlock() ?? "" : ""),
+			systemPrompt: oraclePrompt() + (memoryConsent === "granted" ? pipeline?.runningContextBlock() ?? "" : ""),
 		},
 		// Custom transformer: convert custom messages to LLM-compatible format
 		convertToLlm: customConvertToLlm,
+		streamFn: async (model, context, options) => {
+			const epoch = memoryEpoch;
+			let prepared: Awaited<ReturnType<RecallSession["prepare"]>>;
+			for (;;) {
+				try { prepared = await sessionRecall.prepare(context, async candidate => countRequestTokens(await serializeModelRequest(candidate), "chat", options?.signal), releaseProfile().roles.chat.maxInputTokens); break; }
+				catch (error) { if (!(error instanceof StaleRecallError) || creation !== agentCreation || epoch !== memoryEpoch || options?.signal?.aborted) throw error; }
+			}
+			if (creation !== agentCreation || epoch !== memoryEpoch || options?.signal?.aborted) throw new Error("Conversation or personal memory changed before request admission");
+			return createLocalStreamFn("chat", () => sessionKey, undefined, requestId => {
+				if (creation === agentCreation && epoch === memoryEpoch) prepared.admitted(requestId);
+			})(model, prepared.context, options);
+		},
+		getApiKey: () => "local",
 	});
 
-	// Fresh per-conversation dedup ledger + a fresh running-context session key
-	// (the summary agent rewrites THIS conversation's entry under it).
-	ledger = new InjectedLedger();
+	evidenceLedger = new EvidenceLedger();
+	evidenceLedger.restore(agent.state.messages);
 	const owner = agent;
+	const history = new ConversationHistory(savedHistory, initialState?.messages);
+	histories.set(owner, history);
+	sessionRevisions.set(owner, savedRevision);
+	let preparation: AbortController | undefined;
+	const abort = owner.abort.bind(owner);
+	owner.abort = () => { preparation?.abort(); abort(); };
 	sessionAgents.set(sessionKey, { agent: owner, title: currentTitle });
 	const isCurrent = () => owner === agent && creation === agentCreation;
+	sessionRecall = new RecallSession({
+		policy: PROVISIONAL_RECALL_POLICY,
+		active: () => isCurrent() && memoryConsent === "granted" && !memoryReplacing && !memoryStorage.invalidated,
+		graph: () => userGraph,
+		updateCounters: operation => pipeline.updateRetrievalCounters(operation),
+		onDelivery: receipt => {
+			history.capture({ role: "memory-delivery", receipt, timestamp: Date.now() });
+			updateGutters({ terms: receipt.terms.map(term => ({ label: term.label, description: term.description, hit_count: userGraph.thoughts.get(term.id)?.hit_count ?? 0, matched_surface: term.matches[0]?.surface ?? term.label, matched_via: term.matches[0]?.via ?? "label" })) });
+		},
+	});
+	recall = sessionRecall;
+	const sources = evidenceLedger;
+	owner.prepareNextTurnWithContext = async ({ context, toolResults }, signal) => {
+		if (!toolResults.length || !isCurrent()) return;
+		const epoch = memoryEpoch;
+		try {
+			for (const result of toolResults) await sessionRecall.observe("tool", result.content.filter(block => block.type === "text").map(block => block.type === "text" ? block.text : "").join("\n"));
+			const p = releaseProfile();
+			const summarize = makeCompletion({ baseUrl: servingPath.baseUrl, model: p.model.id, role: "compaction", conversationId: sessionKey });
+			await saveSession(owner, sessionKey);
+			const messages = await compactContext({
+				convert: customConvertToLlm, messages: context.messages, ledger: sources.message(), inputBudget: p.roles.chat.maxInputTokens, summaryInputBudget: p.roles.compaction.maxInputTokens,
+				measure: async messages => countRequestTokens(await serializeModelRequest({ systemPrompt: context.systemPrompt, messages: customConvertToLlm(messages), tools: context.tools }), "chat", signal),
+				measureSummary: text => countRequestTokens({ model: p.model.id, messages: [{ role: "system", content: COMPACTION_INSTRUCTIONS }, { role: "user", content: text }] }, "compaction", signal),
+				summarize: text => summarize([{ role: "system", content: COMPACTION_INSTRUCTIONS }, { role: "user", content: text }], signal),
+				isCurrent: () => isCurrent() && epoch === memoryEpoch && !signal?.aborted,
+			});
+			if (!isCurrent() || epoch !== memoryEpoch || signal?.aborted) return;
+			if (messages !== context.messages) { owner.state.messages = messages; repaintChatAfterExternalEdit(); return { context: { ...context, messages } }; }
+		} catch (error) {
+			dbgError("Research context could not be prepared", error);
+			owner.abort();
+			if (isCurrent()) { const notice = document.getElementById("oracle-request-state"); if (notice) notice.textContent = `Research interrupted: ${error instanceof Error ? error.message : String(error)}`; }
+		}
+	};
 	if (memoryConsent !== "granted") invalidateMemoryContext();
 
-	// DESIGN 2 INJECTION. Wrap the send path so that, BEFORE the run's context
-	// snapshot is taken, we: (1) run browser-local retrieval, (2) update the
-	// left gutter with the full vacuum set, (3) append a persistent hidden
-	// memory-context breadcrumb of the deduped injection block to
-	// agent.state.messages. The breadcrumb accumulates across turns (like CC's
-	// additionalContext), so ledger dedup is correct rather than lossy.
-	// transformContext is NOT used — its output is ephemeral and would drop
-	// earlier turns' context.
+	// Observe accepted input after context preparation; recall is injected per request.
 	const origPrompt = agent.prompt.bind(agent);
 	(agent as unknown as { prompt: (...a: unknown[]) => Promise<void> }).prompt = async (
 		input: unknown,
 		...rest: unknown[]
 	) => {
-		// Re-entrancy guard, BEFORE mutating any turn globals. The wrapper awaits up to ~60s
-		// (compaction + the grant modal) before origPrompt flips isStreaming, so a second send
-		// can race into this window. The loser must not append its own memory-context
-		// breadcrumb + ledger entries or stamp inFlightVoiceTurn. Throw (not return) so the
-		// caller's .catch runs — a losing VOICE send resets its speak gate there, so it can't
-		// leave voiceTurnSpeaking stuck true and get the next typed run spoken aloud.
-		if (!isCurrent()) throw new Error("Conversation has changed");
+		const selection = sessionSelection;
+		const canSend = () => isCurrent() && selection === sessionSelection && !sessionLoadPending;
+		if (!canSend()) throw new Error("Conversation has changed or is loading");
 		if (runInFlight) {
 			dbgWarn("prompt() re-entered while a run is already in flight — dropping the racing send");
 			throw new Error("a run is already in flight");
@@ -1182,127 +968,37 @@ const createAgent = async (initialState?: Partial<AgentState>) => {
 		// bumped voiceTurnSeq before calling us) so agent_end retires the right turn. Cleared
 		// at agent_end.
 		runInFlight = true;
-		try { await ensureAnonGrant(); }
+		try { releaseProfile(); await ensureMemoryConsent(); }
 		catch (error) { if (isCurrent()) runInFlight = false; throw error; }
-		if (!isCurrent()) throw new Error("Conversation changed before send");
+		if (!canSend()) { if (isCurrent()) runInFlight = false; throw new Error("Conversation changed before send"); }
+		preparation = new AbortController();
+		const preparationSignal = preparation.signal;
 		inFlightVoiceTurn = voiceTurnSpeaking ? voiceTurnSeq : null;
 		inFlightVoiceEvidence = voiceTurnSpeaking ? pendingVoiceEvidence : undefined;
 		pendingVoiceEvidence = undefined;
 		const promptEpoch = memoryEpoch;
-
-		// HISTORY BOUNDING (Pi message-level compaction). Runs before retrieval + the
-		// memory-context append. At ~1M context this rarely fires, but it keeps a very long
-		// conversation from overflowing: estimate context tokens, and once over the
-		// threshold, summarize the older messages and replace them with a single
-		// compaction-summary message (recent turns preserved). The high-level
-		// compact()/prepareCompaction() are SessionTree-oriented and don't fit this flat
-		// message array, so we drive the message-level primitives directly. Wrapped so any
-		// failure just lets the turn proceed uncompacted.
+		if (!canSend() || promptEpoch !== memoryEpoch) { if (isCurrent()) runInFlight = false; throw new Error("Conversation or memory changed before send"); }
 		try {
-			const est = estimateContextTokens(agent.state.messages);
-			const cw = agent.state.model?.contextWindow ?? MYRIAPOD_MODEL.contextWindow;
-			if (shouldCompact(est.tokens, cw, DEFAULT_COMPACTION_SETTINGS)) {
-				// findCutPoint is entry-based (SessionTree) and unusable here, so walk from
-				// the end summing per-message token estimates until keepRecentTokens, then cut
-				// at a user-message boundary so a turn is never split.
-				const keepRecentTokens = DEFAULT_COMPACTION_SETTINGS.keepRecentTokens;
-				const msgs = agent.state.messages;
-				let acc = 0;
-				let cut = msgs.length;
-				for (let i = msgs.length - 1; i >= 0; i--) {
-					acc += estimateTokens(msgs[i]);
-					if (acc >= keepRecentTokens && msgs[i].role === "user") {
-						cut = i;
-						break;
-					}
-				}
-				if (cut > 0 && cut < msgs.length) {
-					const toSummarize = msgs.slice(0, cut);
-					const compactionAbort = new AbortController();
-					let compactionTimer: ReturnType<typeof setTimeout> | undefined;
-					const COMPACTION_TIMEOUT = Symbol("compaction-timeout");
-					const summaryCompletion = makeCompletion({
-							baseUrl: servingPath.baseUrl,
-							model: agent.state.model?.id ?? MYRIAPOD_MODEL_ID,
-							apiKey: servingPath.auth,
-							reasoningEffort: MYRIAPOD_REASONING_EFFORT,
-						});
-						// serializeConversation renders the LLM-shaped history to text; customConvertToLlm
-						// maps our custom roles (memory-context / an earlier compaction summary) first.
-						const conversationText = serializeConversation(customConvertToLlm(toSummarize));
-						const summaryRes = await Promise.race([
-						summaryCompletion([
-								{ role: "system", content: COMPACTION_SUMMARY_INSTRUCTIONS },
-								{ role: "user", content: conversationText },
-							], compactionAbort.signal)
-								.then((value) => ({ ok: true as const, value }))
-								.catch((error) => ({ ok: false as const, error })),
-						new Promise<typeof COMPACTION_TIMEOUT>((resolve) =>
-							{ compactionTimer = setTimeout(() => { compactionAbort.abort(); resolve(COMPACTION_TIMEOUT); }, COMPACTION_SUMMARY_TIMEOUT_MS); },
-						),
-					]);
-					clearTimeout(compactionTimer);
-					if (!isCurrent() || promptEpoch !== memoryEpoch) throw new Error("Conversation changed during compaction");
-					if (summaryRes === COMPACTION_TIMEOUT) {
-						dbgError("compaction summary timed out (turn proceeds uncompacted)");
-					} else if (summaryRes.ok && summaryRes.value.trim()) {
-						// Re-derive the kept tail from the LIVE array: a concurrent append (e.g. a
-						// voice-pending placeholder) may have landed during the summary await, and the
-						// stale pre-await snapshot would silently drop it. Only appends happen during the
-						// await, so index `cut` still marks the same boundary.
-						const liveKept = agent.state.messages.slice(cut);
-						agent.state.messages = [
-							createCompactionSummaryMessage(summaryRes.value, est.tokens, new Date().toISOString()),
-							...liveKept,
-						];
-						ledger = new InjectedLedger();
-						repaintChatAfterExternalEdit();
-						dbg(`compaction: summarized ${toSummarize.length} msgs, kept ${liveKept.length} (~${est.tokens} ctx tok)`);
-					} else if (!summaryRes.ok) {
-							dbgError("compaction summary failed (turn proceeds uncompacted):", summaryRes.error);
-					}
-				}
-			}
-		} catch (err) {
-			dbgError("compaction check failed (turn proceeds):", err);
-		}
-
-		try {
-			const userText = extractUserText(input as AgentMessage | AgentMessage[] | string);
-			if (userText.trim()) {
-				// First anonymous send (no grant token yet): welcome the visitor once
-				// (free credits + the own-key / family alternatives), collect the honeypot
-				// + time-trap, mint the grant via /anon-init, and switch the proxy bearer to
-				// the real token. No-op once a token exists or on the own-key / family paths.
-				if (!isCurrent() || promptEpoch !== memoryEpoch) throw new Error("Conversation changed before send");
-				// Memory consent: a no-op on the anon path (the welcome modal already settled it
-				// inline) — this only fires the standalone consent modal for own-key/family users
-				// who never saw the welcome modal.
-				void ensureMemoryConsent();
-				if (memoryConsent === "granted" && !memoryReplacing) {
-				const agentText = lastAssistantText(agent.state.messages);
-				// Retrieval runs over the per-browser term memory (the user's own).
-				const userR = retrieve(userGraph, ledger, userText, agentText);
-				updateGutters({ terms: userR.vacuum.terms });
-				// Retrieval fired hit_count/last_fired on the matched terms (see retrieveVacuum);
-				// persist so the bumped counts survive a reload. Fire-and-forget — the send
-				// must not wait on the IndexedDB write.
-				if (userR.vacuum.terms.length) void saveUserGraph().catch((e) => dbgError("Memory save failed:", e));
-				if (userR.injectionBlock) {
-					agent.state.messages = [...agent.state.messages, createMemoryContextMessage(userR.injectionBlock)];
-				}
-				dbg(
-					`memory retrieve: ${userR.vacuum.terms.length} term(s), ` +
-						`injected=${userR.injectionBlock ? "yes" : "no (deduped)"}`,
-				);
-				}
-			}
-		} catch (err) {
-			dbgError("memory retrieval failed (send proceeds without injection):", err);
-		}
-		if (!isCurrent() || promptEpoch !== memoryEpoch) { if (isCurrent()) runInFlight = false; throw new Error("Conversation or memory changed before send"); }
+			const before = agent.state.messages;
+			const incoming: AgentMessage[] = typeof input === "string" ? [{ role: "user", content: input, timestamp: Date.now() }] : Array.isArray(input) ? input : [input as AgentMessage];
+			const p = releaseProfile();
+			const summaryCompletion = makeCompletion({ baseUrl: servingPath.baseUrl, model: p.model.id, role: "compaction", conversationId: sessionKey });
+			await saveSession(owner, sessionKey);
+			const prepared = await compactContext({
+				convert: customConvertToLlm, messages: before, ledger: evidenceLedger.message(), inputBudget: p.roles.chat.maxInputTokens, summaryInputBudget: p.roles.compaction.maxInputTokens,
+				preserveLatestUser: false,
+				measure: async messages => countRequestTokens(await serializeModelRequest({ systemPrompt: owner.state.systemPrompt, messages: customConvertToLlm([...messages, ...incoming]), tools: owner.state.tools }), "chat", preparationSignal),
+				measureSummary: text => countRequestTokens({ model: p.model.id, messages: [{ role: "system", content: COMPACTION_INSTRUCTIONS }, { role: "user", content: text }] }, "compaction", preparationSignal),
+				summarize: text => summaryCompletion([{ role: "system", content: COMPACTION_INSTRUCTIONS }, { role: "user", content: text }], preparationSignal),
+				isCurrent: () => canSend() && promptEpoch === memoryEpoch && !preparationSignal.aborted,
+			});
+			if (!canSend() || promptEpoch !== memoryEpoch || preparationSignal.aborted) throw new Error("Conversation changed or was cancelled during context preparation");
+			if (prepared !== before) { owner.state.messages = prepared; repaintChatAfterExternalEdit(); }
+			await sessionRecall.observe("message", extractUserText(incoming));
+			if (!canSend() || promptEpoch !== memoryEpoch || preparationSignal.aborted) throw new Error("Conversation changed or was cancelled during recall preparation");
+		} catch (error) { if (isCurrent()) runInFlight = false; throw error; }
 		try { return await origPrompt(input as AgentMessage | AgentMessage[], ...(rest as [])); }
-		finally { if (isCurrent()) runInFlight = false; }
+		finally { preparation = undefined; if (isCurrent()) runInFlight = false; }
 	};
 
 	agentUnsubscribe = agent.subscribe((event: any) => {
@@ -1321,6 +1017,7 @@ const createAgent = async (initialState?: Partial<AgentState>) => {
 		// header shell.
 		try {
 			const type = event?.type;
+			if (type === "message_end" && event.message) history.capture(event.message);
 			const isTerminal = type === "message_end" || type === "agent_end";
 			const messages = agent.state.messages;
 
@@ -1391,8 +1088,8 @@ const createAgent = async (initialState?: Partial<AgentState>) => {
 
 			// Persist on terminal events (not once per streamed token).
 			if (currentSessionId && isTerminal) {
-				if (shouldSaveSession(messages)) updateUrl(currentSessionId);
-				saveSession();
+				if (history.snapshot().records.length) updateUrl(currentSessionId);
+				void saveSession().catch(error => dbgError("Conversation persistence failed", error));
 			}
 
 			// AgentInterface repaints its own committed list on message completion.
@@ -1422,8 +1119,17 @@ const createAgent = async (initialState?: Partial<AgentState>) => {
 				// The turn is over → one pipeline tick (consent-gated; fire-and-forget;
 				// every completed exchange retains its own queued tick).
 				if (memoryConsent === "granted") {
-					pipeline.onTurnEnd(() => owner.state.messages, wasVoiceTurn, inFlightVoiceEvidence);
+					const captured = history.snapshot();
+					const voiceEvidence = inFlightVoiceEvidence;
+					const epoch = memoryEpoch;
 					inFlightVoiceEvidence = undefined;
+					void (async () => {
+						await saveSession(owner, sessionKey);
+						if (!isCurrent() || epoch !== memoryEpoch || memoryConsent !== "granted") return;
+						const saved = await storage.sessions.get(sessionKey);
+						if (!saved?.rawHistory || !isCurrent() || epoch !== memoryEpoch || memoryConsent !== "granted") return;
+						await pipeline.onTurnEndHistory({ sessionKey, revision: saved.revision ?? 0, archive: captured }, wasVoiceTurn, voiceEvidence);
+					})().catch(reportMemoryFailure);
 				}
 			}
 
@@ -1440,72 +1146,77 @@ const createAgent = async (initialState?: Partial<AgentState>) => {
 
 	await chatPanel.setAgent(agent, {
 		onApiKeyRequired: async (provider: string) => {
-			// Owner-funded paths pre-set the proxy provider's key slot, so a prompt for it
-			// would be spurious — accept silently. Only the own-key (openrouter) path should
-			// ever reach a real prompt.
 			if (provider === MYRIAPOD_PROXY_PROVIDER) return true;
-			return await ApiKeyPromptDialog.prompt(provider);
+			return false;
 		},
-		// Empty factory: we overwrite agent.state.tools outright below with our real
-		// tool set (KG search + dump, and web search on the owner-funded paths).
 		toolsFactory: () => [],
 	});
 
 	if (creation !== agentCreation) return;
-	// The model and reasoning level are hardcoded (Kimi K3, always-on reasoning). Hide
-	// both the model picker and the thinking-level selector — this is a single-model
-	// demo, not a configurable Pi client.
 	if (chatPanel.agentInterface) {
 		chatPanel.agentInterface.enableModelSelector = false;
 		chatPanel.agentInterface.enableThinkingSelector = false;
 	}
 
-	// Install our native tools. One assignment covers newSession AND loadSession (the
-	// per-turn context snapshot + the prompt wrapper don't touch state.tools). The memory tools read the
-	// live term store via a getter (it's reassigned on import/delete). web_search is
-	// universal — table-stakes for every visitor — so it's registered on every path. The
-	// endpoint is open (per-IP rate-limited, not principal-gated): owner-funded paths send
-	// their proxy bearer; own-key sends NO bearer, so its OpenRouter key never touches the
-	// proxy.
 	refreshAgentMemory();
+	if (memoryConsent === "granted") void pipeline.resumePending();
 };
 
 const loadSession = async (sessionId: string): Promise<boolean> => {
 	const selection = ++sessionSelection;
 	if (!storage.sessions) return false;
-
-	const sessionData = await storage.sessions.get(sessionId);
-	if (selection !== sessionSelection) return false;
-	if (!sessionData) {
-		dbgWarn(`loadSession: session not found in storage: ${sessionId}`);
-		return false;
+	const previousInterface = chatPanel.agentInterface;
+	const previouslyDisabled = previousInterface ? sessionLoadDisabled.get(previousInterface) ?? previousInterface.sendDisabled : false;
+	sessionLoadPending = true;
+	if (previousInterface) {
+		sessionLoadDisabled.set(previousInterface, previouslyDisabled);
+		previousInterface.sendDisabled = true;
 	}
-	dbg(`loadSession OK: ${sessionId} — ${summarizeMessages(sessionData.messages ?? [])}`);
+	try {
+		const sessionData = await storage.sessions.get(sessionId);
+		if (selection !== sessionSelection) return false;
+		if (!sessionData) {
+			dbgWarn(`loadSession: session not found in storage: ${sessionId}`);
+			return false;
+		}
+		dbg(`loadSession OK: ${sessionId} — ${summarizeMessages(sessionData.messages ?? [])}`);
 
-	const metadata = await storage.sessions.getMetadata(sessionId);
-	if (selection !== sessionSelection) return false;
-	currentSessionId = sessionId;
-	currentView = "chat";
-	currentTitle = metadata?.title || "";
+		const metadata = await storage.sessions.getMetadata(sessionId);
+		if (selection !== sessionSelection) return false;
+		currentSessionId = sessionId;
+		currentView = "chat";
+		currentTitle = metadata?.title || "";
 
-	await createAgent({
-		// Always use the hardcoded model/reasoning, ignoring whatever a stored
-		// session was saved with — the model is not user-selectable.
-		model: MYRIAPOD_MODEL,
-		thinkingLevel: MYRIAPOD_THINKING_LEVEL,
-		messages: sessionData.messages,
-		tools: [],
-	});
+		await createAgent({
+			model: MYRIAPOD_MODEL,
+			thinkingLevel: MYRIAPOD_THINKING_LEVEL,
+			messages: sessionData.messages,
+			tools: [],
+		}, sessionData.rawHistory, sessionData.revision ?? 0);
 
-	if (selection !== sessionSelection) return false;
-	updateUrl(sessionId);
-	updateBodyVisibility();
-	renderHeader();
-	return true;
+		if (selection !== sessionSelection) return false;
+		updateUrl(sessionId);
+		updateBodyVisibility();
+		renderHeader();
+		return true;
+	} catch (error) {
+		if (selection === sessionSelection) {
+			dbgError("Saved conversation could not be loaded; retained without modification", error);
+			alert(`This conversation could not be loaded. Its saved data has been retained; export it from Chats to repair and re-import it. ${error instanceof Error ? error.message : String(error)}`);
+		}
+		return false;
+	} finally {
+		if (selection === sessionSelection) {
+			sessionLoadPending = false;
+			if (previousInterface && chatPanel.agentInterface === previousInterface) previousInterface.sendDisabled = previouslyDisabled;
+			if (previousInterface) sessionLoadDisabled.delete(previousInterface);
+		}
+	}
 };
 
 const newSession = async () => {
 	const selection = ++sessionSelection;
+	sessionLoadPending = false;
 	agentCreation++;
 	dbg("newSession() — resetting to a fresh chat (no page reload)");
 	currentSessionId = undefined;
@@ -1532,42 +1243,6 @@ const setView = (view: "chat" | "about") => {
 	renderHeader();
 };
 
-// Feature-alert email capture on the About page. Posts to the proxy's /subscribe
-// (a fire-and-forget list — no newsletter client) and updates the inline status text
-// imperatively, so the About view needs no reactive state.
-async function handleSubscribe(e: Event): Promise<void> {
-	e.preventDefault();
-	const form = e.currentTarget as HTMLFormElement;
-	const input = form.querySelector<HTMLInputElement>(".cw-signup-input");
-	const status = form.querySelector<HTMLElement>(".cw-signup-status");
-	const btn = form.querySelector<HTMLButtonElement>(".cw-signup-btn");
-	if (!input || !status || !btn) return;
-	const email = input.value.trim();
-	if (!email) return;
-	btn.disabled = true;
-	status.textContent = "…";
-	try {
-		const res = await fetch(`${MYRIAPOD_PROXY_ORIGIN}/subscribe`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ email }),
-		});
-		if (res.ok) {
-			status.textContent = "Thanks — you're on the list.";
-			input.value = "";
-		} else if (res.status === 429) {
-			status.textContent = "Too many tries — give it a minute.";
-			btn.disabled = false;
-		} else {
-			status.textContent = "That didn't look like a valid email.";
-			btn.disabled = false;
-		}
-	} catch {
-		status.textContent = "Couldn't reach the server — try again in a bit.";
-		btn.disabled = false;
-	}
-}
-
 const renderAbout = () => html`
 	<div class="flex-1 overflow-y-auto">
 		<div class="cw-about max-w-2xl mx-auto">
@@ -1577,18 +1252,6 @@ const renderAbout = () => html`
 					'<a target="_blank" rel="noreferrer" href="$1',
 				),
 			)}
-			<form class="cw-signup" @submit=${handleSubscribe}>
-				<input
-					class="cw-signup-input"
-					type="email"
-					name="email"
-					required
-					placeholder="you@example.com"
-					aria-label="Email for feature-release alerts"
-				/>
-				<button class="cw-signup-btn" type="submit">Notify me</button>
-				<span class="cw-signup-status" role="status" aria-live="polite"></span>
-			</form>
 		</div>
 	</div>
 `;
@@ -1608,14 +1271,14 @@ const renderHeader = () => {
 						class="text-primary text-base font-semibold px-1 mr-1 hover:opacity-80 transition-opacity"
 						@click=${() => setView("chat")}
 					>
-						Myriapod
+						Almanac
 					</button>
-					${Button({
+					${aboutDoc.trim() ? Button({
 						variant: "ghost",
 						size: "sm",
 						children: "About",
 						onClick: () => setView("about"),
-					})}
+					}) : null}
 					${Button({
 						variant: "ghost",
 						size: "sm",
@@ -1626,6 +1289,7 @@ const renderHeader = () => {
 									await loadSession(sessionId);
 								},
 								(deletedSessionId) => {
+									void pipeline?.sourceDeleted(deletedSessionId).catch(reportMemoryFailure);
 									// Only reload if the current session was deleted
 									if (deletedSessionId === currentSessionId) {
 										newSession();
@@ -1752,7 +1416,7 @@ async function initApp() {
 	// text is tapped off the lifecycle listener (above) and spoken via TTS. The mic
 	// toggle still defines the turn — toggle-on records, toggle-off transcribes + fires.
 	let recorder: PcmRecorder | null = null;
-	// Guards the async gap in onStart: the grant/consent/lease awaits happen BEFORE the
+	// Guards the async gap in onStart: the consent/lease awaits happen BEFORE the
 	// recorder exists, so a mic toggle-off (onStop) in that window would find recorder ===
 	// null and no-op, then onStart would resume and start a recorder nothing ever stops.
 	// onStop flips this true; onStart checks it after each await and bails, so no orphaned
@@ -1782,8 +1446,8 @@ async function initApp() {
 		// voiceLease is null on the default (broker-off) path → the synth falls back to
 		// VITE_TTS_BASE, exactly as before.
 		synth = voiceLease
-			? new KyutaiTtsSynthesizer(outputWorklet, { baseUrl: voiceLease.ttsUrl, onVoiceUnavailable, onDispose: () => { outputWorklet.disconnect(); void ctx.close(); } })
-			: new KyutaiTtsSynthesizer(outputWorklet, { onVoiceUnavailable, onDispose: () => { outputWorklet.disconnect(); void ctx.close(); } });
+			? new KyutaiTtsSynthesizer(outputWorklet, { baseUrl: voiceLease.ttsUrl, idleTimeoutMs: releaseProfile().limits.speechTimeoutMs, onVoiceUnavailable, onDispose: () => { outputWorklet.disconnect(); void ctx.close(); } })
+			: new KyutaiTtsSynthesizer(outputWorklet, { idleTimeoutMs: releaseProfile().limits.speechTimeoutMs, onVoiceUnavailable, onDispose: () => { outputWorklet.disconnect(); void ctx.close(); } });
 		return synth;
 		} catch (error) { await ctx.close().catch(() => {}); throw error; }
 		})();
@@ -1813,9 +1477,8 @@ async function initApp() {
 
 	// --- Voice-broker lease lifecycle (all no-ops when VOICE_BROKER_ENABLED is off) ---
 
-	// A small transient toast for the "voice busy — type instead" notice (the only
-	// user-facing broker surface). Self-removing; no dependency on a toast framework.
-	const showVoiceToast = (text: string) => {
+	// Status notices expire; an unsent transcript remains until explicitly dismissed.
+	const showVoiceToast = (text: string, recoveredText?: string) => {
 		const el = document.createElement("div");
 		el.textContent = text;
 		el.setAttribute("role", "status");
@@ -1824,7 +1487,19 @@ async function initApp() {
 			"background:#111;color:#34d399;border:1px solid #34d399;border-radius:.5rem;" +
 			"padding:.5rem .9rem;font-size:.875rem;box-shadow:0 2px 12px rgba(0,0,0,.4);";
 		document.body.appendChild(el);
-		window.setTimeout(() => el.remove(), 4000);
+		if (recoveredText === undefined) window.setTimeout(() => el.remove(), 4000);
+		else {
+			el.style.maxWidth = "min(90vw, 40rem)";
+			const transcript = document.createElement("textarea");
+			transcript.readOnly = true;
+			transcript.value = recoveredText;
+			transcript.setAttribute("aria-label", "Unsent voice transcript");
+			transcript.style.cssText = "display:block;width:100%;min-height:6rem;max-height:50vh;margin-top:.5rem;color:inherit;background:transparent;";
+			const dismiss = document.createElement("button");
+			dismiss.textContent = "Dismiss transcript";
+			dismiss.addEventListener("click", () => el.remove());
+			el.append(transcript, dismiss);
+		}
 	};
 
 	// Drop text into the chat composer (the editor's textarea), appending to whatever's
@@ -1933,6 +1608,11 @@ async function initApp() {
 
 	const voiceController = installVoiceCapture({
 		onStart: async (stream) => {
+			if (sessionLoadPending || chatPanel.agentInterface?.sendDisabled) {
+				voiceController.cancel();
+				showVoiceToast("Conversation is loading. Try again when it is ready.");
+				return;
+			}
 			const epoch = ++recordingEpoch;
 			const owner = agent;
 			const selection = sessionSelection;
@@ -1940,13 +1620,8 @@ async function initApp() {
 			const isActive = () => epoch === recordingEpoch && owner === agent && selection === sessionSelection;
 			recordingOwner = owner;
 			cutVoiceAudio(); // barge-in: toggling the mic on cuts any in-progress reply's audio
-			// First launch (or a stale grant token): settle the credit grant + memory opt-in
-			// up front, before the recorder starts, so the modals never interrupt mid-utterance.
-			// On later toggles this is a near-instant no-op (a valid token short-circuits).
-			await ensureAnonGrant();
+			releaseProfile();
 			if (!isActive()) return; // toggled off during the modal → no recorder was built
-			// Memory consent: a no-op on the anon path (the welcome modal settled it inline) —
-			// only fires the standalone consent modal for own-key/family users.
 			void ensureMemoryConsent();
 			// Voice-concurrency admission (no-op when the broker is disabled). On "busy"
 			// every TTS endpoint is full → refuse the mic-on and steer the user to typed
@@ -2006,7 +1681,7 @@ async function initApp() {
 			const placeholder = recordingPlaceholder;
 			recordingOwner = null;
 			recordingPlaceholder = null;
-			const isActive = () => epoch === recordingEpoch && owner === agent && selection === sessionSelection; // // if an onStart is still mid-await, tell it to bail (no leaked recorder)
+			const isActive = () => epoch === recordingEpoch && owner === agent && selection === sessionSelection;
 			// Keep the recording-in-progress placeholder visible THROUGH the STT round-trip:
 			// batch transcription takes multiple seconds, and dropping the cue up front would
 			// leave dead air with no feedback during exactly that wait. The same ellipsis
@@ -2069,20 +1744,27 @@ async function initApp() {
 						// they can send it once the current reply finishes.
 						dbgWarn("voice barge-in while a run is in flight — transcript parked, not sent");
 						if (!fillComposer(transcript)) {
-							showVoiceToast(`Heard while replying: "${transcript}"`);
+							showVoiceToast("Heard while replying. Copy your transcript before dismissing.", transcript);
 						}
 						return; // finally still runs dropPlaceholder (already dropped — idempotent)
 					}
 					voiceTurnSeq++; // stamp this turn so its agent_end retires the right speak state
 					voiceTurnSpeaking = true; // gate: this turn's reply speaks, incl. the post-tool final answer (see TTS tap)
 					voiceTurnCut = false; // fresh turn — clear any prior barge-in guard
-					void owner!.prompt(transcript).catch((err) => {
+					const sendingTurn = voiceTurnSeq;
+					const voiceMessage: AgentMessage = { role: "user", content: transcript, timestamp: Date.now() };
+					void sendWithAdmission(owner!, voiceMessage, () => {}, () => {
+						if (owner === agent && selection === sessionSelection) {
+							if (fillComposer(transcript)) showVoiceToast("Message could not be sent. Your transcript is in the composer.");
+							else showVoiceToast("Message could not be sent. Copy your transcript before dismissing.", transcript);
+						} else showVoiceToast("Message could not be sent in its original conversation. Copy your transcript before dismissing.", transcript);
+						if (owner === agent && sendingTurn === voiceTurnSeq) {
+							voiceTurnSpeaking = false;
+							inFlightVoiceTurn = null;
+							inFlightVoiceEvidence = undefined;
+						}
+					}).catch((err) => {
 						dbgError("voice agent.prompt failed:", err);
-						// A voice send that errors before reaching agent_end (e.g. the re-entrancy
-						// guard threw) never retires its speak gate the normal way. Reset it here so
-						// the NEXT turn isn't spoken aloud — but only if the in-flight winner is a
-						// typed run (inFlightVoiceTurn === null); a concurrent voice turn owns the gate.
-						if (inFlightVoiceTurn === null) voiceTurnSpeaking = false;
 					});
 				}
 			} finally {
@@ -2115,6 +1797,7 @@ async function initApp() {
 	// + pipeline activity; click offers opt-in when off).
 	await loadMemoryConsent();
 	const onMemoryClick = () => {
+		if (memoryConsent === "granted" && pipeline?.hasFailedWork) { pipeline.retryPending(); return; }
 		if (memoryConsent !== "granted") {
 			void (async () => setMemoryConsent(await showConsentModal()))();
 		}
@@ -2124,7 +1807,7 @@ async function initApp() {
 			if (memoryConsent !== "granted") return "off";
 			// `pipeline?` — the button mounts before the pipeline is constructed a few
 			// lines below; until then it just reads as idle ("saved").
-			return pipeline?.isRunning ? "running" : "saved";
+			return pipeline?.isRunning ? "running" : pipeline?.hasFailedWork ? "failed" : "saved";
 		},
 		onClick: onMemoryClick,
 	});
@@ -2152,21 +1835,29 @@ async function initApp() {
 	// (action buffers, running context, speech data, flags) loads in init().
 	pipeline = new PipelineRuntime({
 		backend,
-		getGraph: () => userGraph,
-		saveGraph: saveUserGraph,
-		saveMemory: async (snapshot) => {
-			if (!graphLoaded) throw new Error("Memory has not loaded");
-			await writeMemory({ graph: userGraph.serialize(), pipeline: snapshot });
+		getRawHistory: async (sessionKey: string) => {
+			const saved = await storage.sessions.get(sessionKey);
+			if (saved === null) return null;
+			if (!saved.rawHistory) throw new Error("Original conversation history is unavailable");
+			return { revision: saved.revision ?? 0, archive: saved.rawHistory };
 		},
-		savePipeline: (snapshot) => writeMemory({ pipeline: snapshot }),
+		getGraph: () => userGraph,
+		setGraph: (graph) => { userGraph = graph; },
+		publishMemory: async (graph, snapshot, archive, assertActive) => {
+			if (!graphLoaded) throw new Error("Memory has not loaded");
+			await writeMemory({ graph, pipeline: snapshot, ...(archive ? { archive } : {}) }, assertActive);
+		},
+		appendArchive: (records: MemoryArchiveRecord[], assertActive?: () => void) => writeMemory({ archive: records }, assertActive),
+		readArchive: (query: MemoryArchiveQuery, assertActive?: () => void) => memoryStorage.readArchive(query, assertActive),
 		onError: reportMemoryFailure,
 		embed: makeEmbedClient({
 			endpoint: EMBED_ENDPOINT,
-			getBearer: () => (servingPath.mode === "own" ? "" : servingPath.auth),
+			getBearer: () => "",
 		}),
+		phonemize: makePhonemizeClient({ endpoint: `${MYRIAPOD_PROXY_BASE}/phonemize`, getBearer: () => "" }),
 		getModel: () => servingPath.model,
 		getBaseUrl: () => servingPath.baseUrl,
-		getModelId: () => MYRIAPOD_MODEL_ID,
+		getModelId: () => servingPath.model.id,
 		getAuth: () => servingPath.auth,
 		// The current memory-consent state, so the pipeline agent can re-check before it
 		// persists (consent can be revoked between a turn ending and its tick running).
@@ -2205,4 +1896,9 @@ async function initApp() {
 	renderHeader();
 }
 
-initApp();
+initApp().catch((error) => {
+	dbgError("Application initialization failed", error);
+	const notice = document.createElement("div"); notice.setAttribute("role", "alert");
+	notice.className = "p-4"; notice.textContent = error instanceof Error ? error.message : String(error);
+	document.body.appendChild(notice);
+});

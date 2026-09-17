@@ -1,285 +1,176 @@
-// myriapod-proxy — metered OpenAI-compatible inference proxy.
-//
-// Holds the owner OpenRouter key server-side; the browser never sees it. Every
-// principal — anonymous-free or family — is identified by an opaque bearer token
-// minted at POST /anon-init (anon) or POST /redeem (family). /v1/chat/completions
-// is spend-only: it resolves the bearer, checks credit + caps, injects the right
-// upstream key, forwards to OpenRouter, and debits the measured cost. The own-key
-// path doesn't come here at all — the browser calls OpenRouter directly.
-//
-// The free grant lives entirely in /anon-init: one $10 per browser token, gated
-// (on a genuinely-new browser + IP) by the BotD / honeypot / time-trap checks in
-// anon.ts. A known token carried across IPs (VPN hop) keeps its balance with no
-// new grant; a cleared browser on an already-granted IP adopts that IP's existing
-// principal. So a fresh grant needs BOTH a never-seen token AND a never-granted IP.
-
+import { vllmTokenizePayload } from "./tokenize";
+import { speechBridge } from "./speech-socket";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { getConnInfo } from "hono/bun";
-import { randomBytes } from "node:crypto";
-import { config } from "./config";
-import { Db } from "./db";
-import { forwardCompletion, mintSubKey } from "./openrouter";
-import type { Usage } from "./openrouter";
-import { grantGatesPass } from "./anon";
+import { bodyLimit } from "hono/body-limit";
+import { appendFileSync, readFileSync, realpathSync } from "node:fs";
+import { resolve, sep } from "node:path";
+import { config, validateProfile, type GatewayConfig, type ReleaseProfile } from "./config";
+import { AdmissionError, CompletionQueue } from "./queue";
 import { VoiceBroker, registerVoiceRoutes } from "./voice-broker";
-import type { Context } from "hono";
 
-const db = new Db(config.dbPath);
-const app = new Hono();
-
-// Voice-session broker — in-memory leases over the configured TTS endpoint(s).
-// Ephemeral concurrency state, not money; a restart just resets the counts.
-const voiceBroker = new VoiceBroker({
-	endpoints: config.voiceTtsEndpoints,
-	capacity: config.voiceTtsSessionCapacity,
-	heartbeatSec: config.voiceHeartbeatSec,
-	maxLeaseSec: config.voiceMaxLeaseSec,
-});
-
-app.use(
-	"*",
-	cors({
-		origin: config.allowedOrigins,
-		allowMethods: ["GET", "POST", "OPTIONS"],
-		// No allowHeaders list → Hono reflects the browser's
-		// Access-Control-Request-Headers. The OpenAI SDK attaches x-stainless-*
-		// headers; a fixed allow-list omits them and the preflight blocks the POST.
-	}),
-);
-
-// Access log — method, path, status, duration. Makes "is traffic reaching the
-// proxy, and which path is it taking?" answerable at a glance.
-app.use("*", async (c, next) => {
-	const t0 = Date.now();
-	await next();
-	console.log(`[proxy] ${c.req.method} ${new URL(c.req.url).pathname} → ${c.res.status} (${Date.now() - t0}ms)`);
-});
-
-app.get("/health", (c) => c.json({ ok: true }));
-
-// Voice-session broker routes (POST /voice/lease | /heartbeat | /release).
-// Registered after the CORS + access-log middleware so both apply.
-registerVoiceRoutes(app, voiceBroker, clientIp);
-
-/** The bearer token presented by the client, or "" if none. The legacy "anon"
- *  placeholder (sent before a real token exists) is treated as no-bearer. */
-function bearerOf(c: Context): string {
-	const auth = c.req.header("authorization") ?? "";
-	const t = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
-	return t === "anon" ? "" : t;
-}
-
-/** The client IP for per-IP limits + signup/continuity. Honors X-Forwarded-For ONLY
- *  when the direct socket peer is a configured trusted proxy (config.trustedProxies,
- *  or "*"). Untrusted → the real peer, so a client can't spoof its IP via XFF. */
-function clientIp(c: Context): string {
-	let peer = "unknown";
-	try {
-		peer = getConnInfo(c).remote.address ?? "unknown";
-	} catch {
-		peer = "unknown";
-	}
-	if (config.trustedProxies.length) {
-		const trusted = config.trustedProxies.includes("*") || config.trustedProxies.includes(peer);
-		if (trusted) {
-			const xff = c.req.header("x-forwarded-for");
-			if (xff) {
-				// The trusted proxy APPENDS the real peer as the RIGHTMOST entry; anything to
-				// its left is client-supplied and spoofable. With a single trusted hop (the TLS
-				// terminator), the last entry is the real client. Never read the leftmost — that
-				// is exactly what a spoofed X-Forwarded-For controls.
-				const parts = xff.split(",").map((s) => s.trim()).filter(Boolean);
-				if (parts.length) return parts[parts.length - 1]!;
-			}
-		}
-	}
-	return peer;
-}
-
-// Current principal's remaining hosted credit (for the Access settings readout).
-// No token yet → report the full free grant (not yet minted).
-app.get("/balance", (c) => {
-	const bearer = bearerOf(c);
-	if (bearer) {
-		const p = db.getPrincipal(bearer);
-		if (!p) return c.json({ error: "invalid token" }, 401);
-		if (p.tier === "family") {
-			return c.json({ tier: "family", remaining: p.credit_remaining, grant: config.familyLimit });
-		}
-		return c.json({ tier: "free", remaining: p.credit_remaining, grant: config.freeGrant });
-	}
-	return c.json({ tier: "free", remaining: config.freeGrant, grant: config.freeGrant });
-});
-
-// Read-only usage telemetry: sessions, origin IPs, engagement minutes, credits —
-// NO conversation content, ever. Bearer-gated by config.adminToken; when that's
-// unset the route 404s, so an unconfigured deploy never exposes it. Purpose is
-// operational visibility (is anyone using it? is a bot draining the owner key?).
-app.get("/admin/telemetry", (c) => {
-	if (!config.adminToken) return c.notFound();
-	if (bearerOf(c) !== config.adminToken) return c.json({ error: "unauthorized" }, 401);
-	return c.json(db.telemetry());
-});
-
-// In-memory per-IP sliding-window rate limit for the open web-search proxy. Web
-// search is table-stakes for every visitor (own-key included), so the endpoint is
-// NOT principal-gated — CORS already scopes browser callers to the site, and this
-// window stops non-browser abuse of the open SearXNG passthrough. Not money, so it
-// is not metered; a restart just resets the counts.
-const WEB_SEARCH_WINDOW_MS = 60_000;
-const WEB_SEARCH_MAX = 40;
-const webSearchHits = new Map<string, number[]>();
-function webSearchRateLimited(ip: string): boolean {
-	const now = Date.now();
-	const cutoff = now - WEB_SEARCH_WINDOW_MS;
-	const hits = (webSearchHits.get(ip) ?? []).filter((t) => t > cutoff);
-	hits.push(now);
-	webSearchHits.set(ip, hits);
-	return hits.length > WEB_SEARCH_MAX;
-}
-
-// Open (rate-limited) web search. Proxies a query to the self-hosted SearXNG and
-// returns a trimmed result list. Universal — every serving path may call it; the
-// per-IP window above is the only guard. NOT metered (SearXNG is self-hosted/free).
-app.get("/v1/web-search", async (c) => {
-	if (webSearchRateLimited(clientIp(c))) {
-		return c.json({ error: "rate limit — slow down" }, 429);
-	}
-
-	const q = c.req.query("q")?.trim() ?? "";
-	if (!q) return c.json({ error: "missing query (q)" }, 400);
-	const limitParam = Number(c.req.query("limit"));
-	const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 10) : 8;
-
-	let res: Response;
-	try {
-		res = await fetch(
-			`${config.searxngBase}/search?q=${encodeURIComponent(q)}&format=json&safesearch=0`,
-			{ headers: { Accept: "application/json" }, signal: AbortSignal.timeout(15000) },
-		);
-	} catch (err) {
-		console.error("[proxy] searxng fetch failed:", err);
-		return c.json({ error: "searxng unreachable" }, 502);
-	}
-	if (!res.ok) {
-		return c.json({ error: `searxng ${res.status}` }, 502);
-	}
-
-	const data = await res.json().catch(() => null);
-	if (!data || !Array.isArray(data.results) || data.results.some((r: unknown) =>
-		!r || typeof r !== "object" || typeof (r as Record<string, unknown>).url !== "string")) {
-		return c.json({ error: "invalid searxng response" }, 502);
-	}
-	const degraded = Array.isArray(data.unresponsive_engines) && data.unresponsive_engines.length > 0;
-	if (degraded && data.results.length === 0) {
-		return c.json({ error: "search engines failed; empty results are inconclusive" }, 502);
-	}
-	const results = data.results.slice(0, limit).map((r: Record<string, unknown>) => ({
-		title: (r.title as string) || "Untitled",
-		url: r.url as string,
-		snippet: (r.content as string) || (r.abstract as string) || "",
-	}));
-	return c.json({ results, degraded });
-});
-
-// In-memory per-IP sliding-window rate limit for the open embed passthrough.
-// Same rationale as web-search: the memory pipeline calls it once per term write,
-// so it's not principal-gated (CORS scopes browser callers); the window stops
-// non-browser abuse. Not money, not metered; a restart resets the counts.
-const EMBED_WINDOW_MS = 60_000;
-const EMBED_MAX = 240; // higher than web-search: a busy turn embeds several terms
-const EMBED_MAX_INPUTS = 64; // per-request array cap
-const EMBED_MAX_INPUT_CHARS = 8192; // per-string cap
-const embedHits = new Map<string, number[]>();
-function embedRateLimited(ip: string): boolean {
-	const now = Date.now();
-	const cutoff = now - EMBED_WINDOW_MS;
-	const hits = (embedHits.get(ip) ?? []).filter((t) => t > cutoff);
-	hits.push(now);
-	embedHits.set(ip, hits);
-	return hits.length > EMBED_MAX;
-}
-
-// In-memory per-IP sliding-window rate limit for the email-signup form. A public
-// endpoint (anyone can submit), so this is the only guard; not money, not metered.
-const SUBSCRIBE_WINDOW_MS = 60_000;
-const SUBSCRIBE_MAX = 5; // it's a single form submit — a handful a minute is plenty
-const subscribeHits = new Map<string, number[]>();
-function subscribeRateLimited(ip: string): boolean {
-	const now = Date.now();
-	const cutoff = now - SUBSCRIBE_WINDOW_MS;
-	const hits = (subscribeHits.get(ip) ?? []).filter((t) => t > cutoff);
-	hits.push(now);
-	subscribeHits.set(ip, hits);
-	return hits.length > SUBSCRIBE_MAX;
-}
-
-// A deliberately-loose email shape check — reject obvious garbage and bound the
-// stored string; real deliverability isn't proven here (low-volume list, read by
-// hand). RFC-5322 is not the goal.
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const EMAIL_MAX_CHARS = 254;
-
-// Per-IP brute-force guard for /redeem: a raw sliding-window cap PLUS an escalating
-// backoff that lengthens with each failed (unknown-code) attempt. Both maps are
-// in-memory + ephemeral and pruned by the periodic sweep below.
-const REDEEM_WINDOW_MS = 60_000;
-const REDEEM_MAX_PER_WINDOW = 12; // raw attempts/min per IP before a hard 429
-const REDEEM_BACKOFF_BASE_MS = 2_000;
-const REDEEM_BACKOFF_MAX_MS = 15 * 60_000;
-const redeemHits = new Map<string, number[]>();
-const redeemFailures = new Map<string, { count: number; blockedUntil: number }>();
-function redeemRateLimited(ip: string): boolean {
-	const now = Date.now();
-	const f = redeemFailures.get(ip);
-	if (f && now < f.blockedUntil) return true;
-	const cutoff = now - REDEEM_WINDOW_MS;
-	const hits = (redeemHits.get(ip) ?? []).filter((t) => t > cutoff);
-	hits.push(now);
-	redeemHits.set(ip, hits);
-	return hits.length > REDEEM_MAX_PER_WINDOW;
-}
-function noteRedeemFailure(ip: string): void {
-	const now = Date.now();
-	const f = redeemFailures.get(ip) ?? { count: 0, blockedUntil: 0 };
-	f.count += 1;
-	f.blockedUntil = now + Math.min(REDEEM_BACKOFF_BASE_MS * 2 ** (f.count - 1), REDEEM_BACKOFF_MAX_MS);
-	redeemFailures.set(ip, f);
-}
-function noteRedeemSuccess(ip: string): void {
-	redeemFailures.delete(ip);
-	redeemHits.delete(ip);
-}
-
-// Periodic eviction for the in-memory per-IP rate-limit maps so a flood of distinct
-// IPs can't grow them without bound. Unref'd → never keeps the process (or a test run)
-// alive. Sweeps expired sliding-window entries and lapsed backoff records.
-const RATE_MAP_SWEEP_MS = 5 * 60_000;
-function pruneWindowMap(map: Map<string, number[]>, windowMs: number): void {
-	const cutoff = Date.now() - windowMs;
-	for (const [ip, hits] of map) {
-		const live = hits.filter((t) => t > cutoff);
-		if (live.length) map.set(ip, live);
-		else map.delete(ip);
-	}
-}
-const rateMapSweeper = setInterval(() => {
-	pruneWindowMap(webSearchHits, WEB_SEARCH_WINDOW_MS);
-	pruneWindowMap(embedHits, EMBED_WINDOW_MS);
-	pruneWindowMap(subscribeHits, SUBSCRIBE_WINDOW_MS);
-	pruneWindowMap(redeemHits, REDEEM_WINDOW_MS);
-	const now = Date.now();
-	for (const [ip, f] of redeemFailures) {
-		if (now >= f.blockedUntil) redeemFailures.delete(ip);
-	}
-}, RATE_MAP_SWEEP_MS);
-rateMapSweeper.unref?.();
-
-// Identity is read around each batch so a backend restart cannot attach the
-// preceding encoder's lineage to newly generated vectors.
+export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch = fetch, providedProfile?: ReleaseProfile) {
+  if (cfg.qualificationMode && cfg.qualificationBoundary && cfg.qualificationBoundary !== "isolated-container") throw new Error("invalid qualification boundary declaration");
+  // The installer validates host publication and network isolation before supplying this declaration.
+  if (cfg.qualificationMode && !["127.0.0.1", "::1", "localhost"].includes(cfg.host) && cfg.qualificationBoundary !== "isolated-container") throw new Error("qualification mode requires loopback binding or an installer-validated isolated-container boundary");
+  let profile: ReleaseProfile | null = null;
+  let profileError = "release_profile_missing";
+  const log = (event: object) => { try { appendFileSync(cfg.logPath, JSON.stringify({at: new Date().toISOString(), ...event}) + "\n"); } catch (error) { console.error("gateway log write failed", error); } };
+  try { if (providedProfile) profile = validateProfile(providedProfile, cfg.qualificationMode); else if (cfg.profilePath) profile = validateProfile(JSON.parse(readFileSync(cfg.profilePath, "utf8")), cfg.qualificationMode); }
+  catch (error) { profileError = "release_profile_invalid"; log({stage: "profile", status: "failed", error: String(error)}); }
+  const app = new Hono();
+  app.use("*", async (c, next) => { await next(); const policy = c.res.headers.get("Content-Security-Policy"); c.header("Content-Security-Policy", `${policy ? policy + "; " : ""}frame-ancestors 'none'`); });
+  const queue = profile ? new CompletionQueue(profile.limits, log) : null;
+  app.use("*", cors({origin: cfg.allowedOrigins, allowMethods: ["GET", "POST", "DELETE", "OPTIONS"], exposeHeaders: ["X-Request-Id"]}));
+  app.use("*", bodyLimit({maxSize: Math.max(131072, profile?.limits.maxRequestBytes ?? 65536, profile?.limits.speechMaxBytes ?? 65536), onError: c => c.json({error: {code: "body_too_large"}}, 413)}));
+  app.onError((error, c) => { log({stage: "request", status: "failed", error: error.name}); return c.json({error: {code: "gateway_failure"}}, 500); });
+  async function corpus(signal?: AbortSignal) {
+    try {
+      const r = await fetcher(`${cfg.contentBase}/capabilities`, {signal: AbortSignal.any([signal ?? new AbortController().signal, AbortSignal.timeout(5000)])});
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      if (!data || typeof data.ready !== "boolean") throw new Error("invalid capability response");
+      return data;
+    } catch (error) { log({stage: "corpus_health", status: "failed", error: error instanceof Error ? error.name : "unknown"}); return {ready: false, error: "corpus_unavailable"}; }
+  }
+  async function readiness(signal?: AbortSignal) {
+    const content = await corpus(signal);
+    let modelReady = false;
+    if (profile && cfg.llmBase) {
+      try { const r = await fetcher(`${cfg.llmBase}/health`, {signal: AbortSignal.timeout(5000)}); modelReady = r.ok; }
+      catch { modelReady = false; }
+    }
+    return {ready: !!profile?.qualified && modelReady && content.ready === true && content.qualified === true, qualificationMode: cfg.qualificationMode, status: !profile ? profileError : !modelReady ? "model_unavailable" : !content.ready ? "corpus_unavailable" : !content.qualified && !cfg.qualificationMode ? "corpus_unqualified" : !profile.qualified ? "qualification_only" : "ready", profile,
+      capabilities: {corpus: content.ready === true, personalMemory: true, speech: {stt: !!cfg.sttBase, tts: !!cfg.ttsBase}, webSearch: !!cfg.searxngBase}, corpus: content};
+  }
+  app.get("/health", c => c.json({ok: true, state: "running", last_progress_ts: Date.now() / 1000}));
+  app.get("/v1/profile", async c => c.json(await readiness(c.req.raw.signal)));
+  app.get("/ready", async c => { const r = await readiness(c.req.raw.signal); return c.json(r, r.ready ? 200 : 503); });
+  app.get("/v1/requests/:id", c => { const status = queue?.status(c.req.param("id")); return status ? c.json(status) : c.json({error: {code: "request_unknown"}}, 404); });
+  app.delete("/v1/requests/:id", c => queue?.cancel(c.req.param("id")) ? c.json({state: "interrupted"}) : c.json({error: {code: "request_unknown"}}, 404));
+  for (const tool of ["search", "read"]) app.post(`/v1/corpus/${tool}`, async c => {
+    const body = await c.req.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) return c.json({error: {code: "invalid_request"}}, 400);
+    try {
+      const upstream = await fetcher(`${cfg.contentBase}/v1/corpus/${tool}`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body), signal: AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(30000)])});
+      const data = await upstream.json(); return c.json(data, upstream.status as 200);
+    } catch (error) { log({stage: `corpus_${tool}`, status: "failed", error: error instanceof Error ? error.name : "unknown"}); return c.json({error: {code: "corpus_unavailable"}}, 502); }
+  });
+  app.post("/v1/phonemize", async c => {
+    const body = await c.req.text();
+    if (new TextEncoder().encode(body).length > 131072) return c.json({error: {code: "body_too_large"}}, 413);
+    try {
+      const upstream = await fetcher(`${cfg.contentBase}/v1/phonemize`, {
+        method: "POST", headers: {"Content-Type": "application/json"}, body,
+        signal: AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(15000)]),
+      });
+      return c.json(await upstream.json(), upstream.status as 200);
+    } catch {
+      log({stage: "phonemize", status: "failed"});
+      return c.json({error: {code: "phonemizer_unavailable"}}, 502);
+    }
+  });
+  async function countTokens(body: Record<string, unknown>, signal: AbortSignal) {
+    if (profile?.model.parser === "vllm") {
+      const result = await fetcher(`${cfg.llmBase}/tokenize`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(vllmTokenizePayload(body, profile.model.excludeToolsWhenNone)), signal});
+      const tokens = await result.json();
+      if (!result.ok || !Array.isArray(tokens.tokens) || tokens.tokens.some((x: unknown) => !Number.isSafeInteger(x) || Number(x) < 0) || tokens.count !== tokens.tokens.length || !Number.isSafeInteger(tokens.max_model_len) || tokens.max_model_len < profile.model.contextWindow) throw new AdmissionError("tokenizer_failed", 502);
+      return tokens.count;
+    }
+    if (!profile || profile.model.parser !== "llama.cpp") throw new AdmissionError("tokenizer_adapter_unavailable");
+    const template = await fetcher(`${cfg.llmBase}/apply-template`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body), signal});
+    const formatted = await template.json();
+    if (!template.ok || typeof formatted.prompt !== "string") throw new AdmissionError("template_failed", 502);
+    const result = await fetcher(`${cfg.llmBase}/tokenize`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({content: formatted.prompt, add_special: true, parse_special: true}), signal});
+    const tokens = await result.json();
+    if (!result.ok || !Array.isArray(tokens.tokens) || tokens.tokens.some((x: unknown) => !Number.isSafeInteger(x))) throw new AdmissionError("tokenizer_failed", 502);
+    return tokens.tokens.length;
+  }
+  app.post("/v1/tokenize", async c => {
+    if (!profile || !cfg.llmBase) return c.json({error: {code: "runtime_unconfigured"}}, 503);
+    const body = await c.req.json().catch(() => null);
+    if (!body || !Array.isArray(body.messages) || body.model !== profile.model.id) return c.json({error: {code: "invalid_request"}}, 400);
+    try { return c.json({tokens: await countTokens(body, AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(15000)]))}); }
+    catch (error) { log({stage: "tokenize", status: "failed", error: error instanceof Error ? error.name : "unknown"}); return c.json({error: {code: error instanceof AdmissionError ? error.code : "tokenizer_failed"}}, 502); }
+  });
+  app.post("/v1/chat/completions", async c => {
+    if (!profile || !queue || !cfg.llmBase) return c.json({error: {code: "runtime_unconfigured"}}, 503);
+    const raw = await c.req.text();
+    if (new TextEncoder().encode(raw).length > profile.limits.maxRequestBytes) return c.json({error: {code: "body_too_large"}}, 413);
+    let body: Record<string, unknown>; try { body = JSON.parse(raw); } catch { return c.json({error: {code: "invalid_json"}}, 400); }
+    const id = c.req.header("X-Request-Id") ?? crypto.randomUUID();
+    const conversation = c.req.header("X-Conversation-Id") ?? id;
+    const priority = c.req.header("X-Request-Priority") ?? "foreground";
+    if (!/^[A-Za-z0-9_-]{16,128}$/.test(id) || !/^[A-Za-z0-9_-]{1,128}$/.test(conversation) || !["foreground", "background"].includes(priority)) return c.json({error: {code: "invalid_routing_handle"}}, 400);
+    if (!body || body.model !== profile.model.id || !Array.isArray(body.messages) || !body.messages.length || (body.stream !== undefined && typeof body.stream !== "boolean")) return c.json({error: {code: "invalid_completion"}}, 400);
+    const role = c.req.header("X-Request-Role") ?? (priority === "foreground" ? "chat" : "memory");
+    const budgets = profile.roles[role];
+    if (!budgets) return c.json({error: {code: "invalid_role"}}, 400);
+    const max = body.max_tokens ?? body.max_completion_tokens ?? budgets.maxOutputTokens;
+    if (!Number.isSafeInteger(max) || Number(max) < 1 || Number(max) > budgets.maxOutputTokens) return c.json({error: {code: "output_budget_exceeded"}}, 400);
+    delete body.max_completion_tokens; body.max_tokens = max;
+    Object.assign(body, profile.model.sampling ?? {});
+    const content = await corpus(c.req.raw.signal);
+    if (!content.ready || (!content.qualified && !cfg.qualificationMode)) return c.json({error: {code: "corpus_unavailable"}}, 503);
+    let lease;
+    try {
+      lease = await queue.acquire(id, conversation, priority as "foreground" | "background", c.req.raw.signal);
+      const tokens = await countTokens(body, lease.signal);
+      if (tokens > budgets.maxInputTokens || tokens + Number(max) > profile.model.contextWindow) throw new AdmissionError("context_budget_exceeded", 413);
+      const upstream = await fetcher(`${cfg.llmBase}/v1/chat/completions`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body), signal: lease.signal});
+      if (!upstream.ok || !upstream.body) { await upstream.body?.cancel(); throw new AdmissionError("inference_failed", 502); }
+      if (!body.stream) {
+        const data = await upstream.json();
+        if (!Array.isArray(data.choices) || !data.choices.length || data.choices.some((x: any) => !x.message || !["stop", "tool_calls", "length"].includes(x.finish_reason))) throw new AdmissionError("invalid_completion_response", 502);
+        lease.finish(); return c.json(data);
+      }
+      const reader = upstream.body.getReader(); const owned = lease;
+      const decoder = new TextDecoder(); let tail = "", complete = false;
+      let streamController: ReadableStreamDefaultController<Uint8Array>;
+      const onAbort = () => {
+        void reader.cancel(owned.signal.reason).finally(() => owned.finish("failed"));
+        try { streamController.error(owned.signal.reason); } catch { /* Stream is already closed. */ }
+      };
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) { streamController = controller; owned.signal.addEventListener("abort", onAbort, {once: true}); if (owned.signal.aborted) onAbort(); },
+        async pull(controller) {
+          try {
+            const chunk = await reader.read();
+            if (chunk.done) {
+              owned.signal.removeEventListener("abort", onAbort);
+              if (!complete) throw new AdmissionError("incomplete_generation", 502);
+              owned.finish(); controller.close();
+            } else {
+              const text = tail + decoder.decode(chunk.value, {stream: true});
+              complete ||= /(?:^|\n)data: ?\[DONE\](?:\r?\n|$)/.test(text);
+              tail = text.slice(-64); controller.enqueue(chunk.value);
+            }
+          } catch (error) { owned.signal.removeEventListener("abort", onAbort); owned.finish("failed"); controller.error(error); }
+        },
+        async cancel(reason) { queue.cancel(id); try { await reader.cancel(reason); } finally { owned.signal.removeEventListener("abort", onAbort); owned.finish("failed"); } },
+      });
+      return new Response(stream, {headers: {"Content-Type": "text/event-stream", "Cache-Control": "no-store", "X-Request-Id": id}});
+    } catch (error) {
+      lease?.finish("failed"); const err = error instanceof AdmissionError ? error : new AdmissionError("inference_failed", 502);
+      log({id, stage: "completion", status: "failed", code: err.code});
+      return c.json({error: {code: err.code, message: err.code}, request_id: id}, err.status as 503);
+    }
+  });
+  app.get("/v1/web-search", async c => {
+    const q = c.req.query("q")?.trim();
+    if (!q || q.length > 4096) return c.json({error: {code: "invalid_query"}}, 400);
+    try {
+      const r = await fetcher(`${cfg.searxngBase}/search?q=${encodeURIComponent(q)}&format=json`, {signal: AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(15000)])});
+      const data = await r.json();
+      if (!r.ok || !Array.isArray(data.results) || data.results.some((x: any) => !x || typeof x.url !== "string")) throw new Error("invalid search response");
+      const degraded = Array.isArray(data.unresponsive_engines) && data.unresponsive_engines.length > 0;
+      if (degraded && !data.results.length) throw new Error("all search engines failed");
+      return c.json({results: data.results.slice(0, 10).map((r: any) => ({title: r.title || "Untitled", url: r.url, snippet: r.content || r.abstract || ""})), degraded});
+    } catch (error) { log({stage: "web_search", status: "failed", error: error instanceof Error ? error.name : "unknown"}); return c.json({error: {code: "web_search_unavailable"}}, 502); }
+  });
+  const EMBED_MAX_INPUTS = 64, EMBED_MAX_INPUT_CHARS = 8192;
 async function embeddingIdentity(signal: AbortSignal): Promise<string> {
-	const response = await fetch(`${config.embedBase}/info`, { signal });
+	const response = await fetcher(`${cfg.embedBase}/info`, { signal });
 	if (!response.ok) throw new Error(`embedding metadata HTTP ${response.status}`);
 	const info = await response.json();
 	if (!info || typeof info.model_id !== "string" || !info.model_id ||
@@ -298,9 +189,6 @@ async function embeddingIdentity(signal: AbortSignal): Promise<string> {
 // validated vectors as {encoder, embeddings}. NOT metered. Used by the memory pipeline's
 // mint-time dedup (one call per term write).
 app.post("/v1/embed", async (c) => {
-	if (embedRateLimited(clientIp(c))) {
-		return c.json({ error: "rate limit — slow down" }, 429);
-	}
 	let body: { inputs?: unknown };
 	try {
 		body = (await c.req.json()) as { inputs?: unknown };
@@ -325,7 +213,7 @@ app.post("/v1/embed", async (c) => {
 	const signal = AbortSignal.timeout(15000);
 	try {
 		encoder = await embeddingIdentity(signal);
-		res = await fetch(`${config.embedBase}/embed`, {
+		res = await fetcher(`${cfg.embedBase}/embed`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ inputs, truncate: false, normalize: true }),
@@ -354,361 +242,49 @@ app.post("/v1/embed", async (c) => {
 	return c.json({ encoder, embeddings: vectors });
 });
 
-// Feature-release email capture (About page). Open + rate-limited — a public form.
-// Stores the address in the subscribers table; there is no newsletter client, the
-// list is read by hand off the box. Idempotent on email (a re-submit is a no-op 200).
-app.post("/subscribe", async (c) => {
-	if (subscribeRateLimited(clientIp(c))) {
-		return c.json({ error: "rate limit — slow down" }, 429);
-	}
-	let body: { email?: unknown };
-	try {
-		body = (await c.req.json()) as { email?: unknown };
-	} catch {
-		return c.json({ error: "invalid JSON body" }, 400);
-	}
-	if (!body || typeof body !== "object" || Array.isArray(body)) {
-		return c.json({ error: "request must be a JSON object" }, 400);
-	}
-	const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-	if (!email || email.length > EMAIL_MAX_CHARS || !EMAIL_RE.test(email)) {
-		return c.json({ error: "invalid email" }, 400);
-	}
-	db.addSubscriber(email, clientIp(c));
-	return c.json({ ok: true });
-});
-
-// Establish (or recover) an anonymous free-tier principal and return its token.
-// The frontend calls this once, on the first owner-funded send, then uses the
-// returned token as the proxy bearer for chat. This is the ONLY place a fresh $10
-// is minted and the only place the grant gates run.
-app.post("/anon-init", async (c) => {
-	let body: Record<string, unknown> = {};
-	try {
-		const raw = await c.req.text();
-		// An absent body permits token continuity, but cannot pass fresh-grant gates.
-		if (raw.trim()) body = JSON.parse(raw);
-	} catch {
-		return c.json({ error: "invalid JSON body" }, 400);
-	}
-	if (!body || typeof body !== "object" || Array.isArray(body)) {
-		return c.json({ error: "request must be a JSON object" }, 400);
-	}
-	const presented = bearerOf(c) || (typeof body.token === "string" ? body.token : "");
-	const ip = clientIp(c);
-
-	// 1. Known token → continuity. Same browser on a new IP (VPN hop) keeps its
-	//    balance; bind this IP to it so nobody else can grant on it.
-	if (presented) {
-		const p = db.getPrincipal(presented);
-		if (p && p.tier === "free") {
-			db.bindIp(ip, p.id);
-			return c.json({ token: p.id, remaining: p.credit_remaining });
-		}
-		if (p && p.tier === "family") {
-			return c.json({ token: p.id, remaining: p.credit_remaining });
-		}
-		// unknown token → fall through (cleared storage / spoofed); resolve by IP
-	}
-
-	// 2. IP already granted → adopt that principal (cleared/new browser, same IP).
-	//    No fresh grant — this is what stops clear-storage-to-refarm.
-	const bound = db.anonPrincipalForIp(ip);
-	if (bound) {
-		return c.json({ token: bound.id, remaining: bound.credit_remaining });
-	}
-
-	// 3. Genuinely new browser AND new IP → gated fresh grant.
-	if (db.newIpGrantsToday() >= config.newIpPerDay) {
-		return c.json(
-			{
-				error:
-					"free-credit signups are maxed out for today — try again tomorrow, or add your own OpenRouter key for unlimited use",
-			},
-			429,
-		);
-	}
-	if (!grantGatesPass({ honeypot: body.honeypot, elapsedMs: body.elapsedMs, botd: body.botd })) {
-		return c.json(
-			{ error: "couldn't verify your browser — add your own OpenRouter key to keep chatting" },
-			403,
-		);
-	}
-	const token = randomBytes(32).toString("hex");
-	db.createPrincipal({
-		id: token,
-		type: "anon",
-		upstreamKey: null,
-		credit: config.freeGrant,
-		tier: "free",
-	});
-	db.bindIp(ip, token);
-	return c.json({ token, remaining: config.freeGrant });
-});
-
-// In-flight reserved spend per cap window, held only while requests are outstanding
-// (added at reservation, removed once the true cost lands in usage_log or is refunded).
-// The DB caps are SUM(usage_log) — blind to concurrent forwards not yet metered — so a
-// burst could all pass the pre-check; adding these to the DB totals closes that gap.
-// All reads/writes here are synchronous, so under Bun's single-threaded event loop the
-// check-then-reserve section below is effectively atomic (no interleaving).
-const inflight = { free: 0, monthly: 0, familyMonthly: 0 };
-
-/** A conservative USD upper bound for one request: prompt bytes (≈4 chars/token) plus
- *  the generation ceiling, at the configured price ceiling. Used both to pre-reserve
- *  credit and as the fallback debit when a completion returns no usage. */
-function estimateCostUsd(rawChars: number, maxTokens: number): number {
-	const promptTokens = Math.ceil(rawChars / 4);
-	return ((promptTokens + maxTokens) / 1_000_000) * config.costCeilPerMToken;
+  let sttActive = 0;
+  app.on("POST", ["/v1/audio/transcriptions", "/api/asr-http"], async c => {
+    if (!profile || !cfg.sttBase) return c.json({error: {code: "speech_unavailable"}}, 503);
+    if (sttActive >= profile.limits.speechConcurrency) return c.json({error: {code: "speech_busy"}}, 429);
+    sttActive++;
+    try {
+      const bytes = await c.req.arrayBuffer();
+      if (bytes.byteLength > profile.limits.speechMaxBytes) return c.json({error: {code: "speech_body_too_large"}}, 413);
+      const r = await fetcher(`${cfg.sttBase}/v1/audio/transcriptions`, {method: "POST", headers: {"Content-Type": c.req.header("Content-Type") ?? "application/octet-stream"}, body: bytes, signal: AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(profile.limits.speechTimeoutMs)])});
+      const data = await r.json(); if (!r.ok || typeof data.text !== "string") throw new Error("invalid transcription response");
+      return c.json(data);
+    } catch (error) { log({stage: "speech", status: "failed", error: error instanceof Error ? error.name : "unknown"}); return c.json({error: {code: "speech_failed"}}, 502); }
+    finally { sttActive--; }
+  });
+  if (profile && cfg.ttsBase) registerVoiceRoutes(app, new VoiceBroker({endpoints: [{ttsUrl: "/api/tts_streaming"}], capacity: profile.limits.speechConcurrency, heartbeatSec: 30}));
+  else app.post("/voice/lease", c => c.json({error: {code: "speech_unavailable"}}, 503));
+  app.get("/v1/corpus/source/:handle", async c => {
+    try {
+      const upstream = await fetcher(`${cfg.contentBase}/v1/corpus/source/${encodeURIComponent(c.req.param("handle"))}`, {signal: c.req.raw.signal});
+      return new Response(upstream.body, {status: upstream.status, headers: {"Content-Type": upstream.headers.get("Content-Type") ?? "application/octet-stream", "Content-Disposition": upstream.headers.get("Content-Disposition") ?? "attachment", "Content-Security-Policy": "sandbox; default-src 'none'", "X-Content-Type-Options": "nosniff"}});
+    } catch { return c.json({error: {code: "source_unavailable"}}, 502); }
+  });
+  app.get("*", async c => {
+    const pathname = new URL(c.req.url).pathname;
+    if (pathname.startsWith("/v1/") || pathname.startsWith("/voice/")) return c.notFound();
+    let filePath: string;
+    try {
+      const root = realpathSync(cfg.frontendDir);
+      const candidate = resolve(root, `.${decodeURIComponent(pathname)}`);
+      if (candidate !== root && !candidate.startsWith(root + sep)) return c.notFound();
+      const file = Bun.file(candidate);
+      filePath = await file.exists() && pathname !== "/" ? realpathSync(candidate) : realpathSync(resolve(root, "index.html"));
+      if (!filePath.startsWith(root + sep)) return c.notFound();
+    } catch { return c.notFound(); }
+    return new Response(Bun.file(filePath), {headers: {"X-Content-Type-Options": "nosniff"}});
+  });
+  return {app, queue, profile};
 }
-
-app.post("/v1/chat/completions", async (c) => {
-	const raw = await c.req.text();
-	if (raw.length > config.maxInputChars) {
-		return c.json({ error: "request too large" }, 413);
-	}
-	let body: Record<string, unknown>;
-	try {
-		body = JSON.parse(raw);
-	} catch {
-		return c.json({ error: "invalid JSON body" }, 400);
-	}
-
-	if (!body || typeof body !== "object" || Array.isArray(body)) {
-		return c.json({ error: "request must be a JSON object" }, 400);
-	}
-	if (body.max_tokens !== undefined &&
-		(typeof body.max_tokens !== "number" || !Number.isSafeInteger(body.max_tokens) || body.max_tokens <= 0)) {
-		return c.json({ error: "max_tokens must be a positive integer" }, 400);
-	}
-
-	// --- Resolve principal by bearer (spend-only — grants happen at /anon-init) ---
-	const bearer = bearerOf(c);
-	if (!bearer) {
-		return c.json({ error: "no session — initialize a free grant or add your own key" }, 401);
-	}
-	const principal = db.getPrincipal(bearer);
-	if (!principal) {
-		return c.json({ error: "invalid or expired session token" }, 401);
-	}
-
-	const isFamily = principal.tier === "family";
-
-	// Cheap balance guard with a tier-specific message, before the atomic reserve.
-	if (principal.credit_remaining <= 0) {
-		return c.json(
-			isFamily
-				? { error: "family credit exhausted" }
-				: { error: "free credit used up — add your own OpenRouter key to keep chatting" },
-			402,
-		);
-	}
-
-	const upstreamKey = isFamily ? (principal.upstream_key ?? config.ownerKey) : config.ownerKey;
-	if (!upstreamKey) {
-		return c.json({ error: "proxy is missing its upstream key" }, 500);
-	}
-
-	// Model allowlist — the owner key must never fund an arbitrary model.
-	const model = typeof body.model === "string" ? body.model : null;
-	if (!model || !config.allowedModels.includes(model)) {
-		return c.json({ error: "unsupported model" }, 400);
-	}
-
-	const cap = config.maxTokensCap;
-	const maxTokens = typeof body.max_tokens === "number" ? Math.min(body.max_tokens, cap) : cap;
-	const estimate = estimateCostUsd(raw.length, maxTokens);
-
-	// --- Atomic admission ----------------------------------------------------
-	// Cap checks (DB total + in-flight reservations) then an atomic credit reservation.
-	// This runs entirely synchronously, so no concurrent forward can slip between the
-	// check and the reserve (Bun's JS loop is single-threaded).
-	if (isFamily) {
-		if (db.familyMonthlySpend() + inflight.familyMonthly >= config.familyMonthlyCap) {
-			return c.json({ error: "family monthly capacity reached — resets next month" }, 503);
-		}
-	} else if (db.freeSpendToday() + inflight.free >= config.freeDailyCap) {
-		return c.json(
-			{ error: "the hosted free tier is at capacity for today — try again tomorrow or use your own key" },
-			429,
-		);
-	}
-	if (db.monthlySpend() + inflight.monthly >= config.monthlyCap) {
-		return c.json(
-			{
-				error:
-					"the hosted service is at monthly capacity — try again next month, or add your own OpenRouter key for unlimited use",
-			},
-			503,
-		);
-	}
-	if (!db.reserve(principal.id, estimate)) {
-		return c.json(
-			isFamily
-				? { error: "family credit exhausted" }
-				: { error: "free credit used up — add your own OpenRouter key to keep chatting" },
-			402,
-		);
-	}
-	inflight.monthly += estimate;
-	if (isFamily) inflight.familyMonthly += estimate;
-	else inflight.free += estimate;
-
-	// Settle the reservation exactly once — reconcile to the true (or fallback) cost, or
-	// refund it whole on an upstream error — and drop the in-flight amount.
-	let settled = false;
-	const releaseInflight = () => {
-		inflight.monthly -= estimate;
-		if (isFamily) inflight.familyMonthly -= estimate;
-		else inflight.free -= estimate;
-	};
-	const reconcile = (cost: number, u: Usage | null) => {
-		if (settled) return;
-		settled = true;
-		db.reconcileUsage({
-			principalId: principal.id,
-			model,
-			promptTokens: u?.promptTokens ?? 0,
-			completionTokens: u?.completionTokens ?? 0,
-			cost,
-			reserved: estimate,
-		});
-		releaseInflight();
-	};
-	const refund = () => {
-		if (settled) return;
-		settled = true;
-		db.refundReservation(principal.id, estimate);
-		releaseInflight();
-	};
-
-	// --- Forward -------------------------------------------------------------
-	const fwdBody: Record<string, unknown> = {
-		...body,
-		max_tokens: maxTokens,
-		usage: { include: true },
-		// Enforce Zero Data Retention at the request layer — route only to ZDR
-		// endpoints, independent of the account-level toggle (they OR together).
-		provider: {
-			...((body as Record<string, unknown>).provider as Record<string, unknown> | undefined),
-			zdr: true,
-		},
-	};
-
-	console.log(`[proxy] forwarding: tier=${principal.tier} model=${model} stream=${fwdBody.stream === true}`);
-	let result;
-	try {
-		result = await forwardCompletion({
-			base: config.openrouterBase,
-			upstreamKey,
-			body: fwdBody,
-			timeoutMs: config.upstreamTimeoutMs,
-		});
-	} catch (err) {
-		refund();
-		console.error("[proxy] forward threw:", err);
-		return c.json({ error: "upstream error", status: 502 }, 502);
-	}
-
-	if (!result.ok) {
-		// Upstream failed — no real spend, so refund the reservation. The body is already
-		// a generic {error,status} (openrouter.ts logs the raw upstream body server-side).
-		refund();
-		return new Response(result.clientText ?? JSON.stringify({ error: "upstream error", status: result.status }), {
-			status: result.status,
-			headers: { "Content-Type": result.contentType },
-		});
-	}
-
-	// Success — reconcile once usage is known, in the background so it lands even after
-	// the streamed response returns or the client disconnects. Missing usage → debit the
-	// conservative fallback estimate rather than serving free compute.
-	result.usage
-		.then((u) => reconcile(u ? u.cost : estimate, u))
-		.catch((err) => {
-			console.error("[proxy] metering failed:", err);
-			reconcile(estimate, null);
-		});
-
-	if (result.stream && result.clientStream) {
-		return new Response(result.clientStream, {
-			status: 200,
-			headers: { "Content-Type": result.contentType },
-		});
-	}
-	return new Response(result.clientText ?? "", {
-		status: 200,
-		headers: { "Content-Type": result.contentType },
-	});
-});
-
-app.post("/redeem", async (c) => {
-	if (!config.provisioningKey) {
-		return c.json({ error: "family tier not configured" }, 503);
-	}
-	// Brute-force guard: /redeem is unauthenticated and codes are guessable, so throttle
-	// per IP (sliding window) AND apply an escalating backoff after failed attempts. The
-	// check runs BEFORE any code lookup or sub-key mint.
-	const ip = clientIp(c);
-	if (redeemRateLimited(ip)) {
-		return c.json({ error: "too many attempts — slow down" }, 429);
-	}
-	let body: { code?: unknown };
-	try {
-		body = await c.req.json();
-	} catch {
-		return c.json({ error: "invalid JSON body" }, 400);
-	}
-	if (!body || typeof body !== "object" || Array.isArray(body)) {
-		return c.json({ error: "request must be a JSON object" }, 400);
-	}
-	const code = typeof body.code === "string" ? body.code.trim() : "";
-	if (!code) return c.json({ error: "missing code" }, 400);
-	if (!db.codeExists(code)) {
-		noteRedeemFailure(ip);
-		return c.json({ error: "unknown code" }, 404);
-	}
-
-	// Reserve the code atomically BEFORE the async mint so two concurrent
-	// redemptions can't both succeed; release it if minting fails.
-	const token = randomBytes(32).toString("hex");
-	if (!db.claimCode(code, token)) {
-		return c.json({ error: "code already redeemed" }, 409);
-	}
-	try {
-		const { key } = await mintSubKey({
-			base: config.openrouterBase,
-			provisioningKey: config.provisioningKey,
-			name: `myriapod-family-${code}`,
-			limit: config.familyLimit,
-		});
-		db.createPrincipal({
-			id: token,
-			type: "token",
-			upstreamKey: key,
-			credit: config.familyLimit,
-			tier: "family",
-		});
-		noteRedeemSuccess(ip);
-		return c.json({ token });
-	} catch (err) {
-		db.releaseCode(code);
-		console.error("[proxy] provisioning failed:", err);
-		return c.json({ error: "could not provision family key" }, 502);
-	}
-});
-
-// Serve only when run directly (`bun run server.ts`); importing the module (e.g.
-// from tests) gives you `app` + `db` without binding a port.
-if (import.meta.main) {
-	if (!config.ownerKey) {
-		console.warn("[proxy] WARNING: OWNER_OPENROUTER_KEY is empty — free-tier requests will fail.");
-	}
-	console.log(
-		`[proxy] myriapod-proxy listening on http://${config.host}:${config.port} | ` +
-			`origins=${config.allowedOrigins.join(", ")}`,
-	);
-	Bun.serve({ hostname: config.host, port: config.port, fetch: app.fetch });
-}
-
-export { app, db, voiceBroker };
+const {app, profile} = createGateway();
+const speech = speechBridge(config.ttsBase, profile?.limits.speechConcurrency ?? 0, profile?.limits.speechTimeoutMs ?? 1000, profile?.limits.speechMaxBytes ?? 1024);
+export default {hostname: config.host, port: config.port, idleTimeout: 0,
+  fetch(request: Request, server: Bun.Server<import("./speech-socket").SpeechSocket>) {
+    if (new URL(request.url).pathname === "/api/tts_streaming") return speech.upgrade(request, server);
+    return app.fetch(request, server);
+  }, websocket: speech.websocket,
+};

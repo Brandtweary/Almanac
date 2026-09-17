@@ -1,0 +1,233 @@
+{
+  "schema_version": 1,
+  "id": "retained-speech-assets-v1",
+  "scope": "source assets only; service images, notices and full speech admission separate",
+  "index_workspace_bytes": 0,
+  "runtime_workspace_bytes": 0,
+  "image_store_bytes": 0,
+  "artifacts": [
+    {
+      "path": "notices/speech-dependencies.txt",
+      "kind": "license",
+      "bytes": 1110,
+      "sha256": "1d74a3734331e01c43616c3b92fa6fd98268bf0fd643ea66f7e534c786cea00a",
+      "embedded_text": "Retained speech runtime artifacts\n\nOrpheus-3b-FT quantization: https://huggingface.co/lex-au/Orpheus-3b-FT-Q4_K_M.gguf/tree/51079fc5f7de3e137cdb453398baa1d4bc1614dc (declared Apache-2.0).\nSNAC codec: https://huggingface.co/hubertsiuzdak/snac_24khz/tree/d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec (declared MIT).\nWhisper conversion: https://huggingface.co/Systran/faster-distil-whisper-large-v3/tree/c3058b475261292e64a0412df1d2681c06260fab (declared MIT).\n\nThese source identities and declared license labels accompany exact pinned bytes. Model/code/dependency license texts and all required notices must be included and reviewed before redistributing a complete runtime bundle; this file does not replace them. The application's MIT license does not relicense these artifacts.\n\nThis manifest prepares ordinary local model directories. Configure SNAC.from_pretrained with the local snac directory and Whisper with the local whisper directory, or a verified pinned HF cache layout. HF_HUB_OFFLINE and TRANSFORMERS_OFFLINE must be enabled. Saving an image alone omits weights held in its container writable layer.\n",
+      "urls": [],
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://huggingface.co/lex-au/Orpheus-3b-FT-Q4_K_M.gguf/resolve/51079fc5f7de3e137cdb453398baa1d4bc1614dc/Orpheus-3b-FT-Q4_K_M.gguf",
+          "https://huggingface.co/hubertsiuzdak/snac_24khz/resolve/d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec/config.json",
+          "https://huggingface.co/hubertsiuzdak/snac_24khz/resolve/d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec/pytorch_model.bin",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/config.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/model.bin",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/preprocessor_config.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/tokenizer.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/vocabulary.json"
+        ],
+        "notice": "notices/speech-dependencies.txt"
+      }
+    },
+    {
+      "path": "speech/orpheus/Orpheus-3b-FT-Q4_K_M.gguf",
+      "kind": "speech",
+      "bytes": 2363760768,
+      "sha256": "18284d3efd9831d0a8409f5f5877c84bff69009df7c3db818e904dccea6b6c55",
+      "urls": [
+        "https://huggingface.co/lex-au/Orpheus-3b-FT-Q4_K_M.gguf/resolve/51079fc5f7de3e137cdb453398baa1d4bc1614dc/Orpheus-3b-FT-Q4_K_M.gguf"
+      ],
+      "source_revision": "51079fc5f7de3e137cdb453398baa1d4bc1614dc",
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://huggingface.co/lex-au/Orpheus-3b-FT-Q4_K_M.gguf/resolve/51079fc5f7de3e137cdb453398baa1d4bc1614dc/Orpheus-3b-FT-Q4_K_M.gguf",
+          "https://huggingface.co/hubertsiuzdak/snac_24khz/resolve/d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec/config.json",
+          "https://huggingface.co/hubertsiuzdak/snac_24khz/resolve/d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec/pytorch_model.bin",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/config.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/model.bin",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/preprocessor_config.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/tokenizer.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/vocabulary.json"
+        ],
+        "notice": "notices/speech-dependencies.txt"
+      }
+    },
+    {
+      "path": "speech/snac/config.json",
+      "kind": "speech",
+      "bytes": 300,
+      "sha256": "e119b9366d4f5e73c6ca5f31137c4ff361578bbb132953a5203afe037c4012be",
+      "urls": [
+        "https://huggingface.co/hubertsiuzdak/snac_24khz/resolve/d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec/config.json"
+      ],
+      "source_revision": "d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec",
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://huggingface.co/lex-au/Orpheus-3b-FT-Q4_K_M.gguf/resolve/51079fc5f7de3e137cdb453398baa1d4bc1614dc/Orpheus-3b-FT-Q4_K_M.gguf",
+          "https://huggingface.co/hubertsiuzdak/snac_24khz/resolve/d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec/config.json",
+          "https://huggingface.co/hubertsiuzdak/snac_24khz/resolve/d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec/pytorch_model.bin",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/config.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/model.bin",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/preprocessor_config.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/tokenizer.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/vocabulary.json"
+        ],
+        "notice": "notices/speech-dependencies.txt"
+      }
+    },
+    {
+      "path": "speech/snac/pytorch_model.bin",
+      "kind": "speech",
+      "bytes": 79488254,
+      "sha256": "4b8164cc6606bfa627f1a784734c1e539891518f1191ed9194fe1e3b9b4bff40",
+      "urls": [
+        "https://huggingface.co/hubertsiuzdak/snac_24khz/resolve/d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec/pytorch_model.bin"
+      ],
+      "source_revision": "d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec",
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://huggingface.co/lex-au/Orpheus-3b-FT-Q4_K_M.gguf/resolve/51079fc5f7de3e137cdb453398baa1d4bc1614dc/Orpheus-3b-FT-Q4_K_M.gguf",
+          "https://huggingface.co/hubertsiuzdak/snac_24khz/resolve/d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec/config.json",
+          "https://huggingface.co/hubertsiuzdak/snac_24khz/resolve/d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec/pytorch_model.bin",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/config.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/model.bin",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/preprocessor_config.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/tokenizer.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/vocabulary.json"
+        ],
+        "notice": "notices/speech-dependencies.txt"
+      }
+    },
+    {
+      "path": "speech/whisper/config.json",
+      "kind": "speech",
+      "bytes": 2690,
+      "sha256": "90c55f775cc4e0bb17293d0bf12f96557a486f20dea886fabd8e6075a3588b21",
+      "urls": [
+        "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/config.json"
+      ],
+      "source_revision": "c3058b475261292e64a0412df1d2681c06260fab",
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://huggingface.co/lex-au/Orpheus-3b-FT-Q4_K_M.gguf/resolve/51079fc5f7de3e137cdb453398baa1d4bc1614dc/Orpheus-3b-FT-Q4_K_M.gguf",
+          "https://huggingface.co/hubertsiuzdak/snac_24khz/resolve/d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec/config.json",
+          "https://huggingface.co/hubertsiuzdak/snac_24khz/resolve/d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec/pytorch_model.bin",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/config.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/model.bin",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/preprocessor_config.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/tokenizer.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/vocabulary.json"
+        ],
+        "notice": "notices/speech-dependencies.txt"
+      }
+    },
+    {
+      "path": "speech/whisper/model.bin",
+      "kind": "speech",
+      "bytes": 1512927867,
+      "sha256": "b79368e19b6623813609431a6e5ee309a71506701ebc49fd7820e692dec7c5f5",
+      "urls": [
+        "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/model.bin"
+      ],
+      "source_revision": "c3058b475261292e64a0412df1d2681c06260fab",
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://huggingface.co/lex-au/Orpheus-3b-FT-Q4_K_M.gguf/resolve/51079fc5f7de3e137cdb453398baa1d4bc1614dc/Orpheus-3b-FT-Q4_K_M.gguf",
+          "https://huggingface.co/hubertsiuzdak/snac_24khz/resolve/d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec/config.json",
+          "https://huggingface.co/hubertsiuzdak/snac_24khz/resolve/d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec/pytorch_model.bin",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/config.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/model.bin",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/preprocessor_config.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/tokenizer.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/vocabulary.json"
+        ],
+        "notice": "notices/speech-dependencies.txt"
+      }
+    },
+    {
+      "path": "speech/whisper/preprocessor_config.json",
+      "kind": "speech",
+      "bytes": 340,
+      "sha256": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711",
+      "urls": [
+        "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/preprocessor_config.json"
+      ],
+      "source_revision": "c3058b475261292e64a0412df1d2681c06260fab",
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://huggingface.co/lex-au/Orpheus-3b-FT-Q4_K_M.gguf/resolve/51079fc5f7de3e137cdb453398baa1d4bc1614dc/Orpheus-3b-FT-Q4_K_M.gguf",
+          "https://huggingface.co/hubertsiuzdak/snac_24khz/resolve/d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec/config.json",
+          "https://huggingface.co/hubertsiuzdak/snac_24khz/resolve/d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec/pytorch_model.bin",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/config.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/model.bin",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/preprocessor_config.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/tokenizer.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/vocabulary.json"
+        ],
+        "notice": "notices/speech-dependencies.txt"
+      }
+    },
+    {
+      "path": "speech/whisper/tokenizer.json",
+      "kind": "speech",
+      "bytes": 2480617,
+      "sha256": "6d8cbd7cd0d8d5815e478dac67b85a26bbe77c1f5e0c6d76d1ce2abc0e5f21ca",
+      "urls": [
+        "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/tokenizer.json"
+      ],
+      "source_revision": "c3058b475261292e64a0412df1d2681c06260fab",
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://huggingface.co/lex-au/Orpheus-3b-FT-Q4_K_M.gguf/resolve/51079fc5f7de3e137cdb453398baa1d4bc1614dc/Orpheus-3b-FT-Q4_K_M.gguf",
+          "https://huggingface.co/hubertsiuzdak/snac_24khz/resolve/d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec/config.json",
+          "https://huggingface.co/hubertsiuzdak/snac_24khz/resolve/d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec/pytorch_model.bin",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/config.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/model.bin",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/preprocessor_config.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/tokenizer.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/vocabulary.json"
+        ],
+        "notice": "notices/speech-dependencies.txt"
+      }
+    },
+    {
+      "path": "speech/whisper/vocabulary.json",
+      "kind": "speech",
+      "bytes": 1068114,
+      "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1",
+      "urls": [
+        "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/vocabulary.json"
+      ],
+      "source_revision": "c3058b475261292e64a0412df1d2681c06260fab",
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://huggingface.co/lex-au/Orpheus-3b-FT-Q4_K_M.gguf/resolve/51079fc5f7de3e137cdb453398baa1d4bc1614dc/Orpheus-3b-FT-Q4_K_M.gguf",
+          "https://huggingface.co/hubertsiuzdak/snac_24khz/resolve/d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec/config.json",
+          "https://huggingface.co/hubertsiuzdak/snac_24khz/resolve/d73ad176a12188fcf4f360ba3bf2c2fbbe8f58ec/pytorch_model.bin",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/config.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/model.bin",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/preprocessor_config.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/tokenizer.json",
+          "https://huggingface.co/Systran/faster-distil-whisper-large-v3/resolve/c3058b475261292e64a0412df1d2681c06260fab/vocabulary.json"
+        ],
+        "notice": "notices/speech-dependencies.txt"
+      }
+    }
+  ]
+}

@@ -86,22 +86,19 @@ test("heartbeat on an unknown lease returns false", () => {
 	expect(b.heartbeat("nope")).toBe(false);
 });
 
-test("a lease is reclaimed past the absolute max-age even while heartbeating", () => {
-	let t = 0;
-	const b = new VoiceBroker({ endpoints: ONE, capacity: 1, heartbeatSec: 60, maxLeaseSec: 300, now: () => t });
-	const first = b.lease();
-	expect(first.granted).toBe(true);
-	// Beat every 100s to stay inside the 3x-heartbeat (180s) TTL...
-	t = 100_000;
-	if (first.granted) expect(b.heartbeat(first.leaseId)).toBe(true);
-	t = 200_000;
-	if (first.granted) expect(b.heartbeat(first.leaseId)).toBe(true);
-	// ...but cross the 300s absolute age cap (last beat only 105s ago → not TTL-stale).
-	t = 305_000;
-	// Capacity is 1: a granted re-lease proves the still-heartbeating lease was reclaimed
-	// by the age cap (otherwise this would 202-queue).
-	const after = b.lease();
-	expect(after.granted).toBe(true);
+test("productive voice ownership survives long research until heartbeat loss or release", () => {
+ let t = 0;
+ const b = new VoiceBroker({endpoints: ONE, capacity: 1, heartbeatSec: 30, now: () => t});
+ const first = b.lease(); expect(first.granted).toBe(true);
+ if (!first.granted) throw new Error("lease refused");
+ // Research and narration may span many HTTP/synthesis timeout intervals.
+ for (t = 30_000; t <= 3_600_000; t += 30_000) {
+  expect(b.heartbeat(first.leaseId)).toBe(true);
+  expect(b.lease().granted).toBe(false);
+ }
+ t += 90_001;
+ expect(b.heartbeat(first.leaseId)).toBe(false);
+ expect(b.lease().granted).toBe(true);
 });
 
 test("two endpoints load-balance: the second lease lands on the empty endpoint", () => {
@@ -138,4 +135,9 @@ test("release is tolerant of unknown / double releases", () => {
 	// capacity intact: exactly one slot, grant then overflow
 	expect(b.lease().granted).toBe(true);
 	expect(b.lease().granted).toBe(false);
+});
+test("invalid numeric capacity is refused before any lease can be granted", () => {
+ for (const capacity of [NaN, Infinity, -Infinity, 0, -1, 1.5]) {
+  expect(()=>new VoiceBroker({endpoints:[{ttsUrl:'ws://speech.invalid'}],capacity,heartbeatSec:30})).toThrow();
+ }
 });

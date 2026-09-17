@@ -1,3 +1,5 @@
+import { waitForSpeechEnd } from "./tts-idle.js";
+import { speechSocketUrl } from "./app-paths.js";
 // tts.ts — the streaming text-to-speech half of the browser-orchestrated voice
 // cascade. Unlike the old server-side Unmute cascade (one WebSocket carrying
 // STT→LLM→TTS), this module is a *standalone* TTS leg: the Pi agent drives the
@@ -158,6 +160,8 @@ export interface SpeechSynthesizer {
 export interface TtsConfig {
 	// Override the WS endpoint (else VITE_TTS_BASE / the localhost default).
 	baseUrl?: string;
+	// Inactivity between transport messages; the application supplies its runtime profile.
+	idleTimeoutMs?: number;
 	// Voice identifier, sent as the `voice` query param (see DEFAULT_VOICE).
 	voice?: string;
 	// Classifier-free-guidance strength.
@@ -178,13 +182,11 @@ export interface TtsConfig {
 
 const ENV = (import.meta as unknown as { env?: Record<string, string> }).env ?? {};
 
-// Dev default points at a local TTS server. Deploy overrides via VITE_TTS_BASE
-// (a wss:// URL on the public host).
-const DEFAULT_TTS_BASE = ENV.VITE_TTS_BASE ?? "ws://localhost:8123/api/tts_streaming";
-// The voice identifier sent as the `voice` query param. The default is a Kyutai-style
-// path_on_server id; a server that doesn't recognize it falls through to its own default
-// voice. Override with VITE_TTS_VOICE to name a voice your TTS server actually has.
-const DEFAULT_VOICE = ENV.VITE_TTS_VOICE ?? "unmute-prod-website/developer-1.mp3";
+// Speech uses the application's gateway unless an explicit endpoint is supplied.
+const DEFAULT_TTS_BASE = ENV.VITE_TTS_BASE ?? speechSocketUrl();
+// The voice identifier sent as the `voice` query parameter matches the bundled
+// speech profile. Other backends can select their voice with VITE_TTS_VOICE.
+const DEFAULT_VOICE = ENV.VITE_TTS_VOICE ?? "alba";
 // Classifier-free-guidance strength. Override with VITE_TTS_CFG_ALPHA.
 const DEFAULT_CFG_ALPHA = ENV.VITE_TTS_CFG_ALPHA ? Number(ENV.VITE_TTS_CFG_ALPHA) : 1.5;
 
@@ -213,13 +215,6 @@ const DRAIN_INTERVAL_MS = 15;
 // few seconds of dead air, not ~10s per sentence.
 const MAX_READY_CHECKS = 3;
 const READY_CHECK_MS = 1000;
-
-// Ceiling on how long endSession() waits for a session's `done` (ws close/error).
-// A server that streams PCM but never closes would otherwise wedge run() forever;
-// on timeout we close the socket so the sentence loop advances. Sized a few
-// seconds beyond expected per-sentence generation time (generation runs >realtime).
-const SESSION_DONE_TIMEOUT_MS = 8000;
-
 
 // Inbound message shapes (msgpack). We act on Ready + Audio; Text timing
 // frames are accepted and ignored for now.
@@ -419,26 +414,8 @@ export class KyutaiTtsSynthesizer implements SpeechSynthesizer {
 			session.ws.send(encode({ type: "Eos" }));
 			dbg("[tts] -> Eos");
 		}
-		// `done` only settles on ws close/error. A server that emits PCM then never closes
-		// would hang here forever and wedge the rest of the turn — so race it against a
-		// timeout, and on the timeout branch close the socket so the loop advances.
-		let timer: ReturnType<typeof setTimeout> | undefined;
-		const timeout = new Promise<void>((resolve) => {
-			timer = setTimeout(() => {
-				dbgWarn("[tts] session done timeout; closing socket");
-				try {
-					session.ws.close();
-				} catch {
-					/* already closing */
-				}
-				resolve();
-			}, SESSION_DONE_TIMEOUT_MS);
-		});
-		try {
-			await Promise.race([session.done, timeout]);
-		} finally {
-			if (timer) clearTimeout(timer);
-		}
+		await waitForSpeechEnd(session.ws, session.done, this.config.idleTimeoutMs ?? 60_000,
+			() => dbgWarn("[tts] session inactivity timeout; closing socket"));
 	}
 
 	private openSocket(): WebSocket {

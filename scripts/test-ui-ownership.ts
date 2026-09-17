@@ -2,13 +2,14 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import ts from "typescript";
+import { sendWithAdmission } from "../src/send-admission.js";
 // Execute actual component modules with inert rendering/storage dependencies.
 let getKey: () => Promise<unknown> = async () => "key";
 const writes: unknown[][] = [];
 const storage = { providerKeys: { get: () => getKey(), set: async (...args: unknown[]) => { writes.push(args); } } };
 const decorator = () => () => undefined;
 const dependencies = { LitElement: class { requestUpdate() {} }, customElement: () => (value: unknown) => value,
- property: decorator, state: decorator, query: decorator, getAppStorage: () => storage, html: () => undefined };
+ sendWithAdmission, property: decorator, state: decorator, query: decorator, getAppStorage: () => storage, html: () => undefined };
 function load(file: string) {
  const js = ts.transpileModule(readFileSync(new URL(file, import.meta.url), "utf8"), {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, experimentalDecorators: true, useDefineForClassFields: false },
@@ -59,7 +60,8 @@ const ui = new AgentInterface();
 ui.session = { state: { model: { provider: "same" } }, prompt: async (input: unknown) => { sent.push(input); } };
 ui._messageEditor = { value: "draft", attachments: [] };
 await ui.sendMessage("draft");
-assert.deepEqual(sent, ["draft"]);
+assert.equal((sent[0] as any).content, "draft");
+assert.equal(sent.length, 1);
 assert.equal(ui._messageEditor.value, "");
 const valid = new ProviderKeyInput();
 valid.provider = "same";
@@ -137,4 +139,58 @@ for (const stage of ["lookup", "hook"]) {
  await old;
  assert.equal(sent.length, 0);
 }
-console.log("6 send-admission edge cases passed");
+{
+ const { ui, sent } = chat();
+ const gate = deferred<any>();
+ getKey = () => gate.promise;
+ const pending = ui.sendMessage("draft");
+ ui.sendDisabled = true;
+ gate.resolve("key");
+ await pending;
+ assert.equal(sent.length, 0, "conversation transition prevents dispatch to the old agent");
+ assert.equal(ui._messageEditor.value, "draft", "conversation transition preserves the unsent draft");
+}
+console.log("7 send-admission edge cases passed");
+
+getKey = async () => "key";
+for (const mutation of ["none", "text", "attachments", "session"]) {
+ const {ui} = chat();
+ const gate = deferred<void>(); const entered = deferred<void>();
+ const attachment = {id:"saved"};
+ ui._messageEditor.attachments = [attachment];
+ ui.session.prompt = async () => { entered.resolve(); await gate.promise; throw new Error("Context measurement unavailable"); };
+ const pending = ui.sendMessage("draft", [attachment]);
+ const rejected = assert.rejects(pending, /Context measurement unavailable/);
+ await entered.promise;
+ assert.equal(ui._messageEditor.value, "draft", "prompt admission keeps the original draft");
+ if (mutation === "text") ui._messageEditor.value = "newer draft";
+ if (mutation === "attachments") ui._messageEditor.attachments = [{id:"newer"}];
+ if (mutation === "session") { ui.session = {state:{model:{provider:"new"}}}; ui._messageEditor = {value:"other chat",attachments:[]}; }
+ gate.resolve(); await rejected;
+ assert.equal(ui._messageEditor.value, mutation === "text" ? "newer draft" : mutation === "session" ? "other chat" : "draft");
+ if (mutation === "none") assert.equal(ui._messageEditor.attachments[0], attachment);
+ if (mutation === "attachments") assert.equal(ui._messageEditor.attachments[0].id, "newer");
+ if (mutation !== "session") assert.match(ui._sendError,/Context measurement unavailable/);
+}
+{
+ const {ui}=chat(); const gate=deferred<void>(); const entered=deferred<void>(); let listener:any; let submitted:any;
+ ui.session.subscribe=(fn:any)=>{listener=fn;return()=>{listener=undefined;};};
+ ui.session.prompt=async (message:any)=>{submitted=message;entered.resolve();await gate.promise;};
+ const pending=ui.sendMessage("draft"); await entered.promise;
+ listener({type:"message_start",message:{role:"user",content:"another message"}});
+ assert.equal(ui._messageEditor.value,"draft","unrelated messages cannot accept this draft");
+ listener({type:"message_start",message:submitted});
+ assert.equal(ui._messageEditor.value,"");
+ ui._messageEditor.value="draft";
+ gate.resolve();await pending;
+ assert.equal(ui._messageEditor.value,"draft","successful completion cannot erase a newly retyped identical draft");
+ assert.equal(listener,undefined,"admission listener is removed");
+}
+for(const accepted of [false,true]){
+ let listener:any;let recovered="";const message:any={role:"user",content:"recognized speech",timestamp:1};
+ const session:any={subscribe:(fn:any)=>{listener=fn;return()=>{listener=undefined;};},prompt:async()=>{if(accepted)listener({type:"message_start",message});throw new Error("unavailable");}};
+ await assert.rejects(sendWithAdmission(session,message,()=>{},()=>{recovered=message.content;}));
+ assert.equal(recovered,accepted?"":"recognized speech","voice recovery applies only before admission");
+ assert.equal(listener,undefined);
+}
+console.log("7 rejected-send, admission and voice-recovery cases passed");

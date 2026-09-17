@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "status": "provisional-vllm-candidate-not-release",
+  "qualified": false,
+  "repo": "Inferact/Muse-Glimmer-30B-NVFP4-W4A4",
+  "revision": "d35cb79050f419c457611b1cee5c5d15b176f285",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 187,
+      "sha256": "fb82c1a5fc07f4ff794d337c851a568415c89c8564ed306b99e993b5c7b5d0ca",
+      "url": "https://huggingface.co/Inferact/Muse-Glimmer-30B-NVFP4-W4A4/resolve/d35cb79050f419c457611b1cee5c5d15b176f285/README.md"
+    },
+    {
+      "path": "chat_template.jinja",
+      "bytes": 7167,
+      "sha256": "114f55ebdc1804c1af371197b9fdf2d6bb925966c9dfe46b73782a71bc07965e",
+      "url": "https://huggingface.co/Inferact/Muse-Glimmer-30B-NVFP4-W4A4/resolve/d35cb79050f419c457611b1cee5c5d15b176f285/chat_template.jinja"
+    },
+    {
+      "path": "config.json",
+      "bytes": 41941,
+      "sha256": "5ebb2d7b3566a65a9ec765afd76c3bfde46bb2b72f522230045ebec38500fe06",
+      "url": "https://huggingface.co/Inferact/Muse-Glimmer-30B-NVFP4-W4A4/resolve/d35cb79050f419c457611b1cee5c5d15b176f285/config.json"
+    },
+    {
+      "path": "dense_nvfp4_manifest.json",
+      "bytes": 513,
+      "sha256": "80622806c8784086ab9860f7554ab44b8553cb5b413f142a9ea8d775ad22ebd8",
+      "url": "https://huggingface.co/Inferact/Muse-Glimmer-30B-NVFP4-W4A4/resolve/d35cb79050f419c457611b1cee5c5d15b176f285/dense_nvfp4_manifest.json"
+    },
+    {
+      "path": "generation_config.json",
+      "bytes": 148,
+      "sha256": "b0e427c998641420eb4091cc85d4e15643fb57f89222834a14ec76430625b6fb",
+      "url": "https://huggingface.co/Inferact/Muse-Glimmer-30B-NVFP4-W4A4/resolve/d35cb79050f419c457611b1cee5c5d15b176f285/generation_config.json"
+    },
+    {
+      "path": "model.safetensors",
+      "bytes": 12061281600,
+      "sha256": "73868794af7fe5c1ed33dac1f6062615513548558128f37106308dcbd24971c0",
+      "url": "https://huggingface.co/Inferact/Muse-Glimmer-30B-NVFP4-W4A4/resolve/d35cb79050f419c457611b1cee5c5d15b176f285/model.safetensors"
+    },
+    {
+      "path": "model.safetensors.index.json",
+      "bytes": 215459,
+      "sha256": "266e0cbcbc731c7391038c21791ed55476065526049d39e7a103159da999b33f",
+      "url": "https://huggingface.co/Inferact/Muse-Glimmer-30B-NVFP4-W4A4/resolve/d35cb79050f419c457611b1cee5c5d15b176f285/model.safetensors.index.json"
+    },
+    {
+      "path": "nvfp4_dense.safetensors",
+      "bytes": 13357338376,
+      "sha256": "9316c68633ecb00d598cde68b3e9ee4eac2381cfd8a801e9c998a8af211b0d3a",
+      "url": "https://huggingface.co/Inferact/Muse-Glimmer-30B-NVFP4-W4A4/resolve/d35cb79050f419c457611b1cee5c5d15b176f285/nvfp4_dense.safetensors"
+    },
+    {
+      "path": "processor_config.json",
+      "bytes": 1084,
+      "sha256": "97e2a486dd9866b81f40cf4b8bc0c9ced9a7cd8a5bc65aa4cc2f4de0712dae77",
+      "url": "https://huggingface.co/Inferact/Muse-Glimmer-30B-NVFP4-W4A4/resolve/d35cb79050f419c457611b1cee5c5d15b176f285/processor_config.json"
+    },
+    {
+      "path": "tokenizer.json",
+      "bytes": 28129897,
+      "sha256": "c9dbee66967b58f31a7c27f723c3760da3526ccd0427578e8905b0abb0031c4d",
+      "url": "https://huggingface.co/Inferact/Muse-Glimmer-30B-NVFP4-W4A4/resolve/d35cb79050f419c457611b1cee5c5d15b176f285/tokenizer.json"
+    },
+    {
+      "path": "tokenizer_config.json",
+      "bytes": 79936,
+      "sha256": "781e6c74f571642c71202167b67d9255b28cc439bdda1582ff31346182f5a9c5",
+      "url": "https://huggingface.co/Inferact/Muse-Glimmer-30B-NVFP4-W4A4/resolve/d35cb79050f419c457611b1cee5c5d15b176f285/tokenizer_config.json"
+    }
+  ],
+  "artifact_bytes": 25447096308,
+  "weight_bytes": 25418619976,
+  "serving": {
+    "image": "vllm/vllm-openai@sha256:082ca6f035279109041ffd3fe0695cb568b29bc580b35c4f297a66a08b216c1b",
+    "version": "0.29.0",
+    "source_revision": "98dff2a81d747d1dba01a47f939f48c3526d4206",
+    "platform": "linux/amd64"
+  },
+  "proposed_measurement": {
+    "context_tokens": 24576,
+    "max_num_seqs": 1,
+    "max_num_batched_tokens": 2048,
+    "gpu_memory_utilization": 0.8,
+    "enforce_eager": false,
+    "speculative_decoding": false,
+    "environment": {
+      "HF_HUB_OFFLINE": "1",
+      "TRANSFORMERS_OFFLINE": "1"
+    },
+    "command": [
+      "/model",
+      "--served-model-name",
+      "muse-glimmer-qualification",
+      "--host",
+      "0.0.0.0",
+      "--port",
+      "8000",
+      "--max-model-len",
+      "24576",
+      "--max-num-seqs",
+      "1",
+      "--max-num-batched-tokens",
+      "2048",
+      "--gpu-memory-utilization",
+      "0.80",
+      "--enable-auto-tool-choice",
+      "--tool-call-parser",
+      "muse_glimmer",
+      "--reasoning-parser",
+      "muse_glimmer",
+      "--kv-cache-dtype",
+      "auto",
+      "--chat-template",
+      "/model/chat_template.jinja",
+      "--language-model-only",
+      "--generation-config",
+      "auto",
+      "--kv-cache-memory-bytes",
+      "1073741824",
+      "--compilation-config",
+      "{\"mode\":0,\"cudagraph_mode\":\"FULL_DECODE_ONLY\",\"cudagraph_capture_sizes\":[1]}"
+    ],
+    "mounts": [
+      {
+        "source": "prepared verified snapshot",
+        "target": "/model",
+        "read_only": true
+      }
+    ],
+    "network": "Internal-only inference network; inspect its container address, then forward that address through a dedicated SSH loopback listener to the source gateway. Internal-network Docker host port publishing is not assumed.",
+    "memory_gate": "Use the primary vLLM W4A4 consumer-Blackwell recipe with text-only/single-request limits for retained speech. Context24576 and1GiB KV are candidate bounds pending this artifact tokenizer, kernel, cache, near-window and overlap measurements.",
+    "disk_gate": "Reserve remaining corpus acquisition plus index/build/runtime writes before acquiring this complete snapshot; do not stage both candidates concurrently.",
+    "kv_cache_memory_bytes": 1073741824,
+    "compilation_config": {
+      "mode": 0,
+      "cudagraph_mode": "FULL_DECODE_ONLY",
+      "cudagraph_capture_sizes": [
+        1
+      ]
+    },
+    "sampling": {
+      "temperature": 1,
+      "top_p": 0.95,
+      "top_k": 64
+    },
+    "reasoning_strength": "high"
+  },
+  "recipe": "https://recipes.vllm.ai/meta-models/Muse-Glimmer-30B"
+}

@@ -1,0 +1,292 @@
+{
+  "schema_version": 1,
+  "purpose": "Pinned acquisition candidates; not a distributable release or proof of coverage",
+  "packs": [
+    {
+      "id": "wikipedia-en-nopic",
+      "category": "encyclopedia",
+      "language": "en",
+      "title": "English Wikipedia (nopic)",
+      "flavour": "nopic",
+      "complete_articles": true,
+      "recommended": true,
+      "artifact": {
+        "path": "wikipedia_en_all_nopic_2026-06.zim",
+        "bytes": 52690706555,
+        "sha256": "441a56d9e05b2d98f8ae9acb7986a513ed47904d73852c92dc6b7d50baa122e5",
+        "urls": [
+          "https://lb.download.kiwix.org/zim/wikipedia/wikipedia_en_all_nopic_2026-06.zim"
+        ]
+      },
+      "upstream_manifest": "https://lb.download.kiwix.org/zim/wikipedia/wikipedia_en_all_nopic_2026-06.zim.meta4",
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://www.mediawiki.org/wiki/Wikimedia_APIs/Content_reuse"
+        ],
+        "text_license": "CC-BY-SA-4.0",
+        "exceptions": "Media have individual licenses. Preserve article attribution/history links and local license notices; archive does not contain full revision history."
+      },
+      "readiness": "not-downloaded-or-indexed",
+      "selected": true
+    },
+    {
+      "id": "wikipedia-en-maxi",
+      "category": "encyclopedia",
+      "language": "en",
+      "title": "English Wikipedia (maxi)",
+      "flavour": "maxi",
+      "complete_articles": true,
+      "recommended": false,
+      "artifact": {
+        "path": "wikipedia_en_all_maxi_2026-08.zim",
+        "bytes": 127418087648,
+        "sha256": "34162d18b9f96f494eac48a73a309c72e0bc95d85f76be405d0f5de795854aa6",
+        "urls": [
+          "https://lb.download.kiwix.org/zim/wikipedia/wikipedia_en_all_maxi_2026-08.zim"
+        ]
+      },
+      "upstream_manifest": "https://lb.download.kiwix.org/zim/wikipedia/wikipedia_en_all_maxi_2026-08.zim.meta4",
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://www.mediawiki.org/wiki/Wikimedia_APIs/Content_reuse"
+        ],
+        "text_license": "CC-BY-SA-4.0",
+        "exceptions": "Media have individual licenses. Preserve article attribution/history links and local license notices; archive does not contain full revision history."
+      },
+      "readiness": "not-downloaded-or-indexed",
+      "selected": false
+    },
+    {
+      "id": "appropedia",
+      "category": "practical-reference",
+      "language": "en",
+      "artifact": {
+        "path": "appropedia_en_all_maxi_2026-02.zim",
+        "bytes": 581641351,
+        "sha256": "dcf200ba723c27397e1c9a2e4891ff91fa13993df1fa285315190d8525a53469",
+        "urls": [
+          "https://lb.download.kiwix.org/zim/other/appropedia_en_all_maxi_2026-02.zim"
+        ]
+      },
+      "upstream_manifest": "https://lb.download.kiwix.org/zim/other/appropedia_en_all_maxi_2026-02.zim.meta4",
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://lb.download.kiwix.org/zim/other/appropedia_en_all_maxi_2026-02.zim.meta4"
+        ],
+        "exceptions": "Catalog availability is not a redistribution grant. Review source-specific and third-party rights before release."
+      },
+      "readiness": "candidate-not-admitted"
+    },
+    {
+      "id": "cd3wd",
+      "category": "practical-reference",
+      "language": "en",
+      "artifact": {
+        "path": "cd3wdproject.org_en_all_2025-11.zim",
+        "bytes": 581165229,
+        "sha256": "f79a27413af0bd17d14adb3a556d282515a8bc1e127d791a5961c93ea9167b92",
+        "urls": [
+          "https://lb.download.kiwix.org/zim/zimit/cd3wdproject.org_en_all_2025-11.zim"
+        ]
+      },
+      "upstream_manifest": "https://lb.download.kiwix.org/zim/zimit/cd3wdproject.org_en_all_2025-11.zim.meta4",
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://lb.download.kiwix.org/zim/zimit/cd3wdproject.org_en_all_2025-11.zim.meta4"
+        ],
+        "exceptions": "Catalog availability is not a redistribution grant. Review source-specific and third-party rights before release."
+      },
+      "readiness": "candidate-not-admitted"
+    },
+    {
+      "id": "ifixit",
+      "category": "practical-reference",
+      "language": "en",
+      "artifact": {
+        "path": "ifixit_en_all_2025-12.zim",
+        "bytes": 3570695757,
+        "sha256": "9bb5f3408707fd0300c6ef47a425c3217187f144cd9154a928183816aa72eead",
+        "urls": [
+          "https://lb.download.kiwix.org/zim/ifixit/ifixit_en_all_2025-12.zim"
+        ]
+      },
+      "upstream_manifest": "https://lb.download.kiwix.org/zim/ifixit/ifixit_en_all_2025-12.zim.meta4",
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://lb.download.kiwix.org/zim/ifixit/ifixit_en_all_2025-12.zim.meta4"
+        ],
+        "exceptions": "Catalog availability is not a redistribution grant. Review source-specific and third-party rights before release."
+      },
+      "readiness": "candidate-not-admitted"
+    },
+    {
+      "id": "survivor",
+      "category": "practical-reference",
+      "language": "en",
+      "artifact": {
+        "path": "survivorlibrary.com_en_all_2025-12.zim",
+        "bytes": 251947683722,
+        "sha256": "c812c4ba3b9bcf7b77864cc965d526336d487e1b9ddc9364bad68fc55d2862e3",
+        "urls": [
+          "https://lb.download.kiwix.org/zim/zimit/survivorlibrary.com_en_all_2025-12.zim"
+        ]
+      },
+      "upstream_manifest": "https://lb.download.kiwix.org/zim/zimit/survivorlibrary.com_en_all_2025-12.zim.meta4",
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://lb.download.kiwix.org/zim/zimit/survivorlibrary.com_en_all_2025-12.zim.meta4"
+        ],
+        "exceptions": "Catalog availability is not a redistribution grant. Review source-specific and third-party rights before release."
+      },
+      "readiness": "candidate-not-admitted"
+    },
+    {
+      "id": "water",
+      "category": "practical-reference",
+      "language": "en",
+      "artifact": {
+        "path": "zimgit-water_en_2024-08.zim",
+        "bytes": 20924451,
+        "sha256": "392c7bc970a44fddd61dd17f6eabf1f4e21936f2d5c27c83093e1dc475cb56b6",
+        "urls": [
+          "https://lb.download.kiwix.org/zim/other/zimgit-water_en_2024-08.zim"
+        ]
+      },
+      "upstream_manifest": "https://lb.download.kiwix.org/zim/other/zimgit-water_en_2024-08.zim.meta4",
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://lb.download.kiwix.org/zim/other/zimgit-water_en_2024-08.zim.meta4"
+        ],
+        "exceptions": "Catalog availability is not a redistribution grant. Review source-specific and third-party rights before release."
+      },
+      "readiness": "candidate-not-admitted"
+    },
+    {
+      "id": "map-oregon",
+      "category": "map",
+      "content_only": true,
+      "release": "2025-12",
+      "upstream_revision": "5b444051914fbf4960be2e64c0fb11f507db7efd",
+      "artifact": {
+        "path": "oregon_2025-12.pmtiles",
+        "bytes": 398259952,
+        "sha256": "34f43427facfd7b596f7487bce313be92423b7aa63bc701eff05a54b0e6e964e",
+        "urls": [
+          "https://media.githubusercontent.com/media/Crosstalk-Solutions/project-nomad-maps/5b444051914fbf4960be2e64c0fb11f507db7efd/pmtiles/oregon_2025-12.pmtiles"
+        ]
+      },
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://www.openstreetmap.org/copyright",
+          "https://github.com/Crosstalk-Solutions/project-nomad-maps/tree/5b444051914fbf4960be2e64c0fb11f507db7efd"
+        ],
+        "license": "ODbL-1.0",
+        "exceptions": "Include OpenStreetMap attribution and upstream Produced Work notices. Styles/fonts/sprites and external reader have separate rights."
+      },
+      "reader": "External PMTiles reader; no application map UI or AI ingestion",
+      "metadata": {
+        "bounds": [
+          -124.703541,
+          41.992082,
+          -116.463262,
+          46.299099
+        ],
+        "minzoom": 0,
+        "maxzoom": 15,
+        "data_timestamp": "2025-12-18T04:00:00Z",
+        "terrain": false,
+        "routing": false,
+        "vector_layers": [
+          "boundaries",
+          "buildings",
+          "earth",
+          "landcover",
+          "landuse",
+          "places",
+          "pois",
+          "roads",
+          "water"
+        ]
+      },
+      "readiness": "original-checksum-and-metadata-verified; external-reader-not-qualified"
+    },
+    {
+      "id": "map-washington",
+      "category": "map",
+      "content_only": true,
+      "release": "2025-12",
+      "upstream_revision": "5b444051914fbf4960be2e64c0fb11f507db7efd",
+      "artifact": {
+        "path": "washington_2025-12.pmtiles",
+        "bytes": 489176579,
+        "sha256": "4e1d1eca1d556f6ed7cc49ac0984d4c19fe4f2f74bb80af716783feacab9a47f",
+        "urls": [
+          "https://media.githubusercontent.com/media/Crosstalk-Solutions/project-nomad-maps/5b444051914fbf4960be2e64c0fb11f507db7efd/pmtiles/washington_2025-12.pmtiles"
+        ]
+      },
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://www.openstreetmap.org/copyright",
+          "https://github.com/Crosstalk-Solutions/project-nomad-maps/tree/5b444051914fbf4960be2e64c0fb11f507db7efd"
+        ],
+        "license": "ODbL-1.0",
+        "exceptions": "Include OpenStreetMap attribution and upstream Produced Work notices. Styles/fonts/sprites and external reader have separate rights."
+      },
+      "reader": "External PMTiles reader; no application map UI or AI ingestion",
+      "metadata": {
+        "bounds": null,
+        "minzoom": null,
+        "maxzoom": null,
+        "data_timestamp": null,
+        "terrain": null,
+        "routing": null
+      },
+      "readiness": "not-downloaded-or-reader-qualified"
+    },
+    {
+      "id": "map-california",
+      "category": "map",
+      "content_only": true,
+      "release": "2025-12",
+      "upstream_revision": "5b444051914fbf4960be2e64c0fb11f507db7efd",
+      "artifact": {
+        "path": "california_2025-12.pmtiles",
+        "bytes": 1185114056,
+        "sha256": "c61f6b70b1910f3e3b14d04bb4c2418e253169a8500082c46e8f62178a0657a8",
+        "urls": [
+          "https://media.githubusercontent.com/media/Crosstalk-Solutions/project-nomad-maps/5b444051914fbf4960be2e64c0fb11f507db7efd/pmtiles/california_2025-12.pmtiles"
+        ]
+      },
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://www.openstreetmap.org/copyright",
+          "https://github.com/Crosstalk-Solutions/project-nomad-maps/tree/5b444051914fbf4960be2e64c0fb11f507db7efd"
+        ],
+        "license": "ODbL-1.0",
+        "exceptions": "Include OpenStreetMap attribution and upstream Produced Work notices. Styles/fonts/sprites and external reader have separate rights."
+      },
+      "reader": "External PMTiles reader; no application map UI or AI ingestion",
+      "metadata": {
+        "bounds": null,
+        "minzoom": null,
+        "maxzoom": null,
+        "data_timestamp": null,
+        "terrain": null,
+        "routing": null
+      },
+      "readiness": "not-downloaded-or-reader-qualified"
+    }
+  ],
+  "selected_wikipedia_flavour": "nopic",
+  "wikipedia_selection": "Complete articles without images; mini does not satisfy coverage."
+}

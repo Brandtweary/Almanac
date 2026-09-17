@@ -31,6 +31,7 @@ export class ChatPanel extends LitElement {
 			toolsFactory?: (agent: Agent, agentInterface: AgentInterface) => AgentTool<any>[];
 		},
 	) {
+		if (this.agentInterface) this.agentInterface.sendDisabled = true;
 		this.agent = agent;
 
 		// Create AgentInterface

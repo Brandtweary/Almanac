@@ -1,70 +1,25 @@
-# myriapod-proxy
+# Local gateway
 
-The metering inference proxy for myriapod. It holds the owner OpenRouter key
-server-side (the browser never sees it), meters per-principal spend in SQLite, and
-gates the free tier. Self-contained Bun service — deploy by copying this `proxy/`
-directory and running it; it shares nothing with the frontend build.
+Bun/Hono serves the built browser application and routes requests to explicitly configured local inference, corpus, embedding, search and speech services. It never reads legacy provider keys or opens the previous credit database. Copy `.env.example` to `.env`, supply a qualified release profile, then run `bun install --frozen-lockfile` and `bun start`. Loopback is the default bind; public operation belongs behind a TLS reverse proxy.
 
-## What it does
+`GET /health` is process liveness. `GET /ready` returns 503 unless a validated qualified profile, reachable model, and active mandatory corpus exist. `GET /v1/profile` exposes the same state without changing HTTP success: clients can explain an unavailable installation. Optional speech failures do not remove typed corpus access.
 
-- **`POST /anon-init`** — establishes (or recovers) an anonymous free-tier principal
-  and returns its `{ token }`. The browser calls it once, then uses the token as the
-  proxy bearer. This is the only place a fresh `$FREE_GRANT_USD` is minted and the
-  only place the grant gates run (a client BotD verdict + honeypot + time-trap, all
-  client-reported and thus a casual-automation filter, not a hard wall). A fresh
-  grant needs BOTH a never-seen token AND a never-granted IP: a known token on a new
-  IP keeps its balance (VPN continuity), and a cleared browser on an already-granted
-  IP adopts that IP's principal. New grants are also subject to `NEW_IP_PER_DAY`.
-- **`POST /v1/chat/completions`** — OpenAI-compatible, **spend-only**. Resolves the
-  principal by its bearer token, checks credit + caps, injects the right upstream
-  key, forwards to OpenRouter, and debits the measured cost (from the streamed
-  `usage` chunk). No bearer / unknown token → 401 (call `/anon-init` first).
-  - **Anonymous:** the `/anon-init` token → owner key, bounded by `FREE_DAILY_CAP_USD`
-    (global daily) and the token's `$FREE_GRANT_USD` lifetime balance.
-  - **Family:** the `/redeem` token → a dedicated OpenRouter sub-key with a hard
-    `$FAMILY_LIMIT` lifetime cap.
-- **`GET /v1/web-search`** — returns `{results, degraded}`; backend failures and inconclusive empty searches return errors.
-- **`POST /v1/embed`** — accepts `{inputs: string[]}` and returns `{encoder, embeddings}` with checked batch cardinality, finite vectors, and stable encoder metadata; oversized tokenizer inputs fail instead of being truncated. The TEI backend must use `--revision <full HF model commit>`: `/info.model_sha` reflects that argument, and an unpinned branch or missing revision is rejected.
-- **`POST /redeem`** `{ code }` → provisions a family sub-key and returns `{ token }`.
-- **`GET /health`**, **`GET /balance`** (bearer → remaining credit).
+The release profile follows `ReleaseProfile` in `config.ts`: model artifact/tokenizer/template identities, parser, quantization, measured context and output budgets, qualification receipts, per-role input/output budgets, queue and speech limits. The model parser names `llama.cpp` or `vllm`; no model or production resource budget is selected in source. Memory-stage roles require a positive cumulative `maxStageOutputTokens` budget. Role names are `chat`, `audit`, `memory`, `summary`, and `compaction`. Inference and tokenizer endpoints must share the pinned artifacts/template. Candidate models can be evaluated directly before the gateway accepts a qualified profile.
 
-The **own-key path never reaches this proxy**: when a visitor supplies their own
-OpenRouter key, the browser calls OpenRouter directly.
+`POST /v1/tokenize` serializes the complete completion payload through the inference server's `/apply-template`, then `/tokenize`, so tool schemas and chat formatting enter context accounting. `POST /v1/chat/completions` repeats admission accounting and forwards the configured model only. `X-Request-Role` chooses a profile budget; `X-Request-Priority` is `foreground` or `background`; ephemeral `X-Conversation-Id` handles drive fair rotation. Send an unpredictable `X-Request-Id` of at least 16 characters to inspect `GET /v1/requests/:id` or cancel with `DELETE` on that route. These handles grant request control, contain no user identity, and are not accounts.
 
-## Run
+Only one completion executes at once. Foreground work takes the next slot, conversations rotate within a priority, and response-body ownership retains the slot until completion or cancellation. Waiting and execution have distinct timeouts. Busy queues reject with 429; expired waits and execution fail explicitly. Streaming EOF without `[DONE]` is incomplete. No interrupted output is automatically replayed. Completed status retention is bounded and transient; restart loses request handles.
 
-```sh
-cp .env.example .env     # then fill in the keys
-bun install
-bun start                # http://0.0.0.0:8790
-```
+Corpus JSON forwards through `POST /v1/corpus/search` and `/v1/corpus/read`; immutable original downloads use `GET /v1/corpus/source/:handle`. The content service owns validation and source resolution. Memory embeddings use `/v1/embed` and validate encoder identity before and after a batch. `/v1/web-search` exposes online SearXNG discovery with explicit degradation.
 
-`.env` is git-ignored. Bun auto-loads it.
+Speech HTTP uses `/api/asr-http` (also `/v1/audio/transcriptions`) and forwards multipart data to `STT_BASE/v1/audio/transcriptions`. A Bun WebSocket bridge at `/api/tts_streaming` carries the existing binary protocol to `VOICE_TTS_BASE`; Both paths bound concurrent work. `speechTimeoutMs` is an absolute deadline for one STT HTTP request and an inactivity deadline between successful TTS transport events; it is never a narration or conversation lifetime. Voice leases remain valid while the browser heartbeats, regardless of research duration; missed heartbeats reclaim them after three heartbeat intervals, and explicit release relinquishes them immediately. The socket bridge independently enforces actual connection capacity, refreshes inactivity on connection or forwarded data, and releases on cancellation, failure or idle expiry. The browser uses the same profile inactivity budget while waiting for final audio, refreshing it on incoming frames and removing its timer/listener on completion or cancellation. Speech errors close the stream visibly. A reverse proxy must pass WebSocket upgrades and disable response buffering for SSE.
 
-## Mint a family code
+`GATEWAY_LOG` is a JSONL operational log of request handles, stages, states and durations, never conversation bodies, memory, or search queries. Configure rotation through the service supervisor. `bun test` runs isolated offline fixtures; `bun run check` checks TypeScript.
 
-```sh
-bun run mint-code.ts AUNT-MAY     # → e.g. AUNT-MAY-7F3KQ9
-```
+Primary API references: [Hono streaming](https://hono.dev/docs/helpers/streaming), [Bun HTTP server](https://bun.sh/docs/runtime/http/server), and [pinned llama.cpp server endpoints](https://github.com/ggml-org/llama.cpp/blob/fb27a525d28381a16a4bb038858a10e4927381ca/tools/server/README.md).
 
-A random entropy segment is always appended (the memorable prefix is optional), so
-codes can't be enumerated. The script prints the full code — hand *that* out; the
-recipient redeems it in the site's settings, which calls `/redeem` and stores the
-returned token in their browser. `/redeem` is per-IP rate-limited with an escalating
-backoff on failed attempts.
+For full-stack candidate qualification, set `QUALIFICATION_MODE=1` with a profile carrying `qualified:false` and a loopback `HOST`. Candidate budgets and artifact identities remain mandatory, but admission receipts may be empty. Direct launches refuse qualification binding beyond loopback; `/ready` remains 503 and `/v1/profile` explicitly reports `qualificationMode:true` and `status:"qualification_only"`. This mode permits candidate inference, browser and speech evaluation without inventing production receipts. For a packaged container, setup validates loopback-only host port publication and internal networks before generating `QUALIFICATION_BOUNDARY=isolated-container`; that explicit declaration permits a non-loopback bind inside the container namespace. The declaration is a deployment assertion, not an independent runtime proof of host exposure. Missing or unrecognized declarations cannot authorize that bind. Never reverse-proxy the qualification listener publicly.
 
-## OpenRouter dashboard (one-time, by hand)
+The vLLM adapter uses its full-chat `/tokenize` endpoint with identical messages, tools, template options and reasoning activation; `add_special_tokens` defaults to false. `model.excludeToolsWhenNone` mirrors the pinned server flag (default false). Auto/none tool selection is supported; named/required selection and response-format overrides fail explicitly until their renderer-specific accounting is admitted. Returned token IDs, count and context capacity must agree. Tokenizer/inference prompt-usage parity is still a local qualification gate.
 
-1. **Owner key** → `OWNER_OPENROUTER_KEY`. Set a **daily-reset spend limit** on it
-   (e.g. $50) — the hard backstop behind the proxy's own `$FREE_DAILY_CAP_USD`
-   counter (OpenRouter has no account-wide daily ceiling, so it lives on the key).
-2. **Provisioning key** (management-only) → `OPENROUTER_PROVISIONING_KEY`. Required
-   for the family tier; `/redeem` returns 503 without it.
-
-## Deploy (later)
-
-Runs anywhere Bun runs. Today it lives on a single host / localhost; public exposure
-(domain → VPS, TLS) is a later phase. To go public, set `ALLOWED_ORIGIN` to the
-site origin. The free tier is gated by the invisible BotD / honeypot / time-trap
-checks at `/anon-init` and bounded by the hard caps (owner-key daily limit +
-per-family sub-key cap).
+Speech upgrade forwarding preserves validated voice, PcmMessagePack format and finite nonnegative guidance. Client auth query values cannot replace backend credentials configured in the upstream URL. Relative broker endpoints resolve within the browser application mount, including `/almanac/`. Native Unicode pronunciation hints forward through `/v1/phonemize`; upstream failure statuses remain visible and cancellation reaches the content service.

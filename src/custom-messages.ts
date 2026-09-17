@@ -1,3 +1,6 @@
+import type { EvidenceRecord } from "./corpus-tools.js";
+import { corpusLedgerContext } from "./corpus-ledger-context.js";
+import type { RecallDelivery } from "./kg/recall-pool.js";
 import type { CompactionSummaryMessage } from "@earendil-works/pi-agent-core";
 import { COMPACTION_SUMMARY_PREFIX, COMPACTION_SUMMARY_SUFFIX } from "@earendil-works/pi-agent-core";
 import type { Message } from "@earendil-works/pi-ai";
@@ -18,15 +21,18 @@ export interface SystemNotificationMessage {
 	timestamp: string;
 }
 
-// Hidden memory breadcrumb. Carries the per-turn <memory> injection block.
-// Deliberately has NO registered renderer, so MessageList skips it (invisible in
-// the chat) — but it persists in agent.state.messages and accumulates across
-// turns, mirroring Claude Code's accumulating additionalContext. convertToLlm
-// converts it to a real user message so the model sees the retrieved context.
+// Legacy saved recall remains readable by audit tools but is excluded from
+// model context; current recall is prepared independently for each request.
 export interface MemoryContextMessage {
 	role: "memory-context";
 	block: string;
 	timestamp: string;
+}
+
+export interface MemoryDeliveryMessage {
+	role: "memory-delivery";
+	receipt: RecallDelivery;
+	timestamp: number;
 }
 
 // Recording-in-progress placeholder. Inserted on the user side at mic record-start
@@ -38,6 +44,12 @@ export interface VoicePendingMessage {
 	timestamp: string;
 }
 
+export interface CorpusLedgerMessage {
+	role: "corpus-ledger";
+	entries: EvidenceRecord[];
+	timestamp: string;
+}
+
 // Extend CustomAgentMessages interface via declaration merging
 // This must target pi-agent-core where CustomAgentMessages is defined.
 // (compactionSummary is already declared by pi-agent-core's harness/messages; we only
@@ -46,7 +58,9 @@ declare module "@earendil-works/pi-agent-core" {
 	interface CustomAgentMessages {
 		"system-notification": SystemNotificationMessage;
 		"memory-context": MemoryContextMessage;
+		"memory-delivery": MemoryDeliveryMessage;
 		"voice-pending": VoicePendingMessage;
+		"corpus-ledger": CorpusLedgerMessage;
 	}
 }
 
@@ -130,7 +144,7 @@ export function createSystemNotification(
  */
 export function customConvertToLlm(messages: AgentMessage[]): Message[] {
 	// First, handle our custom message types
-	const processed = messages.map((m): AgentMessage => {
+	const processed = messages.filter(m => m.role !== "memory-delivery" && m.role !== "memory-context").map((m): AgentMessage => {
 		if (m.role === "system-notification") {
 			const notification = m as SystemNotificationMessage;
 			// Convert to user message with <system> tags
@@ -140,13 +154,7 @@ export function customConvertToLlm(messages: AgentMessage[]): Message[] {
 				timestamp: Date.now(),
 			};
 		}
-		if (m.role === "memory-context") {
-			// The block is already a self-delimiting <memory>…</memory> string;
-			// surface it as a user message so the model reads it as retrieved
-			// context (mirrors CC's additionalContext injection).
-			const mem = m as MemoryContextMessage;
-			return { role: "user", content: mem.block, timestamp: Date.now() };
-		}
+		if (m.role === "corpus-ledger") return { role: "user", content: corpusLedgerContext(), timestamp: Date.now() };
 		if (m.role === "compactionSummary") {
 			// History bounding: the compaction summary REPLACES the cut history.
 			// defaultConvertToLlm drops this role, which would silently delete the

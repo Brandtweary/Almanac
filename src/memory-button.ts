@@ -8,13 +8,13 @@
 //   saved   — memory on, pipeline idle (dim green)
 //   running — pipeline agents in flight this turn (warm-orange pulse)
 //
-// Re-homes itself after each editor re-render via a MutationObserver, mirroring the
-// mic button's mount pattern in voice.ts.
+// The composer lifecycle reattaches this persistent control to its current slot.
 
 import { html, render } from "lit";
+import { mountEditorControl } from "./editor-controls.js";
 import { Brain, createElement } from "lucide";
 
-export type MemoryVisual = "off" | "saved" | "running";
+export type MemoryVisual = "off" | "saved" | "running" | "failed";
 
 export interface MemoryButtonSeam {
 	// Current visual state, read on every (re-)render.
@@ -32,6 +32,7 @@ const STYLES = `
 .cw-mem:focus-visible { outline: 2px solid #34d399; outline-offset: 1px; }
 .cw-mem--off { color: #6b7280; opacity: .65; }
 .cw-mem--saved { opacity: .45; }
+.cw-mem--failed { color: #f87171; }
 .cw-mem--running { color: #fb923c; } /* warm orange while the pipeline works — distinct from the idle green */
 .cw-mem--running svg { animation: cw-mem-pulse 1.1s infinite; }
 @keyframes cw-mem-pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
@@ -49,34 +50,19 @@ const LABELS: Record<MemoryVisual, string> = {
 	off: "Memory off — click to turn on",
 	saved: "Memory on",
 	running: "Memory working…",
+	failed: "Memory paused after failure — click to retry",
 };
 
 export class MemoryButton {
 	private host: HTMLSpanElement;
-	private observer?: MutationObserver;
+	private unmountControl: () => void;
 
 	constructor(private seam: MemoryButtonSeam) {
 		ensureStyles();
 		this.host = document.createElement("span");
 		this.host.style.display = "inline-flex";
 		this.renderButton();
-		this.observer = new MutationObserver(() => this.mount());
-		this.observer.observe(document.body, { childList: true, subtree: true });
-		this.mount();
-	}
-
-	// Re-home just before the mic button. Idempotent: no-op once we're its previous
-	// sibling. If the mic hasn't mounted yet, retry on the next mutation. Once placed,
-	// narrow the observer from document.body to the mic's own cluster so we only re-run
-	// on cluster changes (re-homing) — not on every DOM mutation during a streamed reply.
-	private mount(): void {
-		const mic = document.querySelector(".cw-mic");
-		if (!mic || !mic.parentElement) return;
-		if (mic.previousElementSibling !== this.host) {
-			mic.parentElement.insertBefore(this.host, mic);
-		}
-		this.observer?.disconnect();
-		this.observer?.observe(mic.parentElement, { childList: true });
+		this.unmountControl = mountEditorControl(this.host, 1);
 	}
 
 	// Re-render from the current visual state. Called by the host when pipeline or
@@ -88,7 +74,7 @@ export class MemoryButton {
 	private renderButton(): void {
 		const v = this.seam.getVisual();
 		const label = LABELS[v];
-		const cls = v === "off" ? "cw-mem--off" : v === "running" ? "cw-mem--running" : "cw-mem--saved";
+		const cls = v === "failed" ? "cw-mem--failed" : v === "off" ? "cw-mem--off" : v === "running" ? "cw-mem--running" : "cw-mem--saved";
 		const svg = createElement(Brain);
 		svg.setAttribute("width", "18");
 		svg.setAttribute("height", "18");
@@ -109,7 +95,7 @@ export class MemoryButton {
 	}
 
 	destroy(): void {
-		this.observer?.disconnect();
+		this.unmountControl();
 		this.host.remove();
 	}
 }

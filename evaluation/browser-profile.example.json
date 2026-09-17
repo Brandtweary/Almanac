@@ -1,0 +1,11 @@
+{
+  "model": "replace-with-explicit-candidate-id",
+  "name": "Candidate under test",
+  "maxInputTokens": 49152,
+  "maxOutputTokens": 4096,
+  "maxStageOutputTokens": 8192,
+  "inputUSDPerMillion": null,
+  "outputUSDPerMillion": null,
+  "maxRequests": 32,
+  "maxCostUSD": 1
+}

@@ -2,6 +2,7 @@ import "@mariozechner/mini-lit/dist/ModeToggle.js";
 import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { renderAsync } from "docx-preview";
+import DOMPurify from "dompurify";
 import { html, LitElement } from "lit";
 import { state } from "lit/decorators.js";
 import { Download, X } from "lucide";
@@ -518,7 +519,7 @@ export class AttachmentOverlay extends LitElement {
 					const sheetDiv = document.createElement("div");
 					sheetDiv.style.display = index === 0 ? "flex" : "none";
 					sheetDiv.className = "flex-1 overflow-auto";
-					sheetDiv.appendChild(this.renderExcelSheet(workbook.Sheets[sheetName], sheetName));
+					sheetDiv.appendChild(this.renderExcelSheet(workbook.Sheets[sheetName]));
 					sheetContents.push(sheetDiv);
 
 					// Tab click handler
@@ -548,7 +549,7 @@ export class AttachmentOverlay extends LitElement {
 			} else {
 				// Single sheet
 				const sheetName = workbook.SheetNames[0];
-				wrapper.appendChild(this.renderExcelSheet(workbook.Sheets[sheetName], sheetName));
+				wrapper.appendChild(this.renderExcelSheet(workbook.Sheets[sheetName]));
 			}
 		} catch (error: any) {
 			console.error("Error rendering Excel:", error);
@@ -556,16 +557,32 @@ export class AttachmentOverlay extends LitElement {
 		}
 	}
 
-	private renderExcelSheet(worksheet: any, sheetName: string): HTMLElement {
+	private renderExcelSheet(worksheet: XLSX.WorkSheet): HTMLElement {
 		const sheetDiv = document.createElement("div");
 
-		// Generate HTML table
-		const htmlTable = XLSX.utils.sheet_to_html(worksheet, { id: `sheet-${sheetName}` });
-		const tempDiv = document.createElement("div");
-		tempDiv.innerHTML = htmlTable;
+		// Sheet names, rich text and hyperlink targets remain untrusted after parsing.
+		const htmlTable = XLSX.utils.sheet_to_html(worksheet);
+		const fragment = DOMPurify.sanitize(htmlTable, {
+			ALLOWED_TAGS: ["table", "thead", "tbody", "tfoot", "tr", "td", "th", "span", "b", "strong", "i", "em", "u", "s", "br", "sup", "sub", "a"],
+			ALLOWED_ATTR: ["rowspan", "colspan", "href", "title", "style"],
+			ALLOW_DATA_ATTR: false,
+			ALLOW_ARIA_ATTR: false,
+			ADD_URI_SAFE_ATTR: ["rowspan", "colspan"],
+			ALLOWED_URI_REGEXP: /^(?:https?:|mailto:)/i,
+			RETURN_DOM_FRAGMENT: true,
+		});
+		// Preserve the rich-text styles emitted by SheetJS without admitting URLs,
+		// positioning, overlays or arbitrary workbook-supplied CSS.
+		fragment.querySelectorAll<HTMLElement>("[style]").forEach((element) => {
+			const size = element.style.fontSize;
+			const decoration = element.style.textDecorationLine;
+			element.removeAttribute("style");
+			if (/^\d+(?:\.\d+)?(?:pt|px|em|rem|%)$/.test(size)) element.style.fontSize = size;
+			if (/^(?:none|(?:underline|overline|line-through)(?: (?:underline|overline|line-through))*)$/.test(decoration)) element.style.textDecorationLine = decoration;
+		});
 
 		// Find and style the table
-		const table = tempDiv.querySelector("table");
+		const table = fragment.querySelector("table");
 		if (table) {
 			table.className = "w-full border-collapse text-foreground";
 

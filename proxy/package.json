@@ -1,16 +1,16 @@
 {
-  "name": "myriapod-proxy",
+  "name": "almanac-gateway",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Metering inference proxy for myriapod: holds the owner OpenRouter key, meters per-principal usage, gates free credits. Self-contained Bun service — deploy by copying proxy/ and running `bun install && bun start`.",
+  "description": "Local inference and corpus gateway",
   "scripts": {
     "start": "bun run server.ts",
-    "mint-code": "bun run mint-code.ts",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test": "bun test"
   },
   "dependencies": {
-    "hono": "^4.6.0"
+    "hono": "4.12.26"
   },
   "devDependencies": {
     "@types/bun": "^1.1.0",

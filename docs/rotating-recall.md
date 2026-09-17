@@ -1,0 +1,5 @@
+# Rotating personal recall
+
+`RecallPool` maintains separately clocked user-message and tool-result working sets, refreshes definitions by stable term identity, and admits whole definitions through the caller's exact request-token budget; its provisional capacities and reinforcement policy require qualification with the selected runtime profile. The browser lifecycle supplies consent/session resets and transactional hit publication, replaces model-facing recall per request, and persists only admitted-request delivery receipts for audit; corpus references retain their independent evidence ledger.
+
+`PhraseIndex` supplies indexed literal phrase matching with the existing Unicode boundaries and normalization paths. Offline regression scripts are `scripts/test-recall-pool.ts`, `scripts/test-phrase-index.ts`, `scripts/test-graph-mutation.ts` and `scripts/test-recall-integration.ts`; `observe`, `prepare` and `commitDelivery` are independent scenario seams for retrieval, request admission and evidence publication.

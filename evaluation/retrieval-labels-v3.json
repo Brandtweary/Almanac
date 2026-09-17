@@ -1,0 +1,487 @@
+{
+  "schema_version": 1,
+  "label_revision": "structural-alternatives-v3",
+  "status": "source-inspected-before-ranking",
+  "reason": "Additive source-inspected hydro head/fittings split; v2 hydro-planning.r1 was unmatchable in the full structurally extracted corpus. Preserve/report v1 and v2 results rather than attributing annotation correction to ranking.",
+  "parent_suite_digests": [
+    "e255c838ec443583299952e61c8c28728945aec0cd107be2dd731bcb545b4df2",
+    "c533ebca3fef652a57cab9c0e3d9a843c895dff7c4c4918198295b62aa6cdcb0"
+  ],
+  "cases": [
+    {
+      "id": "bleach-dose",
+      "split": "development",
+      "question": "According to the EPA guide, how many drops of 8.25% bleach go into one gallon of clear water, and what product restrictions apply?",
+      "requirements": [
+        {
+          "id": "dose",
+          "rubric": "Six drops per gallon for 8.25%, not eight drops or six percent.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Use the table below as a guide to decide the amount of bleach you should add to the water, for example, 8 drops of 6% bleach, or 6 drops of 8.25% bleach, to each gallon of water. Double the amount of bleach if the water is cloudy, colored, or very cold."
+              ]
+            },
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Volume of Water Amount of 6% Bleach to Add* Amount of 8.25% Bleach to Add* 1 quart/liter 2 drops 2 drops 1 gallon 8 drops 6 drops 2 gallons 16 drops (1/4 tsp) 12 drops (1/8 teaspoon) 4 gallons 1/3 teaspoon 1/4 teaspoon 8 gallons 2/3 teaspoon 1/2 teaspoon *Bleach may contain 6 or 8.25% sodium hypochlorite."
+              ]
+            },
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Volume of Water | Amount of 6% Bleach to Add* | Amount of 8.25% Bleach to Add*",
+                "1 gallon | 8 drops | 6 drops"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "product",
+          "rubric": "Regular unscented suitable bleach only; no scented, color-safe, or added cleaners.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Only use regular, unscented chlorine bleach products that are suitable for disinfection and sanitization as indicated on the label. The label may say that the active ingredient contains 6 or 8.25% of sodium hypochlorite. Do not use scented, color safe, or bleaches with added cleaners."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "wait",
+          "rubric": "Stir, wait 30 minutes and check slight chlorine odor.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Stir and let stand for 30 minutes. The water should have a slight chlorine odor. If it doesn’t, repeat the dosage and let stand for another 15 minutes before use."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "epa-dose",
+        "epa-table",
+        "epa-bleach",
+        "epa-odor"
+      ],
+      "tags": [
+        "identifier",
+        "units",
+        "prerequisite"
+      ]
+    },
+    {
+      "id": "cloudy-water",
+      "split": "development",
+      "question": "The emergency water is cloudy and very cold. What preparation and dosage qualifications does the EPA page give for household bleach?",
+      "requirements": [
+        {
+          "id": "prepare",
+          "rubric": "Let settle and filter; disinfection works less well when cloudy.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Disinfection does not work as well when water is cloudy or colored. If water is cloudy, let it settle. Then filter the water through a clean cloth, paper towel, or coffee filter. Store the settled and filtered water in clean containers with covers."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "double",
+          "rubric": "Double the normal dose when cloudy, colored OR very cold; do not multiply twice for two conditions.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Use the table below as a guide to decide the amount of bleach you should add to the water, for example, 8 drops of 6% bleach, or 6 drops of 8.25% bleach, to each gallon of water. Double the amount of bleach if the water is cloudy, colored, or very cold."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "restricted",
+          "rubric": "Use only suitable regular unscented bleach.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Only use regular, unscented chlorine bleach products that are suitable for disinfection and sanitization as indicated on the label. The label may say that the active ingredient contains 6 or 8.25% of sodium hypochlorite. Do not use scented, color safe, or bleaches with added cleaners."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "epa-settle",
+        "epa-dose",
+        "epa-bleach"
+      ],
+      "tags": [
+        "paraphrase",
+        "exception"
+      ]
+    },
+    {
+      "id": "odor-followup",
+      "split": "development",
+      "question": "I followed the EPA bleach dose, stirred and waited half an hour, but there is no chlorine smell. What does the guide say next?",
+      "requirements": [
+        {
+          "id": "repeat",
+          "rubric": "Repeat same dosage, then wait another 15 minutes before use.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Stir and let stand for 30 minutes. The water should have a slight chlorine odor. If it doesn’t, repeat the dosage and let stand for another 15 minutes before use."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "epa-odor",
+        "epa-dose"
+      ],
+      "tags": [
+        "followup",
+        "units"
+      ]
+    },
+    {
+      "id": "chemical-limits",
+      "split": "development",
+      "question": "Can the EPA boiling or bleach instructions make water containing heavy metals and salts safe to drink?",
+      "requirements": [
+        {
+          "id": "limit",
+          "rubric": "Do not claim chemical safety: boiling/disinfection do not remove heavy metals, salts and most chemicals. Do not invent a treatment recipe.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "However, boiling or disinfection will not destroy other contaminants, such as heavy metals, salts, and most other chemicals."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "epa-limits",
+        "epa-boil"
+      ],
+      "tags": [
+        "unsupported",
+        "scope"
+      ]
+    },
+    {
+      "id": "altitude-disagreement",
+      "split": "development",
+      "question": "The EPA page lists 5,000 feet alongside 1,000 meters for the longer boiling time. Are those the same altitude, and what should I conclude from the page?",
+      "requirements": [
+        {
+          "id": "conflict",
+          "rubric": "Flag the source inconsistency: 5,000 feet is 1,524 meters; do not silently repeat equivalent thresholds or invent which threshold EPA intended.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Bring water to a rolling boil for at least one minute. At altitudes above 5,000 feet (1,000 meters), boil water for three minutes."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "scope",
+          "rubric": "Distinguish source quotation from conversion; report that the page alone cannot resolve its conflicting threshold.",
+          "critical": true,
+          "evidence": []
+        }
+      ],
+      "gold_context": [
+        "epa-boil"
+      ],
+      "tags": [
+        "source-disagreement",
+        "units"
+      ]
+    },
+    {
+      "id": "bleach-table",
+      "split": "development",
+      "question": "Read the EPA table: for four gallons of water, what teaspoon doses are listed for 6% and 8.25% bleach? Preserve the table qualifications.",
+      "requirements": [
+        {
+          "id": "columns",
+          "rubric": "One-third teaspoon for 6%, one-quarter teaspoon for 8.25%, in four gallons.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Volume of Water Amount of 6% Bleach to Add* Amount of 8.25% Bleach to Add* 1 quart/liter 2 drops 2 drops 1 gallon 8 drops 6 drops 2 gallons 16 drops (1/4 tsp) 12 drops (1/8 teaspoon) 4 gallons 1/3 teaspoon 1/4 teaspoon 8 gallons 2/3 teaspoon 1/2 teaspoon *Bleach may contain 6 or 8.25% sodium hypochlorite."
+              ]
+            },
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Volume of Water | Amount of 6% Bleach to Add* | Amount of 8.25% Bleach to Add*",
+                "4 gallons | 1/3 teaspoon | 1/4 teaspoon"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "double",
+          "rubric": "Double for cloudy, colored or very cold water.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Use the table below as a guide to decide the amount of bleach you should add to the water, for example, 8 drops of 6% bleach, or 6 drops of 8.25% bleach, to each gallon of water. Double the amount of bleach if the water is cloudy, colored, or very cold."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "restriction",
+          "rubric": "These are sodium hypochlorite bleach concentrations, with unscented suitable product restrictions.",
+          "critical": true,
+          "evidence": [
+            {
+              "source_sha256": "0a8fcb1c135c3468ac5b7c1ceaa20c4d97ab3f571d0c753f3284df703341d43b",
+              "anchors": [
+                "Only use regular, unscented chlorine bleach products that are suitable for disinfection and sanitization as indicated on the label. The label may say that the active ingredient contains 6 or 8.25% of sodium hypochlorite. Do not use scented, color safe, or bleaches with added cleaners."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "epa-table",
+        "epa-dose",
+        "epa-bleach"
+      ],
+      "tags": [
+        "table",
+        "units",
+        "exception"
+      ]
+    },
+    {
+      "id": "compost-tradeoff",
+      "split": "development",
+      "question": "My compost is sodden and contains large wood pieces. Should I remove every coarse piece to speed it up? Explain the moisture and particle-size tradeoff from the source.",
+      "requirements": [
+        {
+          "id": "r1",
+          "critical": true,
+          "rubric": "Moist not soggy; water displaces oxygen and limits aerobic microbial activity.",
+          "evidence": [
+            {
+              "source_sha256": "9744d9ae3538e83430ae85f202bffc7fb886a8a33f4e733a00db64e8e604f369",
+              "anchors": [
+                "whilst composts can be too dry, it is more of a problem when it is too wet, as the water displaces oxygen within the matrix, which may prevent efficient aerobic microbial activity. Therefore, rapid bacterial decomposition requires a moist but not soggy environment."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "r2",
+          "critical": true,
+          "rubric": "Chopping helps surface access; larger pieces can aid air circulation and may be removed near end. Do not prescribe eliminating all coarse structure.",
+          "evidence": [
+            {
+              "source_sha256": "9744d9ae3538e83430ae85f202bffc7fb886a8a33f4e733a00db64e8e604f369",
+              "anchors": [
+                "Woody materials. If using woody materials, chopping will be necessary as the microbes require a high surface area to get to the carbon in the wood, which is often stored in a way that is difficult for them to access. On the other hand, having larger pieces of material within the compost may assist the process as it will aid air circulation. It may be necessary to remove these towards the end of the process."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "compost-wet",
+        "compost-wood"
+      ],
+      "tags": [
+        "practical-workflow"
+      ]
+    },
+    {
+      "id": "hydro-planning",
+      "split": "development",
+      "question": "Can I size a microhydro system from one wet-season flow observation and gross vertical drop while ignoring pipe fittings? What corrections does the source require?",
+      "requirements": [
+        {
+          "id": "r1",
+          "critical": true,
+          "rubric": "Account for head/friction loss, material, pipe size, actual pipe and equivalent fitting lengths.",
+          "evidence": [
+            {
+              "source_sha256": "5a922eb9031544ed5240d05780ec3d0fe087ea6b3b3f60cc1b8ebb3d56d364de",
+              "anchors": [
+                "Head (Vertical drop in ft) - This is the actual head that you have available due to losses from friction. Calculate friction loss using tables based on the materials you use for diversion (e.g. PVC). Determine equivalent length of pipe by adding actual length of pipe and equivalent lengths of fittings based on tables using pipe size."
+              ]
+            },
+            {
+              "source_sha256": "5a922eb9031544ed5240d05780ec3d0fe087ea6b3b3f60cc1b8ebb3d56d364de",
+              "anchors": [
+                "Head (Vertical drop in ft) - This is the actual head that you have available due to losses from friction. Calculate friction loss using tables based on the materials you use for diversion (e.g. PVC).",
+                "Determine equivalent length of pipe by adding actual length of pipe and equivalent lengths of fittings based on tables using pipe size."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "r2",
+          "critical": true,
+          "rubric": "Use observations/resolution covering temporal variation, such as monthly flow; one wet-season observation does not establish year-round output.",
+          "evidence": [
+            {
+              "source_sha256": "5a922eb9031544ed5240d05780ec3d0fe087ea6b3b3f60cc1b8ebb3d56d364de",
+              "anchors": [
+                "Note that these equations are static in time. You must run these equations for with a resolution high enough to cover periods of variation (e.g. monthly river data)."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "hydro-head",
+        "hydro-time"
+      ],
+      "tags": [
+        "practical-workflow"
+      ]
+    },
+    {
+      "id": "night-power",
+      "split": "development",
+      "question": "I want to run a tool after sunset. Does the supplied photovoltaics passage support using panels alone, and does it specify the battery capacity I need?",
+      "requirements": [
+        {
+          "id": "r1",
+          "critical": true,
+          "rubric": "Need storage or secondary source; excerpt does not specify battery capacity, load, hours, or losses, so no invented capacity.",
+          "evidence": [
+            {
+              "source_sha256": "68c459462879de65545f0ea1b6ee7c4fc3b007fe805ce461781af6abf6305432",
+              "anchors": [
+                "Solar cells only produce electricity when the sun is shining and does not tolerate shading, so it is inconsistent as a energy source for power-demanding devices. At night or in bad weather, you need either storage batteries or a secondary power source."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "pv-intermittent"
+      ],
+      "tags": [
+        "practical-workflow"
+      ]
+    },
+    {
+      "id": "soil-scope",
+      "split": "development",
+      "question": "The supplied soil page says the upper 15 to 20 cm is topsoil. Can I conclude that all soil below exactly 20 cm is always compacted and infertile?",
+      "requirements": [
+        {
+          "id": "r1",
+          "critical": true,
+          "rubric": "No: around 15-20cm is approximate, depending on soil type, often less fertile/compacted does not mean always or completely infertile.",
+          "evidence": [
+            {
+              "source_sha256": "4d7209d0336dbbb7063d963df80959ec271acbb358d9c7df3f9f2ea66cac944c",
+              "anchors": [
+                "Topsoil: This is the top layer of soil that can be seen and that extends to around 15 to 20cm beneath the surface. Subsoil: This refers to the layers of soil found beneath the 15 to 20cm of topsoil. Depending on the soil type, it is often compacted and less fertile than the topsoil, and less likely to contain organic matter of use to the gardener/food crop grower."
+              ]
+            },
+            {
+              "source_sha256": "4d7209d0336dbbb7063d963df80959ec271acbb358d9c7df3f9f2ea66cac944c",
+              "anchors": [
+                "Topsoil: This is the top layer of soil that can be seen and that extends to around 15 to 20cm beneath the surface.",
+                "Subsoil: This refers to the layers of soil found beneath the 15 to 20cm of topsoil. Depending on the soil type, it is often compacted and less fertile than the topsoil, and less likely to contain organic matter of use to the gardener/food crop grower."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "soil-depth"
+      ],
+      "tags": [
+        "practical-workflow"
+      ]
+    },
+    {
+      "id": "rain-footprint",
+      "split": "development",
+      "question": "The rectangular house is 8 by 10 meters in plan, and the sloped roof has 95 square meters of surface. Which catchment area does the supplied rainwater page use? Label any arithmetic as yours.",
+      "requirements": [
+        {
+          "id": "r1",
+          "critical": true,
+          "rubric": "Horizontal projected area is 8×10=80 square meters, not95; distinguish source rule from derived calculation.",
+          "evidence": [
+            {
+              "source_sha256": "1bd6a664003a8a987ef8eb06cc8e8bb87b3c610217fe0a49048b39003d42df26",
+              "anchors": [
+                "This is horizontal projected area of the collection surface. For a rectangular house, use length times width."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "rain-area"
+      ],
+      "tags": [
+        "practical-workflow"
+      ]
+    },
+    {
+      "id": "filter-source-change",
+      "split": "development",
+      "question": "After changing water sources for a biosand filter, I plan to chlorinate the incoming water while its biological layer adapts. Does this match the supplied guidance?",
+      "requirements": [
+        {
+          "id": "r1",
+          "critical": true,
+          "rubric": "Adaptation takes several days; secondary disinfection AFTER filtration, never chlorine/chlorinated input because it kills biolayer.",
+          "evidence": [
+            {
+              "source_sha256": "ef642fe95ec241ef897dade7cc02abeec6e8ff251ef62a5a0cdf8cd754f93332",
+              "anchors": [
+                "It may take the biolayer several days to adapt to the level of contamination and nutrients in the new source water. During this time, users can continue to use their BSF but should use a secondary disinfection method AFTER the water has gone through the filter, such as chlorination or boiling. Users should never put chlorine or chlorinated water into the filter; this will kill the biolayer."
+              ]
+            }
+          ]
+        }
+      ],
+      "gold_context": [
+        "filter-sequence"
+      ],
+      "tags": [
+        "practical-workflow"
+      ]
+    }
+  ]
+}

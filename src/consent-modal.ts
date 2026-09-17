@@ -25,9 +25,11 @@ export function showConsentModal(): Promise<ConsentChoice> {
 				<div class="cw-modal" role="dialog" aria-modal="true" aria-labelledby="cw-consent-title">
 					<h2 id="cw-consent-title" class="cw-modal-title">Remember conversations?</h2>
 					<p class="cw-modal-body">
-						Myriapod can build a small personal memory from what you tell it, so it keeps context
-						across turns and future visits. It lives <strong>only in this browser</strong> — never
-						uploaded — and you can export or delete it anytime from Settings. Turn it on?
+						Almanac can remember what you tell it across conversations. Saved memory stays
+						<strong>in this browser</strong>, and you can export or delete it in Settings.
+						When enabled, relevant conversation and memory text goes to the configured AI services;
+						small glossary and speech fragments can also be checked for pronunciation without backend storage.
+						Those services run on your own machine in a local installation. Turn memory on?
 					</p>
 					<div class="cw-modal-actions">
 						<button class="cw-modal-primary" @click=${() => finish("granted")}>Yes, remember</button>

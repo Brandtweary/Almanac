@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "id": "pocket-speech-assets-v1",
+  "scope": "selected stock speech assets; runtime image and full redistribution notices are separate",
+  "index_workspace_bytes": 0,
+  "runtime_workspace_bytes": 0,
+  "image_store_bytes": 0,
+  "artifacts": [
+    {
+      "path": "notices/pocket-speech.txt",
+      "kind": "license",
+      "bytes": 534,
+      "sha256": "26e0d10a97b937b80a1bd4e62c8d37f1ca6856d7fa254ce8180db5d9a6cfac10",
+      "embedded_text": "Pocket TTS 3.1.0 stock assets\n\nModel: Kyutai Pocket TTS English April-2026, CC-BY-4.0; https://huggingface.co/kyutai/pocket-tts-without-voice-cloning\nVoice: Alba MacKenna public stock preset, CC-BY-4.0; https://huggingface.co/kyutai/tts-voices\nSource/runtime: Pocket TTS MIT; https://github.com/kyutai-labs/pocket-tts\nThe supplied state is reference-conditioned from the public stock voice; no private voice artifact is required. Include model-card, voice-card, MIT and CC-BY-4.0 texts from speech/notices with redistributed bundles.\n",
+      "urls": [],
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://huggingface.co/kyutai/pocket-tts-without-voice-cloning",
+          "https://huggingface.co/kyutai/tts-voices"
+        ],
+        "notice": "notices/pocket-speech.txt"
+      }
+    },
+    {
+      "path": "speech/pocket/model.safetensors",
+      "kind": "speech",
+      "bytes": 219029196,
+      "sha256": "be9c6b4876d3f30740a8225dfcaa2e43dc4aeb753c15272735bee16bbb4abb0a",
+      "urls": [
+        "https://huggingface.co/kyutai/pocket-tts-without-voice-cloning/resolve/e81d79e8194ad4c7ce879c87a4258ef20cbf2487/languages/english_2026-04/model.safetensors"
+      ],
+      "source_revision": "e81d79e8194ad4c7ce879c87a4258ef20cbf2487",
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://huggingface.co/kyutai/pocket-tts-without-voice-cloning",
+          "https://huggingface.co/kyutai/tts-voices"
+        ],
+        "notice": "notices/pocket-speech.txt"
+      }
+    },
+    {
+      "path": "speech/pocket/tokenizer.model",
+      "kind": "speech",
+      "bytes": 59339,
+      "sha256": "d461765ae179566678c93091c5fa6f2984c31bbe990bf1aa62d92c64d91bc3f6",
+      "urls": [
+        "https://huggingface.co/kyutai/pocket-tts-without-voice-cloning/resolve/e81d79e8194ad4c7ce879c87a4258ef20cbf2487/languages/english_2026-04/tokenizer.model"
+      ],
+      "source_revision": "e81d79e8194ad4c7ce879c87a4258ef20cbf2487",
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://huggingface.co/kyutai/pocket-tts-without-voice-cloning",
+          "https://huggingface.co/kyutai/tts-voices"
+        ],
+        "notice": "notices/pocket-speech.txt"
+      }
+    },
+    {
+      "path": "speech/pocket/alba.safetensors",
+      "kind": "speech",
+      "bytes": 6194424,
+      "sha256": "69c32db63ca56843d994f81f343f62e0bf2d73f7e4c9bc73e44bb1110b1d8845",
+      "urls": [
+        "https://huggingface.co/kyutai/pocket-tts-without-voice-cloning/resolve/e81d79e8194ad4c7ce879c87a4258ef20cbf2487/languages/english_2026-04/embeddings/alba.safetensors"
+      ],
+      "source_revision": "e81d79e8194ad4c7ce879c87a4258ef20cbf2487",
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://huggingface.co/kyutai/pocket-tts-without-voice-cloning",
+          "https://huggingface.co/kyutai/tts-voices"
+        ],
+        "notice": "notices/pocket-speech.txt"
+      }
+    }
+  ]
+}

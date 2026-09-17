@@ -1,3 +1,4 @@
+import { EDITOR_READY_EVENT } from "../../editor-controls.js";
 import type { Model } from "@earendil-works/pi-ai";
 import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
@@ -28,6 +29,7 @@ export class MessageEditor extends LitElement {
 	}
 
 	@property() isStreaming = false;
+	@property({ type: Boolean }) disabled = false;
 	@property() currentModel?: Model<any>;
 	@property() thinkingLevel: ThinkingLevel = "off";
 	@property() showAttachmentButton = true;
@@ -60,6 +62,7 @@ export class MessageEditor extends LitElement {
 	};
 
 	private handleKeyDown = (e: KeyboardEvent) => {
+		if (this.disabled) return;
 		// Ignore key events during IME composition (e.g. CJK input)
 		if (e.isComposing || e.key === "Process") return;
 
@@ -74,57 +77,51 @@ export class MessageEditor extends LitElement {
 		}
 	};
 
-	private handlePaste = async (e: ClipboardEvent) => {
-		const items = e.clipboardData?.items;
-		if (!items) return;
-
-		const imageFiles: File[] = [];
-
-		// Check for image items in clipboard
-		for (let i = 0; i < items.length; i++) {
-			const item = items[i];
-			if (item.type.startsWith("image/")) {
-				const file = item.getAsFile();
-				if (file) {
-					imageFiles.push(file);
-				}
-			}
+	private async ingestFiles(files: File[]): Promise<void> {
+		if (this.disabled) return;
+		if (this.processingFiles) return;
+		if (!files.length) return;
+		if (files.length + this.attachments.length > this.maxFiles) {
+			alert(`Maximum ${this.maxFiles} files allowed`);
+			return;
 		}
-
-		// If we found images, process them
-		if (imageFiles.length > 0) {
-			e.preventDefault(); // Prevent default paste behavior
-
-			if (imageFiles.length + this.attachments.length > this.maxFiles) {
-				alert(`Maximum ${this.maxFiles} files allowed`);
-				return;
-			}
-
-			this.processingFiles = true;
-			const newAttachments: Attachment[] = [];
-
-			for (const file of imageFiles) {
+		this.processingFiles = true;
+		try {
+			const added: Attachment[] = [];
+			for (const file of files) {
 				try {
 					if (file.size > this.maxFileSize) {
-						alert(`Image exceeds maximum size of ${Math.round(this.maxFileSize / 1024 / 1024)}MB`);
+						alert(`${file.name} exceeds maximum size of ${Math.round(this.maxFileSize / 1024 / 1024)}MB`);
 						continue;
 					}
-
-					const attachment = await loadAttachment(file);
-					newAttachments.push(attachment);
+					added.push(await loadAttachment(file));
 				} catch (error) {
-					console.error("Error processing pasted image:", error);
-					alert(`Failed to process pasted image: ${String(error)}`);
+					console.error(`Error processing ${file.name}:`, error);
+					alert(`Failed to process ${file.name}: ${String(error)}`);
 				}
 			}
-
-			this.attachments = [...this.attachments, ...newAttachments];
+			this.attachments = [...this.attachments, ...added];
 			this.onFilesChange?.(this.attachments);
+		} finally {
 			this.processingFiles = false;
 		}
+	}
+
+	private handlePaste = async (e: ClipboardEvent) => {
+		const files: File[] = [];
+		for (const item of Array.from(e.clipboardData?.items ?? [])) {
+			if (item.type.startsWith("image/")) {
+				const file = item.getAsFile();
+				if (file) files.push(file);
+			}
+		}
+		if (!files.length) return;
+		e.preventDefault();
+		await this.ingestFiles(files);
 	};
 
 	private handleSend = () => {
+		if (this.disabled) return;
 		this.onSend?.(this.value, this.attachments);
 	};
 
@@ -134,37 +131,11 @@ export class MessageEditor extends LitElement {
 
 	private async handleFilesSelected(e: Event) {
 		const input = e.target as HTMLInputElement;
-		const files = Array.from(input.files || []);
-		if (files.length === 0) return;
-
-		if (files.length + this.attachments.length > this.maxFiles) {
-			alert(`Maximum ${this.maxFiles} files allowed`);
+		try {
+			await this.ingestFiles(Array.from(input.files ?? []));
+		} finally {
 			input.value = "";
-			return;
 		}
-
-		this.processingFiles = true;
-		const newAttachments: Attachment[] = [];
-
-		for (const file of files) {
-			try {
-				if (file.size > this.maxFileSize) {
-					alert(`${file.name} exceeds maximum size of ${Math.round(this.maxFileSize / 1024 / 1024)}MB`);
-					continue;
-				}
-
-				const attachment = await loadAttachment(file);
-				newAttachments.push(attachment);
-			} catch (error) {
-				console.error(`Error processing ${file.name}:`, error);
-				alert(`Failed to process ${file.name}: ${String(error)}`);
-			}
-		}
-
-		this.attachments = [...this.attachments, ...newAttachments];
-		this.onFilesChange?.(this.attachments);
-		this.processingFiles = false;
-		input.value = ""; // Reset input
 	}
 
 	private removeFile(fileId: string) {
@@ -196,39 +167,11 @@ export class MessageEditor extends LitElement {
 		e.preventDefault();
 		e.stopPropagation();
 		this.isDragging = false;
-
-		const files = Array.from(e.dataTransfer?.files || []);
-		if (files.length === 0) return;
-
-		if (files.length + this.attachments.length > this.maxFiles) {
-			alert(`Maximum ${this.maxFiles} files allowed`);
-			return;
-		}
-
-		this.processingFiles = true;
-		const newAttachments: Attachment[] = [];
-
-		for (const file of files) {
-			try {
-				if (file.size > this.maxFileSize) {
-					alert(`${file.name} exceeds maximum size of ${Math.round(this.maxFileSize / 1024 / 1024)}MB`);
-					continue;
-				}
-
-				const attachment = await loadAttachment(file);
-				newAttachments.push(attachment);
-			} catch (error) {
-				console.error(`Error processing ${file.name}:`, error);
-				alert(`Failed to process ${file.name}: ${String(error)}`);
-			}
-		}
-
-		this.attachments = [...this.attachments, ...newAttachments];
-		this.onFilesChange?.(this.attachments);
-		this.processingFiles = false;
+		await this.ingestFiles(Array.from(e.dataTransfer?.files ?? []));
 	};
 
 	override firstUpdated() {
+		this.dispatchEvent(new CustomEvent(EDITOR_READY_EVENT, { bubbles: true }));
 		const textarea = this.textareaRef.value;
 		if (textarea) {
 			textarea.focus();
@@ -278,6 +221,7 @@ export class MessageEditor extends LitElement {
 				}
 
 				<textarea
+					?disabled=${this.disabled}
 					class="w-full bg-transparent p-4 text-foreground placeholder-muted-foreground outline-none resize-none overflow-y-auto"
 					placeholder=${i18n("Type a message...")}
 					rows="1"
@@ -375,6 +319,7 @@ export class MessageEditor extends LitElement {
 								`
 								: ""
 						}
+						<span data-editor-controls style="display: contents"></span>
 						${
 							this.isStreaming
 								? html`
@@ -391,7 +336,7 @@ export class MessageEditor extends LitElement {
 										variant: "ghost",
 										size: "icon",
 										onClick: this.handleSend,
-										disabled: (!this.value.trim() && this.attachments.length === 0) || this.processingFiles,
+										disabled: this.disabled || (!this.value.trim() && this.attachments.length === 0) || this.processingFiles,
 										children: html`<div style="transform: rotate(-45deg)">${icon(Send, "sm")}</div>`,
 										className: "h-8 w-8",
 									})}

@@ -1,77 +1,62 @@
-import type { Model } from "@earendil-works/pi-ai";
+import type { Model, ThinkingLevel } from "@earendil-works/pi-ai";
+import { appPath, absoluteServiceUrl } from "./app-paths.js";
 
-// One hardcoded chat model: Kimi K3 (frontier, open-weight) over OpenRouter. There is
-// no model picker — the audience never sees or chooses it. The same model serves BOTH
-// the chat agent and the three per-turn pipeline agents (audit/memory/summary); one
-// model keeps the moving parts down.
-//
-// Three serving paths reach it (resolved in main.ts: resolveServingPath):
-//   own-key → the visitor's own OpenRouter key, calling OpenRouter DIRECTLY (no proxy)
-//   family  → a redeemed family token, through the metering proxy
-//   anon    → a minted $10 free-tier token, through the metering proxy
-// The own-key path uses MYRIAPOD_MODEL (baseUrl = OpenRouter direct); the owner-funded
-// paths use proxyChatModel() (baseUrl = the proxy). The proxy holds the real owner key
-// server-side — no key ever reaches the browser.
-
-// Kimi K3's OpenRouter model id (moonshotai). 1M context.
-export const MYRIAPOD_MODEL_ID = "moonshotai/kimi-k3";
-
-// Kimi K3 has exactly ONE reasoning mode: always on, and OpenRouter accepts only the
-// wire effort "max" (more levels "coming soon"). There is no way to turn thinking off, so
-// the chat agent reasons on every turn too — Kimi's inference is fast enough (adaptive
-// thinking + high token throughput) that the always-on latency is acceptable for the
-// voice cascade.
-//
-// pi-ai 0.80 includes "max" natively in its ThinkingLevel vocabulary, so the chat agent
-// requests thinking level "max" directly (MYRIAPOD_THINKING_LEVEL) and pi-ai emits
-// `reasoning: { effort: "max" }`, the only value Kimi honors — no thinkingLevelMap needed.
-// reasoning MUST stay `true` — pi-ai only emits a reasoning field when model.reasoning is
-// truthy (buildParams in openai-completions).
-//
-// The single wire effort Kimi accepts. Exported for the hand-built ingest path
-// (kg/ingest.ts makeCompletion), which sets `reasoning.effort` directly.
-export const MYRIAPOD_REASONING_EFFORT = "max" as const;
-//
-// cost is USD per million tokens — APPROXIMATE (Kimi K3's OpenRouter price; the proxy
-// meters the TRUE per-call cost from OpenRouter's usage, so this only feeds the UI stats
-// line). maxTokens is a generation ceiling, not a target (the proxy also caps it).
-export const MYRIAPOD_MODEL: Model<"openai-completions"> = {
-	id: MYRIAPOD_MODEL_ID,
-	name: "Kimi K3",
-	api: "openai-completions",
-	provider: "openrouter",
-	baseUrl: "https://openrouter.ai/api/v1",
-	reasoning: true,
-	input: ["text"],
-	cost: { input: 3.0, output: 15.0, cacheRead: 0.3, cacheWrite: 3.0 },
-	contextWindow: 1_000_000,
-	maxTokens: 8_192,
-};
-
-// The chat agent's thinking level — Kimi's native "max" (always-on; there is no "off").
-export const MYRIAPOD_THINKING_LEVEL = "max" as const;
-
-// --- Owner-funded path: the metering proxy ---------------------------------
-// The owner-funded serving paths (anonymous + family) route chat AND ingestion through
-// our Bun proxy instead of calling OpenRouter directly; the own-key path bypasses it.
-// Override the URL at build time via VITE_PROXY_BASE.
 const ENV = (import.meta.env ?? {}) as Record<string, string | undefined>;
-export const MYRIAPOD_PROXY_BASE = ENV.VITE_PROXY_BASE ?? "http://127.0.0.1:8790/v1";
-
-// A provider id distinct from "openrouter" so the own-key path's stored OpenRouter key
-// and the proxy's auth token never share a providerKeys slot.
-export const MYRIAPOD_PROXY_PROVIDER = "myriapod";
-
-// Kimi K3 pointed at the proxy. pi-ai auto-detects a non-openrouter.ai baseUrl as plain
-// OpenAI and would emit `reasoning_effort`; we pin thinkingFormat "openrouter" so the
-// forwarded body carries `reasoning: { effort }` — byte-identical to the direct path (the
-// proxy passes it through to OpenRouter verbatim). Everything else (including reasoning:true)
-// is inherited from MYRIAPOD_MODEL.
-export function proxyChatModel(): Model<"openai-completions"> {
-	return {
-		...MYRIAPOD_MODEL,
-		provider: MYRIAPOD_PROXY_PROVIDER,
-		baseUrl: MYRIAPOD_PROXY_BASE,
-		compat: { thinkingFormat: "openrouter" },
-	};
+export const MYRIAPOD_PROXY_BASE = absoluteServiceUrl(ENV.VITE_PROXY_BASE ?? appPath("v1"));
+export const MYRIAPOD_PROXY_PROVIDER = "local-oracle";
+export type OracleRole = "chat" | "audit" | "memory" | "summary" | "compaction";
+export interface RoleBudget { maxInputTokens: number; maxOutputTokens: number; maxStageOutputTokens?: number; thinkingLevel?: ThinkingLevel }
+export interface ReleaseProfile {
+	id: string;
+	model: { id: string; name: string; contextWindow: number; maxTokens: number; reasoning: boolean; input: ("text" | "image")[]; reasoningEffort?: string; sampling?: { temperature: number; top_p: number; top_k: number } };
+	roles: Record<OracleRole, RoleBudget>;
+	limits: { queueTimeoutMs: number; executionTimeoutMs: number; speechTimeoutMs?: number };
 }
+let profile: ReleaseProfile | undefined;
+export let qualificationMode = false;
+export let MYRIAPOD_MODEL_ID = "unconfigured";
+export let MYRIAPOD_REASONING_EFFORT: string | undefined;
+export let MYRIAPOD_THINKING_LEVEL: ThinkingLevel | "off" = "off";
+export let MYRIAPOD_MODEL: Model<"openai-completions"> = {
+	id: "unconfigured", name: "Local model unavailable", api: "openai-completions", provider: MYRIAPOD_PROXY_PROVIDER,
+	baseUrl: MYRIAPOD_PROXY_BASE, reasoning: false, input: ["text"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 0, maxTokens: 0,
+};
+export function releaseProfile(): ReleaseProfile {
+	if (!profile) throw new Error("The local runtime has no qualified release profile. Complete installation before sending a request.");
+	return profile;
+}
+export function validateProfile(value: unknown): ReleaseProfile {
+	const p = value as ReleaseProfile;
+	const positive = (v: unknown) => typeof v === "number" && Number.isSafeInteger(v) && v > 0;
+	if (!p || typeof p.id !== "string" || !p.id || !p.model || typeof p.model.id !== "string" || !p.model.id ||
+		typeof p.model.name !== "string" || typeof p.model.reasoning !== "boolean" ||
+		!positive(p.model.contextWindow) || !positive(p.model.maxTokens) || !Array.isArray(p.model.input) || !p.model.input.length ||
+		p.model.input.some(v => v !== "text" && v !== "image") || !positive(p.limits?.queueTimeoutMs) || !positive(p.limits?.executionTimeoutMs)) {
+		throw new Error("Local runtime returned an invalid release profile");
+	}
+	const sampling = p.model.sampling;
+	if (sampling !== undefined && (!sampling || typeof sampling !== "object" || Array.isArray(sampling) ||
+		!Number.isFinite(sampling.temperature) || sampling.temperature < 0 || sampling.temperature > 2 ||
+		!Number.isFinite(sampling.top_p) || sampling.top_p <= 0 || sampling.top_p > 1 ||
+		!Number.isSafeInteger(sampling.top_k) || (sampling.top_k !== -1 && sampling.top_k < 1))) throw new Error("Invalid candidate sampling policy");
+	for (const role of ["chat", "audit", "memory", "summary", "compaction"] as const) {
+		const b = p.roles?.[role];
+		if (["audit", "memory", "summary"].includes(role) && !positive(b?.maxStageOutputTokens)) throw new Error(`Invalid ${role} cumulative stage output budget`);
+		if (!b || !positive(b.maxInputTokens) || !positive(b.maxOutputTokens) || b.maxInputTokens + b.maxOutputTokens > p.model.contextWindow || b.maxOutputTokens > p.model.maxTokens) throw new Error(`Invalid ${role} context budget in release profile`);
+	}
+	return p;
+}
+export async function loadReleaseProfile(): Promise<void> {
+	const res = await fetch(`${MYRIAPOD_PROXY_BASE}/profile`, { signal: AbortSignal.timeout(10000) });
+	if (!res.ok) throw new Error(`Local runtime unavailable (HTTP ${res.status})`);
+	const data = await res.json();
+	qualificationMode = data.qualificationMode === true;
+	if (!data.ready && !qualificationMode) throw new Error(`Local oracle is not ready: ${data.status ?? "missing corpus or release profile"}`);
+	profile = validateProfile(data.profile);
+	MYRIAPOD_MODEL_ID = profile.model.id;
+	MYRIAPOD_REASONING_EFFORT = profile.model.reasoningEffort;
+	MYRIAPOD_THINKING_LEVEL = profile.roles.chat.thinkingLevel ?? "off";
+	MYRIAPOD_MODEL = { ...MYRIAPOD_MODEL, ...profile.model, maxTokens: profile.roles.chat.maxOutputTokens };
+}
+export function proxyChatModel(): Model<"openai-completions"> { return { ...MYRIAPOD_MODEL }; }

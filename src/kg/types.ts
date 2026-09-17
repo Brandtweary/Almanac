@@ -15,6 +15,7 @@ export interface Thought {
 	embedding?: number[] | null;
 	embedding_encoder?: string | null;
 	hit_count: number;
+	hit_count_tool?: number;
 	created_at?: string;
 	updated_at?: string;
 	metadata: { no_stem?: boolean } | null;

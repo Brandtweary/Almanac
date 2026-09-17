@@ -1,6 +1,4 @@
-# Proxy runtime state — never commit
+gateway.jsonl
 *.db
-*.db-wal
 *.db-shm
-.env
-.cap-tokens.json
+*.db-wal

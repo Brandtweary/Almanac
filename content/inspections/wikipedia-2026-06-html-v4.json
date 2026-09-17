@@ -1,0 +1,344 @@
+{
+  "source_sha256": "441a56d9e05b2d98f8ae9acb7986a513ed47904d73852c92dc6b7d50baa122e5",
+  "extraction_revision": "html-structural-v4",
+  "selection_policy": "canonical-html",
+  "archive_uuid": "c22094d0-6ad1-6360-36b7-dab953595143",
+  "archive_bytes": 52690706555,
+  "entry_count": 19707079,
+  "article_count_including_redirects": 19191219,
+  "native_fulltext": true,
+  "counter": "application/javascript=4;application/pdf=37;font/ttf=1;image/png=4;image/svg+xml=23;image/svg+xml; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/SVG/1.0.0\"=515748;text/css=39;text/html=8516991;text/html; charset=iso-8859-1=1;text/javascript=3",
+  "observations": [
+    {
+      "path": "Water",
+      "canonical_path": "Water",
+      "title": "Water",
+      "html_bytes": 664013,
+      "blocks": 603,
+      "lead_characters": 2667,
+      "lead_sha256": "8a57be068242fd18a29d48c15b95361666a4b592bf04b24c654d87594deecfdb",
+      "body_text_sha256": "e051cf8a378c24360dba07cf640254260da6ee81eabd113d23f589cb0c4d6a61",
+      "headings": [
+        [
+          "Etymology"
+        ],
+        [
+          "History"
+        ],
+        [
+          "History",
+          "On Earth"
+        ],
+        [
+          "Properties"
+        ],
+        [
+          "Properties",
+          "States"
+        ],
+        [
+          "Properties",
+          "States",
+          "Density"
+        ],
+        [
+          "Properties",
+          "States",
+          "Magnetism"
+        ],
+        [
+          "Properties",
+          "States",
+          "Phase transitions"
+        ]
+      ],
+      "tables": 6,
+      "math_notation_blocks": 50,
+      "flags": [
+        "merged_cells_inspect_original"
+      ],
+      "lead_flags": [],
+      "selection": [
+        true,
+        null,
+        null
+      ]
+    },
+    {
+      "path": "Electricity",
+      "canonical_path": "Electricity",
+      "title": "Electricity",
+      "html_bytes": 275853,
+      "blocks": 243,
+      "lead_characters": 1908,
+      "lead_sha256": "fad11d4dd72cb47db50ffad92e650a58cb5f702640ac17e78862640b76a18385",
+      "body_text_sha256": "78978a4b2cc7ac0b1a8161861d8ee7bf1d0de047bf4e3697f99b326a8c466a4d",
+      "headings": [
+        [
+          "History"
+        ],
+        [
+          "Concepts"
+        ],
+        [
+          "Concepts",
+          "Electric charge"
+        ],
+        [
+          "Concepts",
+          "Electric current"
+        ],
+        [
+          "Concepts",
+          "Electric field"
+        ],
+        [
+          "Concepts",
+          "Electric potential"
+        ],
+        [
+          "Concepts",
+          "Electromagnets"
+        ],
+        [
+          "Concepts",
+          "Electric circuits"
+        ]
+      ],
+      "tables": 4,
+      "math_notation_blocks": 27,
+      "flags": [
+        "merged_cells_inspect_original"
+      ],
+      "lead_flags": [],
+      "selection": [
+        true,
+        null,
+        null
+      ]
+    },
+    {
+      "path": "Crop_rotation",
+      "canonical_path": "Crop_rotation",
+      "title": "Crop rotation",
+      "html_bytes": 139120,
+      "blocks": 146,
+      "lead_characters": 1027,
+      "lead_sha256": "ad0284f745d42cf9edf4538a046ca2534d11826f6a002786a2ae505f70a9e96f",
+      "body_text_sha256": "46880487c6f41a81752f735dca7f50fa3012bbe71731cf6bea2dc417e619f978",
+      "headings": [
+        [
+          "History"
+        ],
+        [
+          "History",
+          "Two-field systems"
+        ],
+        [
+          "History",
+          "Three-field systems"
+        ],
+        [
+          "History",
+          "Four-field rotations"
+        ],
+        [
+          "History",
+          "Modern developments"
+        ],
+        [
+          "Crop choice"
+        ],
+        [
+          "Crop choice",
+          "Row crops"
+        ],
+        [
+          "Crop choice",
+          "Legumes"
+        ]
+      ],
+      "tables": 3,
+      "math_notation_blocks": 15,
+      "flags": [
+        "merged_cells_inspect_original"
+      ],
+      "lead_flags": [],
+      "selection": [
+        true,
+        null,
+        null
+      ]
+    },
+    {
+      "path": "First_aid",
+      "canonical_path": "First_aid",
+      "title": "First aid",
+      "html_bytes": 347418,
+      "blocks": 263,
+      "lead_characters": 1150,
+      "lead_sha256": "1497c020999cdb6744c28374194114b012ee79d7f69072b5f017f39ad8b22872",
+      "body_text_sha256": "26eabdad940887f77a90a7f71d52a119893c2e7f96e542658299fad0d427c841",
+      "headings": [
+        [
+          "Early history and warfare"
+        ],
+        [
+          "Early history and warfare",
+          "Formalization of life saving treatments"
+        ],
+        [
+          "Common emergences that require first aid in humans"
+        ],
+        [
+          "Common emergences that require first aid in humans",
+          "Bleeding"
+        ],
+        [
+          "Common emergences that require first aid in humans",
+          "Cardiac arrest (total stop of heartbeat)"
+        ],
+        [
+          "Common emergences that require first aid in humans",
+          "Choking"
+        ],
+        [
+          "Common emergences that require first aid in humans",
+          "Diabetes, hyperglycemia"
+        ],
+        [
+          "Common emergences that require first aid in humans",
+          "Diabetes, hypoglycemia"
+        ]
+      ],
+      "tables": 6,
+      "math_notation_blocks": 5,
+      "flags": [
+        "merged_cells_inspect_original"
+      ],
+      "lead_flags": [],
+      "selection": [
+        true,
+        null,
+        null
+      ]
+    },
+    {
+      "path": "Photosynthesis",
+      "canonical_path": "Photosynthesis",
+      "title": "Photosynthesis",
+      "html_bytes": 476553,
+      "blocks": 317,
+      "lead_characters": 4096,
+      "lead_sha256": "5804a55743b22e33a379f9e246b805bfb83ce27db5ac513651838384ced94fdb",
+      "body_text_sha256": "0a1a199e178d9184742f46d0c974022bc7d6d5f7e5894469b64542f9d5a967e7",
+      "headings": [
+        [
+          "Overview"
+        ],
+        [
+          "Photosynthetic membranes and organelles"
+        ],
+        [
+          "Light-dependent reactions"
+        ],
+        [
+          "Light-dependent reactions",
+          "Z scheme"
+        ],
+        [
+          "Light-dependent reactions",
+          "Water photolysis"
+        ],
+        [
+          "Light-independent reactions"
+        ],
+        [
+          "Light-independent reactions",
+          "Calvin cycle"
+        ],
+        [
+          "Light-independent reactions",
+          "Carbon concentrating mechanisms"
+        ]
+      ],
+      "tables": 7,
+      "math_notation_blocks": 48,
+      "flags": [
+        "merged_cells_inspect_original",
+        "table_headers_unverified"
+      ],
+      "lead_flags": [],
+      "selection": [
+        true,
+        null,
+        null
+      ]
+    },
+    {
+      "path": "Wikipedia",
+      "canonical_path": "Wikipedia",
+      "title": "Wikipedia",
+      "html_bytes": 1004569,
+      "blocks": 852,
+      "lead_characters": 1927,
+      "lead_sha256": "77db677fbdcdadb7e356fc607a90966e0d7d368aba05264c327f3805a8629f7b",
+      "body_text_sha256": "09a4df8fa8e0322bff4fbb4a5e8671e877785a96e4f4a9f34a6f7b0d5a2bd9ba",
+      "headings": [
+        [
+          "History"
+        ],
+        [
+          "History",
+          "Nupedia"
+        ],
+        [
+          "History",
+          "Launch and growth"
+        ],
+        [
+          "History",
+          "Sister projects"
+        ],
+        [
+          "History",
+          "Milestones"
+        ],
+        [
+          "History",
+          "Impacts of generative AI on Wikipedia views"
+        ],
+        [
+          "Collaborative editing"
+        ],
+        [
+          "Collaborative editing",
+          "Restrictions"
+        ]
+      ],
+      "tables": 11,
+      "math_notation_blocks": 66,
+      "flags": [
+        "merged_cells_inspect_original",
+        "table_headers_unverified"
+      ],
+      "lead_flags": [],
+      "selection": [
+        true,
+        null,
+        null
+      ]
+    }
+  ],
+  "checked": true,
+  "archive": "wikipedia_en_all_nopic_2026-06.zim",
+  "scope": "Representative original native HTML structure and math-preserving extraction; not full factual correctness or blanket redistribution clearance",
+  "checks": [
+    "Sibling and nested headings preserve source ancestry",
+    "Superscript/subscript mathematical notation is explicit in prose, lead excerpts and tables",
+    "MathML/LaTeX alternatives are preserved where supported; unsupported math is flagged omitted",
+    "v3 full-body and title/lead extraction retain versioned historical behavior; new v4 generations have distinct identities",
+    "Native full-text index and complete source reading remain separate from title/lead-only dense representation"
+  ],
+  "license_policy": "Wikipedia contributor attribution and CC-BY-SA-4.0 source links retained; third-party quotations/media keep their own terms."
+}

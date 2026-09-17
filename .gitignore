@@ -9,6 +9,10 @@ CLAUDE.local.md
 
 # Dependencies
 node_modules/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
 .pnp
 .pnp.js
 
