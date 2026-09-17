@@ -49,16 +49,37 @@ def test_schema_rejects_controls_symbols_options_and_oversize():
 def test_alignment_version_and_stdin_only():
     async def run():
         version=Process(b'eSpeak NG text-to-speech: 1.52.0.1 Data at: /private/path\n')
-        first,second=Process('ˈeɪdʒd\n'.encode()),Process('həlˈoʊ wˈɜːld\n'.encode())
-        spawn=Spawn([version,Process(b"voys"),first,second]);native=NativePhonemizer('/test/espeak-ng',spawn=spawn)
+        batch=Process('ˈeɪdʒd\nhəlˈoʊ wˈɜːld\n'.encode())
+        spawn=Spawn([version,Process(b"voys"),batch]);native=NativePhonemizer('/test/espeak-ng',spawn=spawn)
         await native.initialize();result=await native.convert(PhonemizeRequest(texts=['aged','hello world'],language='en-us'))
         assert result=={'phonemes':['ˈeɪdʒd','həlˈoʊ wˈɜːld'],'engine':{'name':'espeak-ng','version':'1.52.0.1','voice':'en-us'}}
-        assert first.stdin.data==b'aged' and second.stdin.data==b'hello world'
+        assert batch.stdin.data==b'aged\nhello world\n'
         assert all('aged' not in args and 'hello world' not in args for args,_ in spawn.calls)
         assert spawn.calls[1][0][1:]==('-q','--ipa','-v','en-us','--stdin')
+        assert spawn.calls[2][0][1:]==('-q','--ipa','-v','en-us')
+        assert len(spawn.calls)==3
         assert all(kwargs.get('start_new_session') and 'shell' not in kwargs for _,kwargs in spawn.calls)
-        assert all(p.waited and p.stdin.closed for p in [version,first,second])
+        assert all(p.waited and p.stdin.closed for p in [version,batch])
         assert '/private/path' not in json.dumps(native.capability())
+    asyncio.run(run())
+
+
+def test_batch_alignment_and_per_item_output_bounds():
+    async def run():
+        body=PhonemizeRequest(texts=['first','second'],language='en-us')
+        for output in [b'one\n', b'one\n\ntwo\n', b'x'*MAX_OUTPUT_BYTES+b'\ntwo\n', b'x'*(MAX_OUTPUT_BYTES+1)+b'\ntwo\n']:
+            process=Process(output);native=ready(Spawn([process]))
+            with pytest.raises(ContentError) as error:await native.convert(body)
+            assert error.value.code=='phonemizer_failed'
+            assert process.waited and native.active==0
+        # The whole request may exceed one record's bound while each result stays bounded.
+        output=b'x'*(MAX_OUTPUT_BYTES//2)+b'\n'+b'y'*(MAX_OUTPUT_BYTES//2)+b'\n'
+        spawn=Spawn([Process(output)]);native=ready(spawn)
+        result=await native.convert(body)
+        assert len(result['phonemes'])==2 and len(spawn.calls)==1
+        empty=ready(Spawn([]))
+        assert (await empty.convert(PhonemizeRequest(texts=[],language='en-us')))['phonemes']==[]
+        assert empty.active==0
     asyncio.run(run())
 
 
@@ -146,7 +167,7 @@ def test_unicode_nfc_validation_and_utf8_stdin():
     async def run():
         p=Process('kaˈfeɪ'.encode());native=ready(Spawn([p]))
         result=await native.convert(PhonemizeRequest(texts=['Café'],language='en-us'))
-        assert p.stdin.data=='Café'.encode('utf-8') and result['phonemes']==['kaˈfeɪ']
+        assert p.stdin.data=='Café\n'.encode('utf-8') and result['phonemes']==['kaˈfeɪ']
     asyncio.run(run())
 
 

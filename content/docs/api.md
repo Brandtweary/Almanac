@@ -52,8 +52,8 @@ conversation text and memory. Proxy disconnect cancels outstanding HTTP retrieva
 `POST /v1/phonemize` accepts `{texts: string[], language: "en-us"}` and returns
 `{phonemes: string[], engine: {name: "espeak-ng", version: string, voice: "en-us"}}`.
 Output order exactly matches input order. The native engine uses plain `--ipa`; consumers may remove
-stress marks and whitespace for comparison. One input per process prevents clause boundaries from
-misaligning a batch. Input text is sent through stdin, never interpolated into a shell or command options.
+stress marks and whitespace for comparison. One process handles each request using native line-by-line
+stdin mode, which calls the engine separately for each newline-terminated input; output alignment and per-item size are checked. Input text is never interpolated into a shell or command options.
 
 A batch has at most 256 entries, each 1–64 NFC-normalized Unicode letters, marks, numbers or ASCII spaces, with at least one
 letter or number. Controls, punctuation and other Unicode categories are rejected. The encoded HTTP body is bounded at 128 KiB before parsing, including chunked requests.

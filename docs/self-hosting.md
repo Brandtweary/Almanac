@@ -1,6 +1,6 @@
 # Self-hosting
 
-Use the single setup entry and release manifests described in [Linux installation and offline preparation](install.md). The browser, gateway, content service, inference, speech and indexes form one installation; a static frontend alone cannot answer reference questions. A release is ready only after its actual artifacts pass the recorded qualification checks.
+Use the concrete source commands in [Linux installation](install.md) and [runtime startup](source-runtime.md); prepared portable manifests are a separate option. The browser, gateway, content service, inference, speech and indexes form one installation; a static frontend alone cannot answer reference questions. A release is ready only after its actual artifacts pass the recorded qualification checks.
 
 ## Service boundaries
 
@@ -12,9 +12,9 @@ Use the single setup entry and release manifests described in [Linux installatio
 | Speech input | Whisper-compatible multipart HTTP transcription; the gateway exposes `/api/asr-http`. |
 | Speech output | Kyutai msgpack streaming WebSocket; the gateway exposes `/api/tts_streaming`. |
 | Personal-memory embeddings | Encoder-identified embedding service; unavailable dedup falls back visibly to string similarity. |
-| Web discovery | Optional SearXNG JSON search in an explicitly online deployment. |
+| Web discovery | SearXNG JSON search for normal connected use, with an explicit unavailable state when the web cannot be reached. |
 
-The offline release uses local artifacts and an internal service network. Hosted demonstrations use the same application and local models on the host; the visitor's browser sends chat/audio and consented memory context to that host. Local installation sends those requests to the user's own machine. Corpus files never become personal-memory entries automatically, and disabling personal memory leaves corpus access enabled.
+The model and reference library use local artifacts. Web search remains available through the gateway when configured and connected; internal inference isolation does not require the whole application to be air-gapped. Hosted demonstrations use the same application and local models on the host; the visitor's browser sends chat/audio and consented memory context to that host. Local installation sends those requests to the user's own machine. Corpus files never become personal-memory entries automatically, and disabling personal memory leaves corpus access enabled.
 
 ## Browser and gateway configuration
 

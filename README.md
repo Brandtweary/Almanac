@@ -50,9 +50,9 @@ Almanac is a local AI assistant built around a practical reference library. Its 
 people find, read and use knowledge: tending land, maintaining tools, preserving food, understanding
 unfamiliar machinery, and studying whatever catches their curiosity after the day's work is done.
 
-The intended installation runs on a computer you control, with its books and model stored locally
-for use without an internet connection. Ask by voice or text; follow the assistant's references back
-to the sources. Optional personal memory helps it retain context you choose to share, while the
+Almanac runs its model and reference library on a computer you control, with web search available
+for current information. Ask by voice or text; follow the assistant's references back to the sources.
+Its installed books and local capabilities remain useful when the internet is unavailable. Optional personal memory helps it retain context you choose to share, while the
 reference library remains available with memory switched off. The underlying documents remain
 useful on their own.
 
@@ -60,10 +60,10 @@ You need not wait for the roads to go quiet. There are things worth mending now.
 
 ## Building the reading room
 
-The conversion from Myriapod to this practical-knowledge oracle is under qualification. The local
-model, complete library indexes, speech stack and offline installation must pass their release
-checks before this is a ready-to-install offline product. No qualified production release manifest
-is supplied yet.
+Almanac is a shareable concept demonstration of a local model, practical library and web-enabled
+assistant. The complete library indexes and whole-installation checks remain under qualification;
+component results are documented separately. Source installation is available, while a certified
+portable bundle is not supplied.
 
 [Source-based installation](./docs/install.md#source-based-local-setup) gives concrete browser, gateway,
 library and CPU speech commands; [runtime startup](./docs/source-runtime.md) includes exact model
@@ -76,7 +76,7 @@ reference tools and optional personal memory.
 For frontend development:
 
 ```sh
-git clone https://github.com/Brandtweary/almanac.git
+git clone https://github.com/Brandtweary/Almanac.git almanac
 cd almanac
 npm ci
 npm run dev        # Vite development server

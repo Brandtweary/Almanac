@@ -1,6 +1,6 @@
 # Source runtime startup
 
-Run these commands from the cloned repository root, after the package/build steps in [installation](install.md#source-based-local-setup). They acquire and start the selected components directly; they do not require an absent portable release manifest. The language-model configuration targets the measured Linux, NVIDIA 32 GB GPU setup. Install Docker Engine, the NVIDIA Container Toolkit, Python 3.11+ and `curl` before disconnecting. Check existing container names and service allocations first; these commands refuse name collisions rather than replacing another installation.
+Run these commands from the cloned repository root, after the package/build steps in [installation](install.md#source-based-local-setup). They acquire and start the selected components directly; they do not require an absent portable release manifest. The language-model configuration targets the measured Linux, NVIDIA 32 GB GPU setup. Install Docker Engine, the NVIDIA Container Toolkit, Python 3.11+ and `curl` during connected preparation. Check existing container names and service allocations first; these commands refuse name collisions rather than replacing another installation.
 
 The selected model snapshot alone is 24,698,225,080 bytes. Add complete reference originals, image storage, writable model caches and the index reservation before acquisition. The full nopic original is 52,690,706,555 bytes; the current compact corpus reservation is a provisional 26 GiB. No command silently reduces context or substitutes a smaller library to fit the machine.
 
@@ -70,7 +70,7 @@ done
 
 ## Start the isolated model and persistent auxiliaries
 
-These services use an internal Docker network and no published container ports. The host can reach their inspected internal addresses. This avoids the measured Docker configuration where an internal network silently ignored requested host-port publication. Keep the browser gateway and content service on host loopback; do not attach inference to an external network to work around addressing.
+These backend services use an internal Docker network and no published container ports. The application gateway can still use normal [web search](web-search.md); the backend boundary keeps local inference separate from that online tool and is not an application air-gap requirement. The host can reach their inspected internal addresses. This avoids the measured Docker configuration where an internal network silently ignored requested host-port publication. Keep the browser gateway and content service on host loopback; do not attach inference to an external network to work around addressing.
 
 ```sh
 export ALMANAC_NETWORK=oracle-qualification-runtime
@@ -184,6 +184,6 @@ The gateway supplies transcription only after the local backend is available. CP
 
 ## Continue with the application
 
-Keep the exported endpoint variables in the shell used for profile creation and content startup. Set `ENCODER_TOKENIZER="$ALMANAC_DATA/models/encoder/tokenizer.json"` and `CHAT_TOKENIZER="$ALMANAC_DATA/models/chat/tokenizer.json"`, then continue with [profile creation and native corpus preparation](install.md#source-based-local-setup). Start the gateway with the exported `LLM_BASE`, `EMBED_BASE` and `STT_BASE`, and the selected CPU speech endpoint. In a new terminal, repeat address discovery instead of copying addresses from an earlier container incarnation.
+For connected discovery, start the documented SearXNG service and export `SEARXNG_BASE=http://127.0.0.1:8888` to the host gateway. A missing internet connection leaves that tool explicitly unavailable while the installed library remains usable. Keep the exported endpoint variables in the shell used for profile creation and content startup. Set `ENCODER_TOKENIZER="$ALMANAC_DATA/models/encoder/tokenizer.json"` and `CHAT_TOKENIZER="$ALMANAC_DATA/models/chat/tokenizer.json"`, then continue with [profile creation and native corpus preparation](install.md#source-based-local-setup). Start the gateway with the exported `LLM_BASE`, `EMBED_BASE` and `STT_BASE`, and the selected CPU speech endpoint. In a new terminal, repeat address discovery instead of copying addresses from an earlier container incarnation.
 
 For a model on another machine, use the [dedicated SSH loopback forward](install.md#isolated-inference-addressing); the public browser entry belongs to the host gateway, never the isolated inference listener. These source commands establish an inspectable local installation path. They do not assert that a portable image bundle, every host platform or all corpus indexes are already qualified.

@@ -363,6 +363,13 @@ class NativeReader:
         tokens = re.findall(r"[^\W_]+(?:[-./][^\W_]+)*", query)
         expression = " OR ".join('"' + token + '"' for token in tokens)
         for article_rank, document in enumerate(documents, 1):
+            if len(ranked) >= limit:
+                # Every remaining article has this score or less even for its
+                # first passage. Strict inequality retains deterministic ties.
+                upper_bound = 1 / ((self.profile.rrf_k + article_rank) * (self.profile.rrf_k + 1))
+                cutoff = sorted((score for _, score in ranked), reverse=True)[limit - 1]
+                if upper_bound < cutoff:
+                    break
             rows = self.passages(document.document_id)
             db = sqlite3.connect(":memory:")
             try:

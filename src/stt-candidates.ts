@@ -89,7 +89,7 @@ export async function speechCandidates(evidence: VoiceEvidence, vocabulary: stri
   const requests = new Set(selected.map(t => sanitize(t.label)).filter(Boolean));
   for (let i = tokenOffset; i < tokenEnd; i++) for (let n = 1; n <= 3 && i+n <= tokenMatches.length; n++) {
     const first=tokenMatches[i],last=tokenMatches[i+n-1];
-    const value=sanitize(orth(evidence.rawText.slice(first.index!,last.index!+last[0].length)));
+    const value=sanitize(fold(evidence.rawText.slice(first.index!,last.index!+last[0].length)));
     if (value && value.length <= MAX_LENGTH) requests.add(value);
   }
   const inputs=[...requests], pronunciations=new Map<string,string>();
@@ -121,7 +121,7 @@ export async function speechCandidates(evidence: VoiceEvidence, vocabulary: stri
       if (fold(heard) === fold(proposed) || rejected.has(key) || changesNumbers(heard, proposed)) continue;
       if (restricted && ids.length < required) continue;
       if (sameTerm(heard,proposed)) continue;
-      const queryIpa = ipa(orth(heard)), targetIpa = ipa(proposed);
+      const queryIpa = ipa(fold(heard)), targetIpa = ipa(proposed);
       if (queryIpa && targetIpa && Math.abs(syllables(queryIpa) - syllables(targetIpa)) > 1) continue;
       const d = Math.min(distance(orth(heard), orth(proposed)), distance(queryIpa, targetIpa));
       if (d > DISTANCE_THRESHOLD) continue;

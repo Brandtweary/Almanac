@@ -23,6 +23,16 @@ try {
   await speechCandidates(evidence('cafe\u0301 flora'),['jalapeño'],emptySttLexicon(),{},async(texts:string[])=>{unicodeInputs.push(...texts);return phonemize(texts);});
   assert.ok(unicodeInputs.includes('café')); assert.ok(unicodeInputs.includes('jalapeño'));
   assert.ok(!unicodeInputs.includes('cafe'));
+  const spokenInputs:string[]=[];
+  const spoken=await speechCandidates(evidence('Rough   road'),['ruff rode'],emptySttLexicon(),{},async(texts:string[])=>{
+    spokenInputs.push(...texts);
+    return {phonemes:texts.map(text=>text==='rough road'||text==='ruff rode'?'rʌf roʊd':'unmatched'),engine:{name:'espeak-ng',version:'fixture',voice:'en-us'}};
+  });
+  assert.ok(spokenInputs.includes('rough road'),'Native pronunciation retains normalized spoken word boundaries');
+  assert.ok(!spokenInputs.includes('roughroad'),'Orthographic joins never enter native pronunciation requests');
+  assert.ok(spoken.candidates.some((c:any)=>c.heard==='Rough   road'&&c.proposed==='ruff rode'&&c.distance===0),
+    'Pronunciation lookup uses the same spaced key; this pair exceeds the spelling-distance threshold');
+
   assert.equal((await run('plain', ['plane'])).candidates.length,0);
   const lex=emptySttLexicon();
   const row={spoken:'plane',transcribed:'plain',kind:'phonetic',rawText:'plain',status:'accepted',ts:''};

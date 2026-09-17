@@ -123,7 +123,7 @@ class NativePhonemizer:
             match = re.search(r"eSpeak NG text-to-speech:\s*([0-9][A-Za-z0-9.+_-]*)", output)
             if not match:
                 raise ContentError("phonemizer_unavailable", "Native phonemizer identity is unavailable")
-            voice = await asyncio.wait_for(self._run(["-q", "--ipa", "-v", "en-us", "--stdin"], b"voice check"), timeout=self.timeout)
+            voice = await asyncio.wait_for(self._run(["-q", "--ipa", "-v", "en-us", "--stdin"], b"voice check\n"), timeout=self.timeout)
             if not voice.strip():
                 raise ContentError("phonemizer_unavailable", "Native phonemizer voice is unavailable")
             # Version metadata is process configuration; no personal text is retained.
@@ -140,14 +140,24 @@ class NativePhonemizer:
         self.active += 1
         try:
             async with asyncio.timeout(self.timeout):
-                phonemes = []
-                for text in body.texts:
-                    # Separate processes guarantee alignment even if engine clause/newline behavior changes.
-                    output = await self._run(["-q", "--ipa", "-v", body.language, "--stdin"], text.encode("utf-8"))
-                    normalized = " ".join(output.split())
-                    if not normalized:
-                        raise ContentError("phonemizer_failed", "Native phonemizer returned an empty pronunciation")
-                    phonemes.append(normalized)
+                if not body.texts:
+                    return {"phonemes": [], "engine": self.identity()}
+                # Without --stdin, the native CLI calls espeak_Synth once per input line.
+                # Unlike bulk --stdin this retains independent pronunciation boundaries
+                # while paying process/dictionary initialization only once per request.
+                # The native 1000-byte line buffer holds every validated 64-codepoint
+                # UTF-8 input (at most 256 bytes plus its required terminating newline).
+                data = ("\n".join(body.texts) + "\n").encode("utf-8")
+                output = await self._run(["-q", "--ipa", "-v", body.language], data,
+                                         stdout_limit=MAX_OUTPUT_BYTES * len(body.texts))
+                lines = output.splitlines(keepends=True)
+                if len(lines) != len(body.texts):
+                    raise ContentError("phonemizer_failed", "Native phonemizer returned misaligned pronunciations")
+                if any(len(line.encode("utf-8")) > MAX_OUTPUT_BYTES for line in lines):
+                    raise ContentError("phonemizer_failed", "Native phonemizer exceeded its output limit")
+                phonemes = [" ".join(line.split()) for line in lines]
+                if not all(phonemes):
+                    raise ContentError("phonemizer_failed", "Native phonemizer returned an empty pronunciation")
                 return {"phonemes": phonemes, "engine": self.identity()}
         except asyncio.TimeoutError:
             raise ContentError("phonemizer_timeout", "Optional phonemization exceeded its execution deadline", 504) from None
@@ -157,7 +167,7 @@ class NativePhonemizer:
         finally:
             self.active -= 1
 
-    async def _run(self, arguments, data):
+    async def _run(self, arguments, data, *, stdout_limit=MAX_OUTPUT_BYTES):
         spawn = asyncio.create_task(self.spawn(self.executable, *arguments, stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, start_new_session=True))
         try:
@@ -177,15 +187,16 @@ class NativePhonemizer:
             raise
         tasks = []
         try:
-            async def bounded(stream):
+            async def bounded(stream, limit):
                 chunks, length = [], 0
                 while chunk := await stream.read(4096):
                     length += len(chunk)
-                    if length > MAX_OUTPUT_BYTES:
+                    if length > limit:
                         raise ContentError("phonemizer_failed", "Native phonemizer exceeded its output limit")
                     chunks.append(chunk)
                 return b"".join(chunks)
-            tasks = [asyncio.create_task(bounded(process.stdout)), asyncio.create_task(bounded(process.stderr))]
+            tasks = [asyncio.create_task(bounded(process.stdout, stdout_limit)),
+                     asyncio.create_task(bounded(process.stderr, MAX_OUTPUT_BYTES))]
             process.stdin.write(data)
             await process.stdin.drain()
             process.stdin.close()

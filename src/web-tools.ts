@@ -1,12 +1,5 @@
-// The browser client half of the web-search tool. A separate component owns the
-// proxy endpoint; this codes to that contract:
-//   GET <endpoint>?q=<query>&limit=<n>
-//   Authorization: Bearer <proxy principal token>   (anon/family only — optional)
-//   → { results: [{ title, url, snippet }] }
-// Web search is universal — registered on every serving path (see main.ts createAgent).
-// The endpoint is open (per-IP rate-limited, not principal-gated): owner-funded paths
-// pass their proxy bearer; own-key visitors pass NO bearer, so the Authorization header
-// is omitted entirely and their OpenRouter key never reaches the proxy.
+// The browser web-search tool calls the local gateway's GET endpoint with q/limit
+// and renders titled results independently of the installed reference library.
 
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { ToolRenderer } from "./pi-web-ui/index.js";
@@ -27,7 +20,7 @@ function stripAngles(s: unknown): string {
 	return String(s ?? "").replace(/[<>]/g, "");
 }
 
-// Fetch web results through the metering proxy. Throws on a non-OK response or a
+// Fetch web results through the local gateway. Throws on a non-OK response or a
 // timeout so the agent loop synthesizes an error result.
 export async function webSearch(
 	endpoint: string,
@@ -38,9 +31,7 @@ export async function webSearch(
 ): Promise<{ results: WebSearchResult[]; degraded: boolean }> {
 	const url = `${endpoint}?q=${encodeURIComponent(query)}&limit=${encodeURIComponent(String(limit))}`;
 	const res = await fetch(url, {
-		// Only attach Authorization when we actually hold a bearer (anon/family). Own-key
-		// visitors pass "" — sending an empty/garbage bearer would leak nothing useful and
-		// the endpoint is open anyway.
+		// A gateway bearer is attached only when explicitly supplied.
 		headers: bearer ? { Authorization: `Bearer ${bearer}` } : {},
 		signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),
 	});
@@ -95,7 +86,7 @@ const webSearchRenderer: ToolRenderer = {
 				isCustom: false,
 			};
 		}
-		return { content: renderHeader(state, Globe, "Searching the web…"), isCustom: false };
+		return { content: renderHeader(state, Globe, result?.isError ? "Web search failed" : "Searching the web…"), isCustom: false };
 	},
 };
 

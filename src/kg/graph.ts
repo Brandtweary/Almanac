@@ -363,7 +363,7 @@ export class Graph {
 		for (const t of this.thoughts.values()) {
 			if (!t.description?.trim()) continue;
 
-			const noStem = t.metadata?.no_stem ?? true; // default: exact match
+			const noStem = t.metadata?.no_stem ?? true; // default: no Porter stemming; plural/normalized routes remain
 			const caseSensitive = isAcronym(t.label);
 			const preparedKey = caseSensitive ? t.label : noStem ? normalizeForMatch(t.label) : stemText(t.label);
 			push(preparedKey, { node_id: t.id, no_stem: noStem || caseSensitive, case_sensitive: caseSensitive, surface: t.label, via: "label" });
@@ -426,11 +426,11 @@ export class Graph {
 		};
 
 		const tokensLower = new Set(tokenize(lowercased));
-		// Depluralized variants — always applied to exact (no_stem) matching so a
+		// Depluralized variants also apply when Porter stemming is disabled, so a
 		// spoken S-plural ("graphs") still finds the singular label ("graph").
 		const tokensSingular = new Set([...tokensLower].flatMap((t) => [depluralize(t), stripPluralS(t)]));
 
-		// Fast path: single-word exact (no_stem) matches.
+		// Fast path: single-word non-Porter matches, including plural variants.
 		for (const token of new Set([...tokensLower, ...tokensSingular])) {
 			const entries = this.termSingle.get(token);
 			if (entries) {

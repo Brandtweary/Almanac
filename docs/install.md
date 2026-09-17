@@ -1,29 +1,13 @@
-# Linux installation and offline preparation
+# Linux source installation
 
-Start with [source-based local setup](#source-based-local-setup) for the current build. `python3 deploy/setup.py` acquires pinned source packs and supports prepared release manifests; a certified portable production bundle is not supplied. The checked-in runtime recipe uses a 131,072-token context with BF16 KV storage and CPU speech, while complete-library, long-window and offline-release qualification remain separate checks. The gateway and speech interfaces are described in [self-hosting](self-hosting.md).
-
-When a qualified release manifest is available, export its portable bundle on a connected preparation machine:
-
-```sh
-python3 deploy/setup.py --release release.json --data /srv/local-oracle --export-bundle /media/offline/oracle-bundle
-```
-
-On the destination machine, with Python 3.10+, Docker Engine, the Compose plugin and any required GPU drivers/container integration already installed:
-
-```sh
-python3 /media/offline/oracle-bundle/setup.py --offline-bundle /media/offline/oracle-bundle --data /srv/local-oracle
-```
-
-For a connected installation without export, omit `--export-bundle`. `--prepare-only` acquires and verifies assets without touching services. Rerunning the same command resumes preparation. Setup does not invoke a package manager, obtain drivers, build containers or pull images at runtime. Offline import reads only the bundle. Host prerequisites are deliberately outside the portable application bundle and must be installed before disconnecting.
-
-For local admission work, an explicitly labelled `qualification_candidate: true` manifest can be started with `--qualification`. This mode permits incomplete release categories and missing admission receipts, while retaining exact hashes, rights checks, image pins, offline networks and runtime download prohibitions. Every published port must bind `127.0.0.1`; after validating these boundaries setup injects `QUALIFICATION_BOUNDARY=isolated-container` only into services declaring `QUALIFICATION_MODE=1`, permitting the gateway to bind its container interface behind the loopback host publication. The declaration is an installer assertion, not independent proof by the gateway. It writes `candidate.json` with `qualification-only` and never updates production `active.json`. Candidate mode makes measurements possible without pretending those measurements already passed.
+Almanac combines a local model and installed reference library with normal web access through its search tool. Start with [source-based local setup](#source-based-local-setup) for the current build; [web search](web-search.md) supplies current online discovery, while installed capabilities can also operate without it. `python3 deploy/setup.py` acquires pinned source packs and supports prepared release manifests; a certified portable production bundle is not supplied. The checked-in runtime recipe uses a 131,072-token context with BF16 KV storage and CPU speech, while complete-library, long-window and offline-release qualification remain separate checks. The gateway and speech interfaces are described in [self-hosting](self-hosting.md).
 
 ## Source-based local setup
 
-The source route can run the browser, gateway and content service before a certified portable release exists. It requires Linux, Python 3.11+, Node.js/npm, Bun, and the selected model/embedding/index/speech runtimes. Prepare dependencies and model files while connected; running the application afterward must use local file paths and endpoints. A model-weight download alone does not produce a complete corpus installation.
+The source route runs the browser, gateway and content service with installed model/reference assets and separately configured web search. It requires Linux, Python 3.11+, Node.js/npm, Bun, and the selected model/embedding/index/speech runtimes. Prepare dependencies and model files while connected; running the application afterward must use local file paths and endpoints. A model-weight download alone does not produce a complete corpus installation.
 
 ```sh
-git clone https://github.com/Brandtweary/almanac.git
+git clone https://github.com/Brandtweary/Almanac.git almanac
 cd almanac
 npm ci
 npm run build
@@ -129,7 +113,7 @@ export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
 .venv/bin/python -m oracle_content
 ```
 
-These endpoint examples refer to separately started local services; set them to the actual ports in the selected runtime. Supply `CONTENT_RERANK_URL` only for a profile using that local reranker. The content service defaults to `127.0.0.1:8791`.
+For normal connected use, start [web search](web-search.md) and set `SEARXNG_BASE` for the gateway. Unavailable web search must report failure; it does not disable the installed corpus. These endpoint examples refer to separately started local services; set them to the actual ports in the selected runtime. Supply `CONTENT_RERANK_URL` only for a profile using that local reranker. The content service defaults to `127.0.0.1:8791`.
 
 Prepare and build the selected CPU speech service while connected, using the checked-in source recipe:
 
@@ -160,7 +144,7 @@ export QUALIFICATION_MODE=1
 bun start
 ```
 
-Adjust `LLM_BASE` to the selected local inference listener and configure optional speech/embedding endpoints from [the gateway environment example](../proxy/.env.example). Open `http://127.0.0.1:8790`. `QUALIFICATION_MODE=1` permits local evaluation with an explicitly unqualified candidate profile; the UI and `/ready` retain that qualification status. Turn it off only with a qualified runtime profile and recorded receipts. Direct candidate listeners stay on loopback and must not be publicly reverse-proxied. This source route is not certification of an exported offline bundle.
+Adjust `LLM_BASE` to the selected local inference listener and configure optional speech/embedding endpoints from [the gateway environment example](../proxy/.env.example). Open `http://127.0.0.1:8790`. `QUALIFICATION_MODE=1` permits local evaluation with an explicitly unqualified candidate profile; `/v1/profile` and `/ready` retain that qualification status. Turn it off only with a qualified runtime profile and recorded receipts. Direct candidate listeners stay on loopback and must not be publicly reverse-proxied. This source route is not certification of an exported offline bundle.
 
 ## Isolated inference addressing
 
@@ -194,6 +178,26 @@ Both sizes exclude semantic/lexical derivatives, model and speech weights, appli
 
 Regional PMTiles are content files. The initial catalog pins Oregon, Washington and California using the upstream repository's Git LFS SHA-256/size declarations. Retain original file names and notices. They require an external reader; no map page, routing or AI map-reading capability is implied. Reader/style/font/sprite assets must be separately pinned and tested offline before a release claims map viewing. Bounds, zooms and source dates stay unknown until inspected; a filename date is not the underlying geographic data date.
 
+## Optional portable bundles
+
+These bundle/export mechanics are separate from ordinary source installation and do not require the application to be air-gapped. The normal gateway can use web search while its model stays local.
+
+When a qualified release manifest is available, export its portable bundle on a connected preparation machine:
+
+```sh
+python3 deploy/setup.py --release release.json --data /srv/local-oracle --export-bundle /media/offline/oracle-bundle
+```
+
+On the destination machine, with Python 3.10+, Docker Engine, the Compose plugin and any required GPU drivers/container integration already installed:
+
+```sh
+python3 /media/offline/oracle-bundle/setup.py --offline-bundle /media/offline/oracle-bundle --data /srv/local-oracle
+```
+
+For a connected installation without export, omit `--export-bundle`. `--prepare-only` acquires and verifies assets without touching services. Rerunning the same command resumes preparation. Setup does not invoke a package manager, obtain drivers, build containers or pull images at runtime. Offline import reads only the bundle. Host prerequisites are deliberately outside the portable application bundle and must be installed before disconnecting.
+
+For local admission work, an explicitly labelled `qualification_candidate: true` manifest can be started with `--qualification`. This mode permits incomplete release categories and missing admission receipts, while retaining exact hashes, rights checks, image pins, offline networks and runtime download prohibitions. Every published port must bind `127.0.0.1`; after validating these boundaries setup injects `QUALIFICATION_BOUNDARY=isolated-container` only into services declaring `QUALIFICATION_MODE=1`, permitting the gateway to bind its container interface behind the loopback host publication. The declaration is an installer assertion, not independent proof by the gateway. It writes `candidate.json` with `qualification-only` and never updates production `active.json`. Candidate mode makes measurements possible without pretending those measurements already passed.
+
 ## Release manifest contract
 
 A release JSON contains:
@@ -207,7 +211,7 @@ A release JSON contains:
 
 Starting requires artifact kinds `application`, `image`, `model`, `tokenizer`, `speech`, `extraction`, `corpus`, `index`, and `license`. Include all runtime auxiliaries, tokenizer/template/parser assets, extraction/OCR models, installed Python/native dependencies (inside images), model shards, voice/codec assets, source files, complete derived index generations, and license/attribution records. Do not count a dependency name or source repository as an installed runtime asset. Image artifacts are saved Docker archives with an `image` reference pinned as `repository@sha256:…`; Each image artifact also carries its measured immutable `image_id`; setup verifies that ID after loading and generates effective Compose references using the ID. The original Compose retains its upstream repository digest for provenance. This avoids assuming every Docker archive/backend preserves registry RepoDigests.
 
-Compose services use these pinned references, `pull_policy: never`, explicit internal networks and `HF_HUB_OFFLINE=1` / `TRANSFORMERS_OFFLINE=1`. Build directives and host network overrides are rejected. The service commands must refer to included local assets. The internal network prevents runtime WAN egress; online discovery is unavailable in this offline deployment. Optional online search requires a separately reviewed online deployment, not an implicit fallback. Configure browser-facing ports only on loopback unless deliberately publishing the service. Bind mounts may use `${ORACLE_DATA_DIR}` and point to the prepared release/immutable data. The release's health/admission receipts, not the presence of a running container, establish application readiness.
+Compose services use these pinned references, `pull_policy: never`, explicit internal networks and `HF_HUB_OFFLINE=1` / `TRANSFORMERS_OFFLINE=1`. Build directives and host network overrides are rejected. The service commands must refer to included local assets. The internal network prevents runtime WAN egress; online discovery is unavailable in this offline deployment. Online discovery uses the separate [SearXNG setup](web-search.md) when connected, outside the offline bundle network; model inference and the reference library remain local. Configure browser-facing ports only on loopback unless deliberately publishing the service. Bind mounts may use `${ORACLE_DATA_DIR}` and point to the prepared release/immutable data. The release's health/admission receipts, not the presence of a running container, establish application readiness.
 
 ## Integrity, interruption and portable originals
 

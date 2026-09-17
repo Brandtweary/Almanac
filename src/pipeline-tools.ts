@@ -118,7 +118,7 @@ export function createPipelineTools(deps: PipelineToolDeps): AgentTool<any>[] {
 	const noStemSchema = Type.Object({
 		label: Type.String(),
 		no_stem: Type.Boolean({
-			description: "true = exact matching only (proper nouns, stem-collision fixes).",
+			description: "true disables Porter stemming; plural and punctuation normalization remain. false enables Porter stemming.",
 		}),
 	});
 
@@ -294,13 +294,14 @@ export function createPipelineTools(deps: PipelineToolDeps): AgentTool<any>[] {
 			name: "set_no_stem",
 			label: "Set matching mode",
 			description:
-				"Set a term's matching mode: no_stem=true means exact matching only (fixes stemming " +
-				"collisions where an unrelated word retrieves the term).",
+				"Set a term's Porter-stemming mode. no_stem=true (the default) disables Porter stemming, " +
+				"but preserves plural and punctuation normalization; it does not separate singular and plural forms. " +
+				"Use for a Porter-stemming collision only when stemming is currently enabled; otherwise inspect aliases or flag an unsupported repair.",
 			parameters: noStemSchema,
 			execute: async (_id, p: Static<typeof noStemSchema>) => {
 				if (!getGraph().setNoStem(p.label, p.no_stem)) throw new Error(`no term '${p.label}'`);
 				record(`set no_stem=${p.no_stem} on ${p.label}`);
-				return text(`'${p.label}' now matches ${p.no_stem ? "exactly" : "by stem"}.`);
+				return text(`'${p.label}': Porter stemming ${p.no_stem ? "disabled; plural and punctuation normalization remain" : "enabled"}.`);
 			},
 		}),
 		tool({

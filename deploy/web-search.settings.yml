@@ -1,0 +1,15 @@
+use_default_settings:
+  engines:
+    keep_only:
+      - duckduckgo web
+      - zapmeta
+search:
+  formats: [html, json]
+server:
+  limiter: false
+  public_instance: false
+engines:
+  - name: duckduckgo web
+    disabled: false
+  - name: zapmeta
+    disabled: false

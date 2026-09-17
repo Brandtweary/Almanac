@@ -14,6 +14,8 @@ const html=`<!doctype html><html><head><meta charset="utf-8"><title>Tool renderi
 import '/src/pi-web-ui/app.css';import '/src/theme.css';import '/src/app.css';
 import '/src/pi-web-ui/components/Messages.ts';
 import {registerReferenceToolRenderers} from '/src/reference-tool-renderers.ts';
+import {registerWebToolRenderer} from '/src/web-tools.ts';
+registerWebToolRenderer();
 const qualificationMode=true;const migrateLocalAccess=async()=>{};const loadReleaseProfile=async()=>{};const proxyChatModel=()=>({id:'fixture'});const MYRIAPOD_PROXY_BASE='/v1';
 ${servingJs}
 await resolveServingPath();${registration}
@@ -21,6 +23,7 @@ const fixtures=[
  ['corpus_search',{query:'query_marker'},{status:'degraded',hits:[{title:'Reference one'},{title:'Reference two'}]},'search_payload_marker'],
  ['corpus_read',{document_id:'document_marker'},{status:'ok',passages:[{title:'Reference one'}]},'read_payload_marker'],
  ['conversation_history',{query:'history_query_marker'},{},'history_payload_marker'],
+ ['web_search',{query:'web_query_marker'},{results:[]},'web_payload_marker'],
 ];
 for(const [name,args,details,marker]of fixtures){const element=document.createElement('tool-message');element.id=name;element.toolCall={id:name,name,arguments:args};element.result={role:'toolResult',toolCallId:name,toolName:name,isError:false,timestamp:1,details,content:[{type:'text',text:JSON.stringify({marker,full_result:'Exact retained source text. '.repeat(80)})}]};document.querySelector('main').append(element);await element.updateComplete;}
 window.fixtureReady=true;
@@ -60,6 +63,11 @@ try{
  await page.evaluate(async()=>{const card=document.getElementById('corpus_read');card.aborted=false;card.result=window.originalReadResult;await card.updateComplete});
  assert.match(await page.locator('#corpus_search button').first().innerText(),/2 passages.*incomplete results/);
  assert.match(await page.locator('#corpus_read button').first().innerText(),/Read source.*1 passage/);
+ await page.evaluate(async()=>{const card=document.getElementById('web_search');card.result=undefined;card.pending=true;await card.updateComplete});
+ assert.match(await page.locator('#web_search').innerText(),/Searching the web/);
+ await page.evaluate(async()=>{const card=document.getElementById('web_search');card.pending=false;card.result={role:'toolResult',toolCallId:'web_search',toolName:'web_search',isError:true,timestamp:2,content:[{type:'text',text:'web search failed: HTTP 502'}]};await card.updateComplete});
+ assert.match(await page.locator('#web_search').innerText(),/Web search failed/);
+ assert.doesNotMatch(await page.locator('#web_search').innerText(),/Searching the web/);
  await page.screenshot({path:'/tmp/almanac-reference-tool-rendering.png'});
- assert.deepEqual(errors,[]);console.log('Browser verified: no qualification banner; three compact tool cards; raw JSON hidden initially; existing expand/collapse works; incomplete status retained; no inference or audio.');
+ assert.deepEqual(errors,[]);console.log('Browser verified: no qualification banner; three compact tool cards; raw JSON hidden initially; existing expand/collapse works; incomplete status retained; web failures replace the pending label; no inference or audio.');
 }finally{await browser?.close();await server.close()}

@@ -1,0 +1,10 @@
+services:
+  web-search:
+    image: searxng/searxng@sha256:75fb408b7824e39d6b7c42135db4402b260c8affe3e8ef289fd99afd4bc3b783
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8888:8080"
+    environment:
+      SEARXNG_SECRET: "${SEARXNG_SECRET:?Set a random local SEARXNG_SECRET before starting}"
+    volumes:
+      - ./web-search.settings.yml:/etc/searxng/settings.yml:ro

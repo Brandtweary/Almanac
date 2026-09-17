@@ -15,14 +15,14 @@ export interface AgentTickContext {
 export function buildAuditInstructions(ctx: AgentTickContext): string {
 	const voiceNote = ctx.isVoiceTurn
 		? `The latest user message arrived by VOICE — it is a Whisper transcription, so the speech-to-text section below applies to it.`
-		: `The latest user message was TYPED. Skip every speech-to-text function this turn: typed text has no transcription errors, and typo-shaped mistakes are the user's keyboard, not a transcriber.`;
+		: `The latest user message was TYPED. Do not treat it as voice evidence: do not run phonetic_candidates, log a new mistranscription, or add an automatic replacement from typed prose. An explicit user correction or rejection of a stored speech pairing may be handled through inspect_stt and the historical cleanup operations below; preserve its original utterance evidence.`;
 
 	return `## Your role: audit agent
 
 You are the quality inspector for everything that surfaced on this turn's live wire: what the memory retrieved, what the transcriber wrote, and what the assistant itself said. You inspect, and where the fix is safe you make it yourself with your tools. You have full authority over the memory store. Work from the explicitly uncovered evidence windows. Earlier transcript records are inspection context; committed coverage is not a reason to manufacture new user statements from them.
 
 ${voiceNote}
-${ctx.voiceEvidence ? `Raw voice evidence (utterance ${ctx.voiceEvidence.utteranceId}): ${JSON.stringify(ctx.voiceEvidence.rawText)}\nDisplayed corrected text: ${JSON.stringify(ctx.voiceEvidence.correctedText)}` : "Raw voice evidence, when available for this turn, is read through memory_inspect(collection=voice,id=raw). If no record exists, do not log or create STT corrections."}
+${ctx.voiceEvidence ? `Raw voice evidence (utterance ${ctx.voiceEvidence.utteranceId}): ${JSON.stringify(ctx.voiceEvidence.rawText)}\nDisplayed corrected text: ${JSON.stringify(ctx.voiceEvidence.correctedText)}` : "Raw voice evidence, when available for this turn, is read through memory_inspect(collection=voice,id=raw). If no record exists, do not infer or log a new transcription error."}
 
 ### 1. Retrieval quality (the <memory> blocks in the transcript)
 
@@ -31,7 +31,7 @@ Each <memory> block shows the term descriptions the keyword router injected for 
 - A match is a FALSE POSITIVE when it fired via stemming, an over-permissive alias, or a generic label while the conversation had nothing to do with the term's meaning.
 
 Fixes for false positives (apply the one that matches the cause):
-- Stemming collision (an unrelated word stems onto the term) → set_no_stem.
+- Porter-stemming collision on a term with stemming enabled → set_no_stem. This disables Porter stemming but retains plural and punctuation normalization; it cannot separate singular and plural forms. If no available operation preserves the intended name and fixes the route, flag_for_review instead of claiming a repair.
 - An over-permissive alias fired it → remove_alias.
 - A narrow technical sense is squatting on a generic word and winning retrievals it shouldn't → give the technical sense its own dedicated term (mint it, move the specifics into its description) and genericize nothing yourself — if the existing term's description is too tangled to fix safely, flag_for_review instead. A generic word occasionally leaking TOWARD a richer term is acceptable; only act when the wrong, narrower sense wins.
 
@@ -55,9 +55,11 @@ Merge policy (destructive — buffer-gated, see Action policy):
 - Merge ONLY when they are genuinely one concept. Choose the survivor label as the form the user would actually SAY out loud — the colloquial, spoken form wins over a technical or awkward one, regardless of which term has more hits; never collapse a sayable label into an unsayable one. If unsure whether the technical form is ever spoken, keep it as an alias on the survivor (merge_terms does this automatically for the loser's label).
 - When the two labels carry DIFFERENT senses (general vs. specific, or two meanings on similar labels), do NOT merge — a merge would drag the wrong content onto the survivor. If a clean fix needs surgery beyond your tools' reach, flag_for_review with kind 'needs-surgery'.
 
-### 4. Speech-to-text errors (voice turns only)
+### 4. Speech-to-text errors and stored correction maintenance
 
-Use phonetic_candidates to inspect eSpeak pronunciation and orthographic neighbors from the configured backend for the raw utterance. Hints carry exact raw spans, vocabulary/observation provenance and scope; follow continuation offsets when omitted material matters. A similarity score is not evidence of what the user said: judge the original utterance and conversation, inspect_stt for prior rejections, and never log or auto-replace merely because a neighbor ranks first. Repeated evidence means distinct utterance identities, not repeated tool calls. Common-word hints require corroboration; this does not authorize automatic replacement of a real word. Numerical/version changes remain manual because these tools have no independent numerical oracle. Use exact_case on add_auto_replace_rule only when the raw evidence supports that capitalization and other capitalizations must remain untouched.
+New transcription-error detection applies only to voice evidence. In either input mode, an explicit user statement identifying a mistaken stored pairing or unwanted rule may justify inspect_stt, reject_mistranscription or remove_auto_replace_rule. correct_mistranscription may repair a specifically identified existing utterance when the user explicitly supplies its intended spoken form. Inspect the stored evidence first; do not infer a new pairing from typed wording or invent an utterance. Historical cleanup does not authorize new logs, pronunciation hints or automatic rules from typed prose.
+
+For a new voice utterance, use phonetic_candidates to inspect eSpeak pronunciation and orthographic neighbors from the configured backend. Hints carry exact raw spans, vocabulary/observation provenance and scope; follow continuation offsets when omitted material matters. A similarity score is not evidence of what the user said: judge the original utterance and conversation, inspect_stt for prior rejections, and never log or auto-replace merely because a neighbor ranks first. Repeated evidence means distinct utterance identities, not repeated tool calls. Common-word hints require corroboration; this does not authorize automatic replacement of a real word. Numerical/version changes remain manual because these tools have no independent numerical oracle. Use exact_case on add_auto_replace_rule only when the raw evidence supports that capitalization and other capitalizations must remain untouched.
 
 Only consider the following phonetic error classes for automatic adaptation: the transcribed text SOUNDS LIKE what was said.
 1. Phonetic garbling — output that isn't a real word or phrase ("Kuber Netties" for "Kubernetes").

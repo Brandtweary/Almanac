@@ -34,9 +34,18 @@ export function createSummaryDraftTool(deps: { read: () => string; store: (text:
 
 export function createAuditHandoffTool(deps: { put: (finding: Omit<Extract<AuditFinding, {kind:"spelling"}>, "evidence"> | Omit<Extract<AuditFinding, {kind:"stale-description"}>, "evidence">, evidence: Array<{recordId:string;quote:string}>) => void }): AgentTool<any> {
   return { name: "audit_handoff", label: "Publish scoped audit evidence",
-    description: "Add supported spelling or stale-description evidence to this audit's private handoff. Cite exact quotations from admitted user records. Spelling must match accepted current-utterance STT evidence; stale-description needs an existing term. Memory receives both kinds; summary receives only spelling. Findings publish only with successful audit coverage.",
+    description: "Add supported spelling or stale-description evidence to this audit's private handoff. Cite exact quotations from admitted user records. For kind=spelling, supply transcribed, spoken and utteranceId matching accepted current-utterance STT evidence. For kind=stale-description, supply termId identifying an existing term and a nonempty reason explaining what is stale. Memory receives both kinds; summary receives only spelling. Findings publish only with successful audit coverage.",
     parameters: Type.Object({ kind: Type.Union([Type.Literal("spelling"), Type.Literal("stale-description")]), transcribed: Type.Optional(Type.String()), spoken: Type.Optional(Type.String()), utteranceId: Type.Optional(Type.String()), termId: Type.Optional(Type.String()), reason: Type.Optional(Type.String()), evidence: Type.Array(Type.Object({recordId:Type.String(),quote:Type.String({minLength:1})}), {minItems:1}) }),
-    execute: async (_id, raw) => { const { evidence, ...finding } = raw as any; deps.put(finding, evidence); return result("Scoped finding added to the private audit handoff."); } };
+    execute: async (_id, raw) => {
+      const { evidence, ...finding } = raw as any;
+      const present = (value: unknown) => typeof value === "string" && value.trim().length > 0;
+      if (finding.kind === "spelling") {
+        if (![finding.transcribed, finding.spoken, finding.utteranceId].every(present)) throw new Error("Spelling handoff requires transcribed, spoken and utteranceId");
+      } else if (finding.kind !== "stale-description" || !present(finding.termId) || !present(finding.reason)) {
+        throw new Error("Stale-description handoff requires an existing term and reason");
+      }
+      deps.put(finding, evidence); return result("Scoped finding added to the private audit handoff.");
+    } };
 }
 
 /** Shared by production and qualification; summary has no glossary mutation authority. */
