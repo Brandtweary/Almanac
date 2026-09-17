@@ -17,6 +17,18 @@ export function base64Bytes(value: unknown, limit = MAX_ATTACHMENT_BYTES): numbe
 	return size <= limit ? size : null;
 }
 
+/** Inline image blocks share the attachment limits regardless of their message role. */
+export function validImageBlocks(blocks: readonly unknown[]): boolean {
+	let count = 0, total = 0;
+	for (const block of blocks) {
+		if (!block || typeof block !== "object" || !("type" in block) || block.type !== "image") continue;
+		if (++count > MAX_ATTACHMENTS || !("data" in block) || !("mimeType" in block) || typeof block.mimeType !== "string") return false;
+		const size = base64Bytes(block.data);
+		if (size === null || (total += size) > MAX_ATTACHMENT_TOTAL_BYTES) return false;
+	}
+	return true;
+}
+
 export function validAttachments(value: unknown): value is Attachment[] {
 	if (!Array.isArray(value) || value.length > MAX_ATTACHMENTS) return false;
 	let total = 0;

@@ -1,4 +1,5 @@
 /** Stock scenarios over the production local admission, queue and stream transport. */
+import {inspectCompletionStream} from "./stream-receipt.ts";
 import { isDeepStrictEqual } from "node:util";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { StreamFn } from "@earendil-works/pi-agent-core";
@@ -47,7 +48,7 @@ function install(gateway:string) {
   if(row){row.httpStatus=response.status;
    trace?.pending.push(response.clone().text().then(text=>{
     row.rawResponse=text;
-    for(const line of text.split("\n")){if(!line.startsWith("data: ")||line.includes("[DONE]"))continue;try{const event=JSON.parse(line.slice(6));if(event.usage)row.usage=event.usage;if(event.error)row.error=event.error;}catch{}}
+    Object.assign(row,inspectCompletionStream(text));
    }).catch(error=>{row.interrupted=true;row.transportError=String(error);}));
   }
   return response;
@@ -79,7 +80,7 @@ export async function prepareLocalStock(gateway:string,runtime:RuntimeIdentity){
   const receipt=await traces.run(trace,()=>runStockCase(fixture,candidate,"local",{...limits,spendAvailable:()=>true,stream}));
   await Promise.all(trace.pending);
   const valid=(u:any)=>u&&Number.isSafeInteger(u.prompt_tokens)&&u.prompt_tokens>=0&&Number.isSafeInteger(u.completion_tokens)&&u.completion_tokens>=0;
-  const completed=trace.completions.filter(row=>valid(row.usage));
+  const completed=trace.completions.filter(row=>valid(row.usage)&&row.protocolDone&&!row.malformedFrame&&!row.interrupted);
   const parity=trace.completions.length===trace.counts.length&&trace.completions.every((row,i)=>{
    const count=trace.counts[i]; const {role:_role,...countRequest}=count.request;
    countRequest.model=profile.model.id; countRequest.max_tokens=countRequest.max_tokens??countRequest.max_completion_tokens; delete countRequest.max_completion_tokens;
@@ -91,7 +92,7 @@ export async function prepareLocalStock(gateway:string,runtime:RuntimeIdentity){
   receipt.usageIncomplete=completed.length!==trace.completions.length;
   receipt.checks.push({id:"native_token_count_parity",passed:parity,critical:true,evidence:"Actual /tokenize payload and count match the completion wire payload and native prompt usage, including cached tokens."});
   if(limits.measureOnly){receipt.status="measurement_only";receipt.checks=[];if(trace.counts.length&&trace.counts.every(row=>Number.isSafeInteger(row.tokens)))delete receipt.error;receipt.measurement={role,inputLimit:budget.maxInputTokens,outputReserve:budget.maxOutputTokens,counts:trace.counts.map(row=>row.tokens),fits:fixture.roleCase?.memoryConsent===false?trace.counts.length===0:trace.counts.length>0&&trace.counts.every(row=>Number.isSafeInteger(row.tokens)&&row.tokens<=budget.maxInputTokens),scope:"Initial stock prompt, evidence and full tool schemas; no generation or quality judgment."};}
-  else if(trace.completions.some(row=>row.httpStatus>=400||row.error||row.interrupted))receipt.status="transport_error";
+  else if(trace.completions.some(row=>row.httpStatus>=400||row.error||row.interrupted||!row.protocolDone||row.malformedFrame))receipt.status="transport_error";
   else if(!parity){receipt.status="evaluator_error";receipt.error="Native tokenizer/usage or request identity mismatch";}
   return receipt;
  }};

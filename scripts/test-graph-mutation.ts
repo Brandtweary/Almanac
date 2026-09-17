@@ -1,6 +1,6 @@
 // Unit tests for the term-store API — getOrCreate / aliases / rename / merge /
 // remove / 100-word cap / serialize / term-match.
-// Run from myriapod/:  node_modules/.bin/tsx scripts/test-graph-mutation.ts
+// Run from almanac/:  node_modules/.bin/tsx scripts/test-graph-mutation.ts
 
 import { DescriptionTooLongError, Graph } from "../src/kg/graph.ts";
 import { boundaryAssertions, escapeRegExp } from "../src/regex-utils.ts";

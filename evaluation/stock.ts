@@ -1,5 +1,6 @@
 /** Actual Pi-loop scenario execution using production prompts and tools. */
 import "./raw-wordlist.ts";
+import {inspectCompletionStream} from "./stream-receipt.ts";
 import {hostedPayload} from "./hosted-policy.ts";
 import {AsyncLocalStorage} from "node:async_hooks";
 import {createHash} from "node:crypto";
@@ -135,7 +136,7 @@ export async function runStockCase(fixture:StockCase,profile:CandidateProfile,ap
 const meta:any={httpStatus:response.status};providerReceipts.push(meta);
     pendingBodies.push(response.clone().text().then(body=>{
      if(response.status>=400){try{const error=JSON.parse(body);meta.errorCode=error.error?.code;meta.errorMessage=error.error?.message;}catch{meta.errorMessage="non_json_provider_error";}}
-     for(const line of body.split("\n")){if(!line.startsWith("data: ")||line.includes("[DONE]"))continue;try{const row=JSON.parse(line.slice(6));if(row.usage)meta.usage=row.usage;if(row.provider)meta.provider=row.provider;if(row.id)meta.id=row.id;if(row.error)meta.errorCode=row.error.code;}catch{}}
+     Object.assign(meta,inspectCompletionStream(body));
     }).catch(()=>{meta.bodyInterrupted=true;}));
  };
  let messages:AgentMessage[]=[];const turnOutcomes:{turn:number;stopReason:string;intermediateFailures:string[]}[]=[];receipt.turnOutcomes=turnOutcomes;
@@ -187,7 +188,7 @@ const meta:any={httpStatus:response.status};providerReceipts.push(meta);
  const validUsage=(u:any)=>u&&Number.isSafeInteger(u.prompt_tokens)&&u.prompt_tokens>=0&&Number.isSafeInteger(u.completion_tokens)&&u.completion_tokens>=0&&typeof u.cost==="number"&&Number.isFinite(u.cost)&&u.cost>=0;
  const usage=providerReceipts.flatMap(r=>validUsage(r.usage)?[r.usage]:[]);
  receipt.metrics={seconds:(performance.now()-started)/1000,inputTokens:usage.reduce((n,u)=>n+(u.prompt_tokens??0),0),outputTokens:usage.reduce((n,u)=>n+(u.completion_tokens??0),0),costUSD:usage.reduce((n,u)=>n+(u.cost??0),0),completions};
- if(requests.length>providerReceipts.length||providerReceipts.some(r=>r.httpStatus>=400||r.errorCode!=null||r.bodyInterrupted))receipt.status="transport_error";
- receipt.usageIncomplete=requests.length!==providerReceipts.length||providerReceipts.some(r=>!validUsage(r.usage));
+ if(requests.length>providerReceipts.length||providerReceipts.some(r=>r.httpStatus>=400||r.errorCode!=null||r.bodyInterrupted||!r.protocolDone||r.malformedFrame))receipt.status="transport_error";
+ receipt.usageIncomplete=requests.length!==providerReceipts.length||providerReceipts.some(r=>!validUsage(r.usage)||!r.protocolDone||r.malformedFrame||r.bodyInterrupted);
  return receipt;
 }

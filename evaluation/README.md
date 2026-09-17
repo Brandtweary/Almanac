@@ -63,7 +63,6 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest evaluation.test_evaluation
 ./node_modules/.bin/tsx evaluation/export-memory.ts /tmp/role-schemas.json
 ```
 
-`screen.py` is an explicit paid developer transport, requiring `OPENROUTER_API_KEY`, a JSON list of `{id, providerRouting: {only: [provider]}}` identities and a fresh output directory. Never point it at production personal state. It preserves exact requests, provider responses, usage, completion status and source fixture digests. The hosted screen's output/input bounds are experiment exposure limits, not release context budgets. Use separate directories for prompt/budget revisions; do not overwrite failed attempts. Provider errors are transport findings, and hosted quantization/provider behavior is not local admission.
 
 Release admission also needs corpus coverage beyond these seeds, actual retrieval/reranker measurements, tool-led research, retained-role runs, target quantization/parser checks, offline installation and measured speech/LLM overlap. Infrastructure fault tests belong to the application/content suites; these evaluator tests are not their substitute.
 

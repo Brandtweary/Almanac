@@ -121,3 +121,27 @@ test("legacy XLS imports retain correctly labelled and previously mislabeled ori
   const id=await h.store.importSession(JSON.stringify(input));assert.deepEqual((await h.store.get(id))!.messages,input.session.messages);
  }
 });
+
+test("tool-result images obey canonical base64 and resource limits before import or save", async()=>{
+ const h=await setup();const image={type:'image',data:'YQ==',mimeType:'image/png'};
+ const oversized=Buffer.alloc(20*1024*1024+1).toString('base64');
+ const payloads=[
+  [{...image,data:'YR=='}],
+  [{...image,data:'YQ='}],
+  [{...image,data:'!!!!'}],
+  [{...image,data:oversized}],
+  Array(11).fill(image),
+ ];
+ for(const content of payloads){
+  const bad={...tool,content};
+  for(const target of['active','raw']){
+   const input=structuredClone(h.exported);if(target==='active')input.session.messages=[bad];else input.session.rawHistory.records[0].message=bad;
+   await assert.rejects(h.store.importSession(JSON.stringify(input)),/Invalid/);
+  }
+  await assert.rejects(h.store.save({...h.data,messages:[bad]},h.meta,1),/Invalid/);
+  assert.deepEqual(await h.backend.keys('sessions'),['original']);assert.deepEqual(await h.backend.keys('sessions-metadata'),['original']);
+  assert.deepEqual(await h.backend.get('sessions','original'),{...h.data,revision:1});
+ }
+ const input=structuredClone(h.exported);input.session.messages=[{...tool,content:Array(10).fill(image)}];input.session.rawHistory=new ConversationHistory(undefined,input.session.messages).snapshot();
+ const id=await h.store.importSession(JSON.stringify(input));assert.deepEqual((await h.store.get(id))!.messages,input.session.messages);
+});

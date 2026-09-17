@@ -24,7 +24,7 @@ globalThis.fetch=async(input,init)=>{
  else if(step===2){const result=JSON.parse(body.messages.at(-1).content);delta=call("corpus_read",{document_id:result.hits[0].document_id,passage_id:result.hits[0].passage_id});}
  else {const result=JSON.parse(body.messages.at(-1).content);delta={role:"assistant",content:`A source [reference](corpus:${result.passages[0].passage_id}).`};finish="stop";}
  const usage={prompt_tokens:mode==="mismatch"?18:17,completion_tokens:Math.min(10,body.max_tokens),total_tokens:27};
- return new Response(`data: ${JSON.stringify({id:`local-${step}`,choices:[{index:0,delta,finish_reason:finish}],usage})}\n\ndata: [DONE]\n\n`,{headers:{"content-type":"text/event-stream"}});
+ return new Response(`data: ${JSON.stringify({id:`local-${step}`,choices:[{index:0,delta,finish_reason:finish}],usage})}\n\n${mode==="truncated"?"":"data: [DONE]\n\n"}`,{headers:{"content-type":"text/event-stream"}});
 };
 const runner=await prepareLocalStock("http://127.0.0.1:18790/v1",runtime);
 const cases=loadStockCases(),fixture=cases.find(c=>c.id==="research.separate_warning")!;
@@ -68,4 +68,10 @@ test("absent optional sampling remains unset as in the production adapter",async
   const r=await unsampled.run(fixture,{maxCompletions:5,timeoutMs:10000});
   assert.equal(r.status,"unadjudicated");assert(sent.length>0);assert(sent.every(body=>!("temperature" in body)&&!("top_p" in body)&&!("top_k" in body)));
  }finally{profile.model.sampling=saved;}
+});
+
+test("usage followed by truncated EOF is a transport failure",async()=>{
+ reset("truncated");const r=await runner.run(fixture,{maxCompletions:5,timeoutMs:10000});
+ assert.equal(r.status,"transport_error");assert.equal(r.usageIncomplete,true);
+ assert(r.providerReceipts.every((row:any)=>row.protocolDone===false));
 });

@@ -1,3 +1,4 @@
+import { validImageBlocks } from "./attachment-limits.js";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { validUserMessage } from "./user-messages.js";
 import { validRecallDelivery } from "./kg/recall-pool.js";
@@ -17,7 +18,7 @@ function validBlock(value: unknown, assistant: boolean): boolean {
   if (!record(value)) return false;
   switch (value.type) {
     case "text": return typeof value.text === "string" && optionalString(value, "textSignature");
-    case "image": return !assistant && typeof value.data === "string" && typeof value.mimeType === "string";
+    case "image": return !assistant; // Payload and aggregate limits are checked by validImageBlocks.
     case "thinking": return assistant && typeof value.thinking === "string" && optionalString(value, "thinkingSignature") &&
       (value.redacted === undefined || typeof value.redacted === "boolean");
     case "toolCall": return assistant && typeof value.id === "string" && typeof value.name === "string" && record(value.arguments) && optionalString(value, "thoughtSignature");
@@ -29,10 +30,10 @@ function validBlock(value: unknown, assistant: boolean): boolean {
 export function validMessageContent(value: unknown): boolean {
   if (!record(value) || typeof value.role !== "string") return false;
   if (value.role === "assistant" || value.role === "toolResult") {
-    return Array.isArray(value.content) && Array.from(value.content).every(block => validBlock(block, value.role === "assistant"));
+    return Array.isArray(value.content) && validImageBlocks(value.content) && Array.from(value.content).every(block => validBlock(block, value.role === "assistant"));
   }
   if (value.role === "user" || value.role === "user-with-attachments") {
-    return typeof value.content === "string" || Array.isArray(value.content) && Array.from(value.content).every(block => validBlock(block, false));
+    return typeof value.content === "string" || Array.isArray(value.content) && validImageBlocks(value.content) && Array.from(value.content).every(block => validBlock(block, false));
   }
   return true; // App-specific roles have their own payloads, checked at the storage boundary.
 }

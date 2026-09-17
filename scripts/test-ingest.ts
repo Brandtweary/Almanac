@@ -2,7 +2,7 @@
 // the existing-memory dump, and the thin-turn guard. (Extraction is now a
 // tooled agent loop, verified live, not a JSON parser.) Also covers the
 // similarity primitives that back mint-time dedup.
-// Run from myriapod/:  node_modules/.bin/tsx scripts/test-ingest.ts
+// Run from almanac/:  node_modules/.bin/tsx scripts/test-ingest.ts
 
 import { Graph } from "../src/kg/graph.ts";
 import { dumpExistingContext, hasContentWords, stripInjectedContext } from "../src/kg/ingest.ts";

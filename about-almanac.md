@@ -2,37 +2,38 @@
 
 *Local AI for self-reliance and homesteading.*
 
-The network has gone quiet. The garden still needs tending, the pump has developed an opinion, and someone wants to know why the moon looks like that. There is a green terminal in the corner. Its librarian has been waiting for a question.
+Almanac combines a local AI assistant with an offline reference library for homesteads, preparedness and off-grid communities. It helps you find information about growing food, managing water, maintaining shelter, repairing equipment and other practical work.
 
-Almanac pairs a local AI companion with a library worth keeping: knowledge for growing food, finding water, building shelter, repairing things, and understanding the world beyond the next repair. Imagine an old homunculus looking after the books at a field station. It has time for the broken pump and the moon.
+## Research with sources
 
-You do not need an apocalypse to have a use for it. The aim is practical independence now, and knowledge that stays within reach when the infrastructure you normally depend on does not.
+Ask a question in ordinary language. Almanac searches the collection, reads relevant passages and follows up when it needs more information. Its answers link back to sources you can inspect. Tool cards show what it is doing, and you can stop a reply while it is working.
 
-## Keep the library. Run the machine.
+The model can miss details or misunderstand a source. References let you check the instructions against the original material and the equipment or conditions in front of you.
 
-Almanac runs its model, speech and reference library on the computer hosting it. Install your own copy and that can be hardware you control. Once the model and library are installed, the local tools work without an internet connection. Web search is available when you want to look beyond the shelves.
+## The collection
 
-The public demo is free to use. When you use a hosted copy, messages and voice recordings are processed by its server. Running your own copy brings that processing onto hardware you control.
+- **English Wikipedia:** full articles without images, covering science, technology, history and general reference.
+- **Appropedia:** practical material on sustainable living, appropriate technology, agriculture, water, sanitation, construction and energy.
+- **CD3WD:** the compact web archive of development manuals and technical reference material, including farming, food processing, building and trades.
+- **Additional manuals:** food preservation, crop-water needs, seed production, drinking-water systems, wood properties, electrical work, machining and emergency care.
 
-## What's on the shelves
+The [collection guide](https://github.com/Brandtweary/Almanac/blob/main/docs/library.md) lists sources, editions and publisher links. The documents remain useful independently of the assistant.
 
-The searchable library contains **English Wikipedia**, with full articles but no images, and **Appropedia**, a practical reference for sustainable living and appropriate technology. Together they cover both the work of staying fed and sheltered and the pleasures of being curious: compost and crop rotation, rainwater and small-scale energy, history and natural science.
+## Using Almanac
 
-The wider reference collection also includes original guides and manuals for:
+- **Text and voice:** type a question or press Ctrl+Space to record; press it again to stop and send. Replies can be read aloud. Ctrl+Alt+Space stops the voice.
+- **Saved conversations:** reopen earlier chats, start another, or export and import conversation files.
+- **Optional memory:** retain useful context between conversations. The reference library works with memory switched off.
+- **Document attachments:** bring your own reference documents, with previews for PDFs, Office documents and spreadsheets.
+- **Long conversations:** automatic summaries keep the conversation within the model's context window while preserving the original history.
+- **Guided first visit:** a short click-through tour explains the controls. Replay it from Quick start in the header.
 
-- **Food and growing:** the USDA home-canning guides, crop-water needs and vegetable-seed production.
-- **Water and preparedness:** emergency drinking-water treatment, rural water-system design and FEMA preparedness guidance.
-- **Building and repair:** the Forest Products Laboratory's *Wood Handbook*, trades training, machining and building maintenance.
-- **Emergency care:** the WHO/ICRC *Basic Emergency Care* workbook, written for first-contact health professionals.
+## Local operation
 
-[Browse the reference originals and download instructions](https://github.com/Brandtweary/Almanac/blob/main/docs/library.md). Those originals are separate documents; chat currently searches Wikipedia and Appropedia. The collection also has an [Oregon offline vector map](https://github.com/Brandtweary/Almanac/blob/main/deploy/packs/map-oregon.json), for use in a separate map reader. Almanac's chat does not display maps or provide routing.
+The reference setup runs Muse Glimmer with a 131,072-token context on a single RTX 5090 with 32 GB of VRAM. The model was selected to run on consumer hardware rather than require a datacenter GPU.
 
-The library holds snapshots, not live mirrors. Almanac searches and reads relevant passages, then links you back to its sources. Keep the source beside the work: a model can misunderstand a page, and a book may describe a different pump.
+Inference, speech and the installed library work without an internet connection. Optional web search provides access to current information when you are online. Chats and personal memory are stored in your browser.
 
-## A familiar voice at the terminal
+This free hosted demo processes requests on its server. Install Almanac yourself to run that processing on hardware you control.
 
-Ask by text or microphone. Follow up, bring another question, or ask for a story when the work is done. Optional personal memory lets Almanac retain useful context between conversations; the reference library works with memory switched off. Saved chats and personal memory stay in this browser.
-
-[Get the source and installation instructions](https://github.com/Brandtweary/Almanac#building-the-reading-room).
-
-Almanac is open-source software. Books, articles, maps and model weights retain their own licenses and attributions.
+[Source code and installation](https://github.com/Brandtweary/Almanac#building-the-reading-room)
