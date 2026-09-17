@@ -37,15 +37,18 @@ def apply_review(receipt: dict, fingerprint: str, review: dict | None) -> dict:
     critical=review.get('criticalFailures')
     if not isinstance(critical,list) or set(critical)-CRITICAL:
         raise ValueError('Unknown or missing critical failure classification')
+    additional=review.get('additionalFindings',[])
+    if not isinstance(additional,list) or any(not isinstance(f,dict) or not f.get('kind') or not f.get('evidence') for f in additional):
+        raise ValueError('Additional findings need explicit kind and evidence')
     semantic=all(judgments) and not critical
     runnable=status not in {'transport_error','evaluator_error','budget_not_run'}
     failed_checks={row['id'] for row in receipt.get('checks',[]) if row['passed'] is not True}
-    recovered_role=receipt.get('caseId','').startswith(('audit.','memory.','summary.')) and receipt.get('stopReason')=='stop' and receipt.get('windowOutcome',{}).get('kind') in {'completed','no-op'} and failed_checks=={'schema_validity'}
+    recovered_role=receipt.get('caseId','').startswith(('audit.','memory.','summary.','background.')) and receipt.get('stopReason')=='stop' and receipt.get('windowOutcome',{}).get('kind') in {'completed','no-op'} and failed_checks=={'schema_validity'}
     supported_outcome=runnable and semantic and (mechanical or recovered_role)
     return {'status':'passed' if runnable and mechanical and semantic else status if not runnable else 'failed',
             'mechanical_pass':mechanical,'semantic_status':'passed' if semantic else 'failed',
             'supportedOutcome':supported_outcome,'recoveredToolError':bool(supported_outcome and recovered_role),
-            'criticalFailures':critical,'reviewer':review['reviewer'],'reviewMethod':review['method'],'notes':review['notes']}
+            'criticalFailures':critical,'additionalFindings':additional,'cleanAnswer':False if additional else review.get('cleanAnswer'),'reviewer':review['reviewer'],'reviewMethod':review['method'],'notes':review['notes']}
 
 def build_report(run:Path,reviews:dict)->dict:
     lookup={entry['artifact']:entry for entry in reviews.get('reviews',[])}
@@ -63,7 +66,7 @@ def build_report(run:Path,reviews:dict)->dict:
         completed=[r['metrics']['seconds'] for r in rows if r['status'] not in {'transport_error','evaluator_error','budget_not_run'}]
         candidates.append({'model':model,'cases':len(rows),'mechanicalPass':sum(r['mechanical_pass'] for r in rows),
             'reviewed':sum(r['semantic_status']!='unadjudicated' for r in rows),'fullyPassed':sum(r['status']=='passed' for r in rows),
-            'criticalFailures':sum(bool(r.get('criticalFailures')) for r in rows),'transportErrors':sum(r['status']=='transport_error' for r in rows),'evaluatorErrors':sum(r['status']=='evaluator_error' for r in rows),
+            'criticalFailures':sum(bool(r.get('criticalFailures')) for r in rows),'additionalFindingCases':sum(bool(r.get('additionalFindings')) for r in rows),'transportErrors':sum(r['status']=='transport_error' for r in rows),'evaluatorErrors':sum(r['status']=='evaluator_error' for r in rows),
             'medianSeconds':statistics.median(completed) if completed else None,'costUSD':sum(r['metrics']['costUSD'] for r in rows)})
     candidates.sort(key=lambda c:(-c['fullyPassed'],c['criticalFailures'],-c['mechanicalPass'],c['model']))
     return {'schemaVersion':1,'candidates':candidates,'cases':result,'scope':'Development scenario comparison. Ordering is descriptive, not release admission; unadjudicated/transport cases are not model failures or passes.'}
@@ -78,9 +81,9 @@ def main():
         args.output.write_text(json.dumps(data,indent=2)+'\n');return
     data=build_report(args.run,json.loads(args.reviews.read_text()) if args.reviews else {'reviews':[]})
     args.output.write_text(json.dumps(data,indent=2)+'\n')
-    lines=['# Almanac model comparison','',data['scope'],'','| Candidate | Cases | Workflow checks | Reviewed | Fully passed | Critical failures | Transport | Fixture/eval | Median seconds | USD |','|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|']
+    lines=['# Almanac model comparison','',data['scope'],'','| Candidate | Cases | Workflow checks | Reviewed | Targeted checks passed | Critical failures | Additional findings | Transport | Fixture/eval | Median seconds | USD |','|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|']
     for c in data['candidates']:
         latency='—' if c['medianSeconds'] is None else f"{c['medianSeconds']:.2f}"
-        lines.append(f"| {c['model']} | {c['cases']} | {c['mechanicalPass']} | {c['reviewed']} | {c['fullyPassed']} | {c['criticalFailures']} | {c['transportErrors']} | {c['evaluatorErrors']} | {latency} | {c['costUSD']:.5f} |")
+        lines.append(f"| {c['model']} | {c['cases']} | {c['mechanicalPass']} | {c['reviewed']} | {c['fullyPassed']} | {c['criticalFailures']} | {c['additionalFindingCases']} | {c['transportErrors']} | {c['evaluatorErrors']} | {latency} | {c['costUSD']:.5f} |")
     args.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')
 if __name__=='__main__':main()

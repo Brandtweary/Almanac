@@ -1,0 +1,37 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {createAssistantMessageEventStream} from "@earendil-works/pi-ai";
+import {loadCreativeSuite} from "./creative.ts";
+import {loadStockCases,objectDigest} from "./stock-cases.ts";
+import {runStockCase} from "./stock.ts";
+const base=loadStockCases();const manifest=JSON.parse(readFileSync(new URL("./benchmark.json",import.meta.url),"utf8"));
+assert.equal(base.length,49);
+assert.equal(objectDigest({manifest,cases:base}),"d86a6e394c5c5b9de2a167cf6556db85431b30ceb005c0a64b4e6e0559ecea2c");
+const suite=loadCreativeSuite();assert.equal(suite.cases.length,5);
+assert(base.every(c=>!c.id.startsWith("creative.")));
+const profile={id:"fixture",contextWindow:16384,maxOutputTokens:2048,reasoning:false};
+let prompt="";let calls=0;
+const stream=(_model:any,context:any)=>{
+ calls++;prompt=context.systemPrompt;const result=createAssistantMessageEventStream();
+ const message:any={role:"assistant",content:[{type:"text",text:"Come in; that apple deserves the good saucer."}],api:"openai-completions",provider:"fixture",model:"fixture",usage:{input:0,output:0,cacheRead:0,cacheWrite:0,totalTokens:0,cost:{input:0,output:0,cacheRead:0,cacheWrite:0,total:0}},stopReason:"stop",timestamp:Date.now()};
+ queueMicrotask(()=>{result.push({type:"done",reason:"stop",message});result.end(message);});return result;
+};
+const frozen={text:"Exact frozen production builder output",sourceDigest:"a".repeat(64)};
+const greeting=await runStockCase(suite.cases[0],profile,"unused",{maxCompletions:2,timeoutMs:1000,spendAvailable:()=>true,stream,creativePrompt:frozen});
+assert.equal(prompt,frozen.text);assert.equal(greeting.status,"unadjudicated");assert(greeting.checks.every((c:any)=>c.passed));
+assert(!greeting.checks.some((c:any)=>c.id==="corpus_used"));
+const practical=await runStockCase(suite.cases.at(-1)!,profile,"unused",{maxCompletions:2,timeoutMs:1000,spendAvailable:()=>true,stream,creativePrompt:frozen});
+assert.equal(practical.status,"failed");assert(practical.checks.some((c:any)=>c.id==="source_identity"&&!c.passed));
+await assert.rejects(runStockCase(base[0],profile,"unused",{maxCompletions:2,timeoutMs:1000,spendAvailable:()=>true,stream,creativePrompt:frozen}),/scoped to the creative/);
+assert.equal(calls,2);
+console.log("Creative suite stays separate; frozen prompts are scoped; greeting is not forced into retrieval; practical source gates remain active. No creativity keyword score or network call.");
+let turns=0;
+const partialStream=()=>{
+ const result=createAssistantMessageEventStream();const reason=turns++===0?"length":"stop";
+ const message:any={role:"assistant",content:[{type:"text",text:"A partial or complete response."}],api:"openai-completions",provider:"fixture",model:"fixture",usage:{input:0,output:0,cacheRead:0,cacheWrite:0,totalTokens:0,cost:{input:0,output:0,cacheRead:0,cacheWrite:0,total:0}},stopReason:reason,timestamp:Date.now()};
+ queueMicrotask(()=>{result.push({type:"done",reason,message});result.end(message);});return result;
+};
+const multi=await runStockCase(suite.cases.find(c=>c.id==="creative.tuba-correction")!,profile,"unused",{maxCompletions:3,timeoutMs:1000,spendAvailable:()=>true,stream:partialStream,creativePrompt:frozen});
+assert.equal(multi.status,"failed");assert.equal(multi.checks.find((c:any)=>c.id==="valid_completion").passed,false);
+assert.deepEqual(multi.turnOutcomes.map((t:any)=>t.stopReason),["length","stop"]);
+console.log("An earlier truncated conversational turn cannot hide behind a later complete answer.");

@@ -3,7 +3,7 @@ import {createHash} from "node:crypto";
 import {shellCases,type ShellCase} from "./shell/index.ts";
 import {roleCases, type RoleCase} from "./roles.ts";
 import type {FixtureContext} from "./library.ts";
-export interface StockCase {id:string;split:"development"|"heldout";track:"agent"|"shell";shellCase?:ShellCase;family:string;description:string;steps:{action:"send";text:string}[];contexts?:FixtureContext[];roleCase?:RoleCase;fault?:{kind:"maintenance-peer-edit";label:string;description:string};assertions:{id:string;kind:string;critical:boolean}[];rubric:string[];}
+export interface StockCase {backgroundSeed?:import("./background-sanity.ts").BackgroundSeed;id:string;split:"development"|"heldout";track:"agent"|"shell"|"creative";shellCase?:ShellCase;family:string;description:string;steps:{action:"send";text:string}[];contexts?:FixtureContext[];roleCase?:RoleCase;fault?:{kind:"maintenance-peer-edit";label:string;description:string};assertions:{id:string;kind:string;critical:boolean}[];rubric:string[];}
 export const objectDigest=(value:unknown)=>createHash("sha256").update(JSON.stringify(value)).digest("hex");
 export function loadStockCases():StockCase[]{
  const cases:StockCase[]=[];

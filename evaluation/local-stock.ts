@@ -60,7 +60,7 @@ export async function prepareLocalStock(gateway:string,runtime:RuntimeIdentity){
  const identity={runtime,profile:structuredClone(profile),gateway,modelDigests:digests};
  // Import after installing the local route: the fixture transport retains this fetch.
  const {runStockCase}=await import("./stock.ts");
- return {identity,async run(fixture:StockCase,limits:{maxCompletions:number;timeoutMs:number;measureOnly?:boolean;shellHelperDirectory?:string}){
+ return {identity,async run(fixture:StockCase,limits:{maxCompletions:number;timeoutMs:number;measureOnly?:boolean;shellHelperDirectory?:string;creativePrompt?:{text:string;sourceDigest:string}}){
   const role=(fixture.roleCase?.role??"chat") as OracleRole;const budget=profile.roles[role];
   const candidate:CandidateProfile={id:profile.model.id,name:profile.model.name,contextWindow:profile.model.contextWindow,maxOutputTokens:budget.maxOutputTokens,maxStageOutputTokens:budget.maxStageOutputTokens,reasoning:profile.model.reasoning,thinkingLevel:budget.thinkingLevel};
   const trace:Trace={counts:[],completions:[],pending:[]};let output=0;
@@ -72,7 +72,7 @@ export async function prepareLocalStock(gateway:string,runtime:RuntimeIdentity){
     const payload=await serializeModelRequest(context,role);await countRequestTokens(payload,role,options?.signal);
     throw new Error("Measurement only: no inference requested");
    }
-   const result=await local(proxyChatModel(),context,{...options,temperature:0});
+   const result=await local(proxyChatModel(),context,options);
    void result.result().then(message=>{output+=message.usage.output;},()=>{});
    return result;
   };

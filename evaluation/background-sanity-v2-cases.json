@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 2,
+  "scope": "Versioned retrieval-context and handoff-contract correction; separate all-candidate amendment, original results retained.",
+  "supersedesForComparison": [
+    "background.voice-and-stale-description",
+    "background.glossary-correction-and-matching"
+  ],
+  "cases": [
+    {
+      "id": "voice-and-stale-description-v2",
+      "text": "I was snacking on oat bars during snack-workshop. Our workshop now meets Tuesdays, not Fridays. We still make oat bars together.",
+      "voice": {
+        "utteranceId": "synthetic-voice-1",
+        "rawText": "I was snocking on oat bars during snack-workshop. Our workshop now meets Tuesdays, not Fridays. We still make oat bars together.",
+        "correctedText": "I was snacking on oat bars during snack-workshop. Our workshop now meets Tuesdays, not Fridays. We still make oat bars together."
+      },
+      "terms": [
+        {
+          "label": "snack-workshop",
+          "description": "The user's recurring workshop meets Fridays and makes oat bars."
+        }
+      ],
+      "summary": "The user attends snack-workshop on Fridays, making oat bars.",
+      "rubric": [
+        "Recognize supported snocking/snacking raw speech evidence without inventing other errors; log and safe nonword replacement are appropriate.",
+        "Identify Friday as stale and Tuesday as current, either by correcting the description while preserving oat bars or by an exact-source stale-description handoff to memory.",
+        "Publish a supported spelling handoff with exact admitted user quote; stale-description handoff is appropriate when audit leaves the update for memory. Downstream consumption is outside this isolated role case."
+      ],
+      "pronunciation": {
+        "engine": {
+          "name": "espeak-ng",
+          "version": "1.51",
+          "voice": "en-us"
+        },
+        "entries": {
+          "snack workshop": "snˈæk wˈɜːkʃɑːp",
+          "snacking": "snˈækɪŋ",
+          "i": "ˈaɪ",
+          "i was": "ˈaɪ wʌz",
+          "i was snocking": "ˈaɪ wʌz snˈɑːkɪŋ",
+          "was": "wˈʌz",
+          "was snocking": "wʌz snˈɑːkɪŋ",
+          "was snocking on": "wʌz snˈɑːkɪŋ ˈɔn",
+          "snocking": "snˈɑːkɪŋ",
+          "snocking on": "snˈɑːkɪŋ ˈɔn",
+          "snocking on oat": "snˈɑːkɪŋ ˌɔn ˈoʊt",
+          "on": "ˈɔn",
+          "on oat": "ˌɔn ˈoʊt",
+          "on oat bars": "ˌɔn ˈoʊt bˈɑːɹz",
+          "oat": "ˈoʊt",
+          "oat bars": "ˈoʊt bˈɑːɹz",
+          "oat bars during": "ˈoʊt bˈɑːɹz dˈʊɹɹɪŋ",
+          "bars": "bˈɑːɹz",
+          "bars during": "bˈɑːɹz dˈʊɹɹɪŋ",
+          "bars during snack": "bˈɑːɹz dˈʊɹɹɪŋ snˈæk",
+          "during": "dˈʊɹɹɪŋ",
+          "during snack": "dˈʊɹɹɪŋ snˈæk",
+          "during snack workshop": "dˈʊɹɹɪŋ snˈæk wˈɜːkʃɑːp",
+          "snack": "snˈæk",
+          "snack workshop our": "snˈæk wˈɜːkʃɑːp ˌaʊɚ",
+          "workshop": "wˈɜːkʃɑːp",
+          "workshop our": "wˈɜːkʃɑːp ˌaʊɚ",
+          "workshop our workshop": "wˈɜːkʃɑːp ˌaʊɚ wˈɜːkʃɑːp",
+          "our": "ˈaʊɚ",
+          "our workshop": "ˌaʊɚ wˈɜːkʃɑːp",
+          "our workshop now": "ˌaʊɚ wˈɜːkʃɑːp nˈaʊ",
+          "workshop now": "wˈɜːkʃɑːp nˈaʊ",
+          "workshop now meets": "wˈɜːkʃɑːp nˈaʊ mˈiːts",
+          "now": "nˈaʊ",
+          "now meets": "nˈaʊ mˈiːts",
+          "now meets tuesdays": "nˈaʊ mˈiːts tˈuːzdeɪz",
+          "meets": "mˈiːts",
+          "meets tuesdays": "mˈiːts tˈuːzdeɪz",
+          "meets tuesdays not": "mˈiːts tˈuːzdeɪz nˈɑːt",
+          "tuesdays": "tˈuːzdeɪz",
+          "tuesdays not": "tˈuːzdeɪz nˈɑːt",
+          "tuesdays not fridays": "tˈuːzdeɪz nˌɑːt fɹˈaɪdeɪz",
+          "not": "nˈɑːt",
+          "not fridays": "nˌɑːt fɹˈaɪdeɪz",
+          "not fridays we": "nˌɑːt fɹˈaɪdeɪz wiː",
+          "fridays": "fɹˈaɪdeɪz",
+          "fridays we": "fɹˈaɪdeɪz wiː",
+          "fridays we still": "fɹˈaɪdeɪz wiː stˈɪl",
+          "we": "wˈiː",
+          "we still": "wiː stˈɪl",
+          "we still make": "wiː stˈɪl mˈeɪk",
+          "still": "stˈɪl",
+          "still make": "stˈɪl mˈeɪk",
+          "still make oat": "stˈɪl mˌeɪk ˈoʊt",
+          "make": "mˈeɪk",
+          "make oat": "mˌeɪk ˈoʊt",
+          "make oat bars": "mˌeɪk ˈoʊt bˈɑːɹz",
+          "oat bars together": "ˈoʊt bˈɑːɹz təɡˈɛðɚ",
+          "bars together": "bˈɑːɹz təɡˈɛðɚ",
+          "together": "təɡˈɛðɚ"
+        },
+        "scope": "Frozen native eSpeak-ng pronunciation of synthetic raw spans and target labels, captured with complete newline-terminated stdin; no model output or private audio."
+      },
+      "retrieval": {
+        "messageText": "I was snacking on oat bars during snack-workshop. Our workshop now meets Tuesdays, not Fridays. We still make oat bars together.",
+        "expectedLabels": [
+          "snack-workshop"
+        ]
+      }
+    },
+    {
+      "id": "glossary-correction-and-matching-v2",
+      "text": "The glossary entry glaze-shelve is still a typo: I call my pottery rack glaze-shelf. Its alias kiln is misleading: the kiln is a separate oven, not that rack. Keep the alias drying rack. I now store blue and green test tiles there, and it is still in my workshop. Also, arms is my strength-training log; ordinary references to an arm must not retrieve it. These are the same corrections I gave on the previous two turns.",
+      "terms": [
+        {
+          "label": "glaze-shelve",
+          "description": "The user's pottery rack in their workshop holds blue test tiles.",
+          "aliases": [
+            "kiln",
+            "drying rack"
+          ]
+        },
+        {
+          "label": "arms",
+          "description": "The user's strength-training log, named Arms; not an anatomical arm."
+        }
+      ],
+      "priorAudit": [
+        {
+          "ts": "2026-01-01T00:00:00.000Z",
+          "actions": [],
+          "note": "User explicitly corrected glaze-shelve to glaze-shelf; first sighting, rename deferred. Alias kiln incorrectly refers to an oven; drying rack is intentional. Arms log collides with ordinary arm."
+        },
+        {
+          "ts": "2026-01-02T00:00:00.000Z",
+          "actions": [],
+          "note": "Independent second user turn repeats glaze-shelve/glaze-shelf correction, bad kiln alias, and Arms/arm retrieval collision."
+        }
+      ],
+      "rubric": [
+        "Inspect prior actions before a destructive rename; preserve the existing rack identity/facts and intentional drying rack alias.",
+        "Remove misleading kiln alias and augment blue tiles with green tiles without losing workshop location.",
+        "Enable exact matching for Arms if addressing the explicit stemming collision.",
+        "Do not mint duplicate rack concepts or merge rack, kiln and training log."
+      ],
+      "retrieval": {
+        "messageText": "The glossary entry glaze-shelve is still a typo: I call my pottery rack glaze-shelf. Its alias kiln is misleading: the kiln is a separate oven, not that rack. Keep the alias drying rack. I now store blue and green test tiles there, and it is still in my workshop. Also, arms is my strength-training log; ordinary references to an arm must not retrieve it. These are the same corrections I gave on the previous two turns.",
+        "expectedLabels": [
+          "glaze-shelve",
+          "arms"
+        ]
+      }
+    }
+  ]
+}

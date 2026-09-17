@@ -61,3 +61,11 @@ test("measurement mode counts initial retained-role prompts without model genera
  const r=await runner.run(role,{maxCompletions:5,timeoutMs:10000,measureOnly:true});
  assert.equal(sent.length,0);assert.equal(r.status,"measurement_only");assert.equal(r.measurement.role,"memory");assert.deepEqual(r.measurement.counts,[17]);assert.equal(r.measurement.fits,true);
 });
+test("absent optional sampling remains unset as in the production adapter",async()=>{
+ reset("research");const saved=profile.model.sampling;delete (profile.model as any).sampling;
+ try{
+  const unsampled=await prepareLocalStock("http://127.0.0.1:18790/v1",runtime);
+  const r=await unsampled.run(fixture,{maxCompletions:5,timeoutMs:10000});
+  assert.equal(r.status,"unadjudicated");assert(sent.length>0);assert(sent.every(body=>!("temperature" in body)&&!("top_p" in body)&&!("top_k" in body)));
+ }finally{profile.model.sampling=saved;}
+});

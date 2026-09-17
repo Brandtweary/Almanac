@@ -107,6 +107,15 @@ class StockReviewTests(unittest.TestCase):
         receipt={'status':'transport_error','checks':[{'passed':True}],'rubric':['Preserve original statement.']}
         review={'receiptSHA256':'exact','method':'agent','reviewer':'test','notes':'Bound evidence','requirements':[True],'criticalFailures':[]}
         self.assertEqual(apply_review(receipt,'exact',review)['status'],'transport_error')
+    def test_targeted_pass_retains_additional_accuracy_failure(self):
+        from .adjudicate import apply_review
+        receipt={'status':'unadjudicated','checks':[{'id':'completion','passed':True}],'rubric':['Correct endpoint conversion.']}
+        review={'receiptSHA256':'exact','method':'agent','reviewer':'test','notes':'Endpoint correct; extra gap wrong.','requirements':[True],'criticalFailures':[], 'additionalFindings':[{'kind':'arithmetic_error','evidence':'Wrong difference between correct endpoints.'}]}
+        result=apply_review(receipt,'exact',review)
+        self.assertEqual(result['status'],'passed')
+        self.assertFalse(result['cleanAnswer'])
+        self.assertEqual(result['additionalFindings'],review['additionalFindings'])
+
     def test_semantic_review_binds_raw_bytes(self):
         from .adjudicate import apply_review
         with self.assertRaises(ValueError):apply_review({'status':'unadjudicated'},'new',{'receiptSHA256':'old'})

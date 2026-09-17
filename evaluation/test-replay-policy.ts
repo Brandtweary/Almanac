@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import {isZeroGenerationRoutingFailure as eligible} from "./replay-policy.ts";
+const base={status:"transport_error",requests:[{}],providerReceipts:[{httpStatus:404,errorCode:404}],messages:[{role:"assistant",content:[],stopReason:"error",usage:{output:0}}],metrics:{outputTokens:0},turnOutcomes:[{stopReason:"error"}],toolCalls:[],events:[]};
+assert(eligible(base));
+assert(!eligible({...base,status:"evaluator_error"}));
+assert(!eligible({...base,providerReceipts:[]}));
+assert(!eligible({...base,providerReceipts:[{httpStatus:500}]}));
+assert(!eligible({...base,metrics:{outputTokens:1}}));
+assert(!eligible({...base,turnOutcomes:[{stopReason:"stop"},{stopReason:"error"}]}));
+assert(!eligible({...base,messages:[{role:"assistant",stopReason:"error",content:[{type:"thinking",thinking:"partial generated thought"}]}]}));
+assert(!eligible({...base,events:[{type:"tool_execution_start"}]}));
+console.log("Replay admits only explicit zero-generation routing rejection; partial generation, completed turns, tools, unknown transport and evaluator limits are excluded.");

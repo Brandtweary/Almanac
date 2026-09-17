@@ -2,6 +2,12 @@
 
 [September 2026 hosted screening results](results/hosted-screening.md) publish the ten-candidate comparison, settings, artifact identities and admission limits.
 
+The separate [conversation and creativity probe](creative.md) compares two frozen production personas on five qualitative development conversations; it does not alter the 49 stock scenarios or their factual scores.
+
+`campaign-run.ts` runs the combined 49 stock, five creative and three supplemental audit scenarios across ten explicitly pinned hosted candidates. It freezes sources, cases, sampling and previously exposed holdout labels; a durable budget ledger retains interrupted-request exposure and includes prior charges/reserves in the cumulative ceiling. Its required `--prior-budget` JSON contains `ceilingUSD`, `priorReportedUSD` and `priorUnknownReserveUSD`; `--prepare` freezes without inference, and `--resume` requires unchanged identities. Supply `--profiles`, a fresh `--output`, and the developer-only key for actual calls. Report categories separately; isolated role probes do not certify integrated pipeline publication.
+
+Semantic reviews may record `additionalFindings` with a kind and evidence alongside frozen rubric judgments; targeted-check success is not a clean-answer endorsement when ancillary arithmetic, factual or assurance errors remain.
+
 The stock suite compares a candidate as Almanac's actual Pi chat/background agent. A deterministic driver operates the application; the candidate is not a separate browser-automation agent. The versioned manifest is `benchmark.json`: 41 agent scenarios (30 development, 11 heldout), eight isolated-shell scenarios (four development, four heldout), a four-case real-browser subset, and 29 deterministic publication/recovery/context/maintenance contracts. Browser cases and mechanical contracts are separate from model-quality scores.
 
 Bash is a separate, operator-selected secondary signal for a future CLI model, not a browser capability or a coding benchmark. `--track shell` uses only generated files and an OS namespace jail; absent containment refuses the track. No host home, workspace, credentials or network are exposed. Shell results use actual exit/output/artifact checks and do not offset research failures.
