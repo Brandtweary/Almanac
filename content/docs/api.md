@@ -49,7 +49,12 @@ lexical results `degraded`; reranker failure labels fused results `degraded`. A 
 failure never serves different bytes under an old handle.
 
 The server logs generated request IDs, methods, statuses and durations, excluding queries,
-conversation text and memory. Proxy disconnect cancels outstanding HTTP retrieval work.
+conversation text and memory. A failing retrieval stage additionally records its stage, exception
+type and traceback frames — never query-bearing text — to `failures.jsonl`, which rotates within the
+`CONTENT_FAILURE_LOG_MAX_BYTES` allotment and folds a repeating identical failure onto occurrences
+1, 2, 4, 8, … under a stable `fingerprint` with its `count` ordinal. Recording never alters the
+response: a failed stage still reports itself through `degradation`. Proxy disconnect cancels
+outstanding HTTP retrieval work.
 
 ## Optional phonetic hints
 

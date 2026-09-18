@@ -66,7 +66,8 @@ def validation(doc):
 
 
 def setup(tmp_path, **changes):
-    retention = {key: changes.pop(key) for key in ("snapshot_ttl", "snapshot_max_bytes") if key in changes}
+    retention = {key: changes.pop(key) for key in
+                 ("snapshot_ttl", "snapshot_max_bytes", "failure_log_max_bytes") if key in changes}
     store, dense, p = Store(tmp_path / "state"), Dense(), profile(**changes)
     doc = document(tmp_path)
     generation = asyncio.run(build(store, [doc], p, dense, Tokens(), validation(doc)))
@@ -412,6 +413,57 @@ def test_snapshot_storage_stays_under_its_ceiling(tmp_path):
     files = snapshot_files(service)
     assert sum(path.stat().st_size for path in files) <= 8000
     assert files, "the newest continuation survives eviction of the oldest"
+
+
+def failure_files(service):
+    return [path for path in (service.store.root / "failures.jsonl",
+                              service.store.root / "failures.1.jsonl") if path.exists()]
+
+
+def failure_rows(service):
+    # Oldest first: the rotated predecessor precedes the live file.
+    rows = []
+    for name in ("failures.1.jsonl", "failures.jsonl"):
+        path = service.store.root / name
+        if path.exists():
+            rows.extend(json.loads(line) for line in path.read_text().splitlines())
+    return rows
+
+
+def test_failure_store_stays_within_its_allotment(tmp_path):
+    service, _, generation = setup(tmp_path, failure_log_max_bytes=4000)
+    # Distinct mechanisms, so the written volume is not reduced by folding and
+    # only the allotment can hold it; the total attempted is many times the cap.
+    for index in range(400):
+        try:
+            raise RuntimeError("stage failed")
+        except RuntimeError as error:
+            service.record_failure(f"probe-{index}", generation, error)
+    assert sum(path.stat().st_size for path in failure_files(service)) <= 4000
+    rows = failure_rows(service)
+    assert rows, "recording continues across rotation"
+    assert rows[-1]["stage"] == "probe-399", "the newest failure is the one retained"
+    assert len(failure_files(service)) == 2 and len(rows) > 1, (
+        "rotation retains a predecessor, so a burst cannot erase the whole store at once")
+    assert rows[-1]["traceback"], "a retained record keeps its full mechanism evidence"
+
+
+def test_repeated_identical_failure_folds_by_fingerprint(tmp_path):
+    service, _, _ = setup(tmp_path)
+    service.dense.fail = True
+    for _ in range(16):
+        result = asyncio.run(service.search(SearchRequest(query="ZX-42")))
+        assert result["degradation"] == ["dense_unavailable"], "overflow behaviour is unchanged"
+    rows = failure_rows(service)
+    assert [row["count"] for row in rows] == [1, 2, 4, 8, 16]
+    assert len({row["fingerprint"] for row in rows}) == 1
+    assert all(row["traceback"] for row in rows)
+    # A repeating fault never buries a different one behind its own volume.
+    try:
+        raise ValueError("another mechanism")
+    except ValueError as error:
+        service.record_failure("reranker", None, error)
+    assert failure_rows(service)[-1]["type"] == "ValueError"
 
 
 def test_uncached_source_reading_leaves_the_event_loop_free(tmp_path):

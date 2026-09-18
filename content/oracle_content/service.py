@@ -64,23 +64,60 @@ SNAPSHOT_TTL_SECONDS = 900
 SNAPSHOT_MAX_BYTES = 256 * 1024 * 1024
 SNAPSHOT_PRUNE_INTERVAL_SECONDS = 30
 
+# Failure records are reachable by ordinary request traffic, so the diagnostic
+# store carries a fixed disk allotment rather than growing with the fault rate.
+# The live file and one retained predecessor together stay inside it: rotating
+# into a single file would let a burst erase every older record before anyone
+# read it, and the predecessor keeps that evidence for one full cycle.
+FAILURE_LOG_MAX_BYTES = 64 * 1024 * 1024
+# A repeating identical fault is written at occurrences 1, 2, 4, 8, ... with its
+# own occurrence ordinal, so one recurring stack reports its rate without
+# crowding every other failure out of the allotment. The map is per process and
+# bounded, because it is a write filter rather than an accounting ledger.
+FAILURE_FINGERPRINTS_MAX = 512
+
 
 class Service:
     def __init__(self, store: Store, profile: Profile, dense, tokenizer, zim=None, reranker=None, *,
-                 snapshot_ttl=SNAPSHOT_TTL_SECONDS, snapshot_max_bytes=SNAPSHOT_MAX_BYTES):
+                 snapshot_ttl=SNAPSHOT_TTL_SECONDS, snapshot_max_bytes=SNAPSHOT_MAX_BYTES,
+                 failure_log_max_bytes=FAILURE_LOG_MAX_BYTES):
         self.store, self.profile, self.dense, self.tokenizer = store, profile, dense, tokenizer
         self.zim, self.reranker = zim, reranker
         self.snapshot_ttl, self.snapshot_max_bytes = snapshot_ttl, snapshot_max_bytes
         self.snapshot_pruned_at, self.snapshot_bytes_written = None, 0
+        self.failure_log_max_bytes, self.failure_counts = failure_log_max_bytes, {}
+
+    def rotate_failures(self, pending):
+        """Keep the failure store and its one predecessor inside the allotment."""
+        path = self.store.root / "failures.jsonl"
+        # Each of the two files is held under half the allotment, so their sum
+        # never exceeds it. A record larger than half rotates on every write and
+        # the store degrades to the two most recent records rather than growing.
+        half = max(self.failure_log_max_bytes // 2, 1)
+        try:
+            size = path.stat().st_size
+        except FileNotFoundError:
+            return
+        if size + pending > half:
+            os.replace(path, path.with_name("failures.1.jsonl"))
 
     def record_failure(self, stage, generation, error):
         # Traceback frames retain mechanism evidence without serializing query-bearing exception text.
+        frames = traceback.format_tb(error.__traceback__)
+        fingerprint = digest([stage, generation, type(error).__name__, frames])[:16]
+        if len(self.failure_counts) >= FAILURE_FINGERPRINTS_MAX:
+            self.failure_counts.clear()
+        count = self.failure_counts[fingerprint] = self.failure_counts.get(fingerprint, 0) + 1
+        if count & (count - 1):
+            return  # Between powers of two the ordinal on the next record carries the rate.
         record = {"request_id": request_id.get(), "stage": stage, "generation": generation, "type": type(error).__name__,
-                  "traceback": traceback.format_tb(error.__traceback__)}
+                  "fingerprint": fingerprint, "count": count, "traceback": frames}
+        line = (json.dumps(record) + "\n").encode()
         try:
+            self.rotate_failures(len(line))
             fd = os.open(self.store.root / "failures.jsonl", os.O_APPEND | os.O_CREAT | os.O_WRONLY, 0o600)
             try:
-                os.write(fd, (json.dumps(record) + "\n").encode())
+                os.write(fd, line)
             finally:
                 os.close(fd)
         except OSError:

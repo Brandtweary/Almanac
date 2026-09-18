@@ -38,6 +38,11 @@ Search/read snapshots are only the continuation cursors of a result set still on
 `CONTENT_SNAPSHOT_TTL_SECONDS` (900) and `CONTENT_SNAPSHOT_MAX_BYTES` (256 MiB, oldest evicted first,
 never the newest) bound what an unauthenticated visitor can accumulate on disk. Following an expired
 cursor reports `invalid_cursor` and the search is repeated.
+Retrieval-stage failures record their stage and traceback to `failures.jsonl` under a fixed disk
+allotment: `CONTENT_FAILURE_LOG_MAX_BYTES` (64 MiB) covers the live file and one rotated predecessor
+together, so ordinary request traffic cannot grow the store without limit. A repeating identical
+failure is written at occurrences 1, 2, 4, 8, … carrying its `fingerprint` and `count` ordinal, so one
+recurring fault reports its rate without evicting the evidence of every other failure.
 The deployment data root can move because stored original paths are relative to it.
 With `managed_originals=True`, verified installer-managed immutable objects use same-filesystem
 hardlinks; cross-filesystem objects require a copy and corresponding staging space. Arbitrary user

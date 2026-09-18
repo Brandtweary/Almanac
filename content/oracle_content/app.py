@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from .adapters import Embeddings, Qdrant, Reranker, ZimLexical
 from .extract import TokenCounter, html_blocks, decode_zim_html
 from .models import ContentError, Profile, SearchRequest, ReadRequest
-from .service import Service, SNAPSHOT_MAX_BYTES, SNAPSHOT_TTL_SECONDS, request_id
+from .service import Service, FAILURE_LOG_MAX_BYTES, SNAPSHOT_MAX_BYTES, SNAPSHOT_TTL_SECONDS, request_id
 from .store import HANDLE, Store
 from .phonemize import NativePhonemizer, PhonemizeRequest, PhonemizeBodyLimit
 
@@ -44,7 +44,8 @@ def configured_service(client):
             TokenCounter(artifact(profile.reranker_tokenizer), profile.reranker_tokenizer_sha256))
     return Service(Store(root), profile, dense, chat, ZimLexical(), reranker,
         snapshot_ttl=float(os.environ.get("CONTENT_SNAPSHOT_TTL_SECONDS", SNAPSHOT_TTL_SECONDS)),
-        snapshot_max_bytes=int(os.environ.get("CONTENT_SNAPSHOT_MAX_BYTES", SNAPSHOT_MAX_BYTES)))
+        snapshot_max_bytes=int(os.environ.get("CONTENT_SNAPSHOT_MAX_BYTES", SNAPSHOT_MAX_BYTES)),
+        failure_log_max_bytes=int(os.environ.get("CONTENT_FAILURE_LOG_MAX_BYTES", FAILURE_LOG_MAX_BYTES)))
 
 
 def create_app(service=None, phonemizer=None):
