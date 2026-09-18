@@ -1,6 +1,6 @@
 // Embedding client — one call per term write (mint / description change),
-// through the metering proxy's /v1/embed passthrough to a self-hosted
-// embedding-inference container (MiniLM-class, 384-dim). Fail-soft: any
+// through the gateway's /v1/embed passthrough to the local
+// embedding-inference service (MiniLM-class, 384-dim). Fail-soft: any
 // error returns null and the term simply carries no embedding until a later
 // write retries (similar_terms degrades to string-only).
 
@@ -8,8 +8,8 @@ import { validVector, type Embedding } from "./types.js";
 import { dbgWarn } from "../debug.js";
 
 export interface EmbedClientOpts {
-	endpoint: string; // the proxy's /v1/embed URL
-	getBearer: () => string; // proxy principal bearer ("" on the own-key path)
+	endpoint: string; // the gateway's /v1/embed URL
+	getBearer: () => string; // "" against the bundled gateway, which needs no credential
 }
 
 export type EmbedFn = (text: string) => Promise<Embedding | null>;

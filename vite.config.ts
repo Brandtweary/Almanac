@@ -76,7 +76,7 @@ export default defineConfig(({ mode }) => ({
 		alias: {
 			// pi-ai's `/compat` barrel is side-effectful: importing it registers every
 			// builtin provider API and statically pulls `providers/all` (all provider
-			// catalogs + the image-generation surface) into the main chunk. Myriapod
+			// catalogs + the image-generation surface) into the main chunk. The app
 			// only drives `openai-completions`, and pi-agent-core imports the barrel
 			// from its own agent loop, so aliasing it to a lean, side-effect-free
 			// replacement drops the whole provider fan-out from the graph for the app

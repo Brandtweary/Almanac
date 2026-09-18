@@ -56,6 +56,10 @@ Its installed books and local capabilities remain useful when the internet is un
 reference library remains available with memory switched off. The underlying documents remain
 useful on their own.
 
+Almanac is a proof of concept for what AI looks like as appropriate technology: a single machine a
+household or a community can own, run and maintain, holding a library that stays readable whether or
+not the machine does.
+
 You need not wait for the roads to go quiet. There are things worth mending now.
 
 ## Building the reading room
@@ -89,10 +93,13 @@ services or reference library; those belong to the installation process above.
 
 ## Provenance and license
 
-This project continues Myriapod's repository and history. Its browser interface uses the vendored
-[pi-web-ui](./src/pi-web-ui/) and its conversations run through Pi's agent library. The application
-is [MIT licensed](./LICENSE); the vendored interface retains its
-[upstream MIT notice](./src/pi-web-ui/LICENSE).
+Almanac's browser interface uses the vendored [pi-web-ui](./src/pi-web-ui/) and its conversations run
+through Pi's agent library. The application is [MIT licensed](./LICENSE); the vendored interface
+retains its [upstream MIT notice](./src/pi-web-ui/LICENSE).
+
+Some source filenames and browser storage keys keep a `myriapod` prefix from an earlier iteration of
+this repository. They are load-bearing identifiers: renaming a storage key discards the saved
+conversations and personal memory of an existing installation.
 
 Books, maps and model weights retain their own licenses and attribution requirements. The
 application's license does not grant redistribution rights to the contents of a library.

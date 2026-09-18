@@ -27,9 +27,9 @@ import { appPath } from "./app-paths.js";
 const DEFAULT_STT_URL =
 	import.meta.env?.VITE_STT_BASE ?? appPath("api/asr-http");
 
-// Optional bearer token for an auth-gated Whisper endpoint. Our faster-whisper has
-// none (undefined ⇒ no Authorization header); a self-hoster fronting Whisper with
-// auth sets VITE_STT_AUTH.
+// Optional bearer token for an auth-gated Whisper endpoint. The reference
+// faster-whisper backend needs none (undefined ⇒ no Authorization header); a
+// self-hoster fronting Whisper with auth sets VITE_STT_AUTH.
 const DEFAULT_STT_AUTH: string | undefined = import.meta.env?.VITE_STT_AUTH;
 
 // Mic capture constraints — mono, echo-cancelled (this drives a speaker-based

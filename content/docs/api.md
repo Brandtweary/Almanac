@@ -37,7 +37,10 @@ Without `passage_id`, read returns a paginated contents overview (`overview: tru
 same passage schema with omitted body text. With a handle, read starts at its preceding neighbor
 and continues in original document order. No global ranking occurs during reads. A cursor is
 bound to the original query/document/handle and profile; repeating it returns the same immutable
-snapshot even after activation of a new corpus. It is not a filesystem path.
+snapshot even after activation of a new corpus. It is not a filesystem path. A cursor is short-lived:
+its snapshot expires on age or storage ceiling and then reports `invalid_cursor`, which asks the caller
+to repeat the search. Passage handles and source URLs remain valid regardless, so nothing already cited
+depends on a retained cursor.
 
 Errors use `{error: {code, message}, request_id}`. Malformed requests/cursors are 400,
 unknown documents/passages 404, unavailable historical generations/originals 410,

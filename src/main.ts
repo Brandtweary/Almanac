@@ -154,8 +154,8 @@ const MYRIAPOD_PROXY_ORIGIN = MYRIAPOD_PROXY_BASE.replace(/\/v1\/?$/, "");
 async function migrateLocalAccess(): Promise<void> {
 	for (const key of ["openrouter", "myriapod-family", "myriapod-anon", "myriapod"]) await providerKeys.delete(key);
 }
-// The auth-gated web-search endpoint, alongside the proxy's other /v1 routes
-// (/v1/chat/completions etc.). Reached with the proxy principal bearer.
+// The gateway's web-search endpoint, alongside its other /v1 routes
+// (/v1/chat/completions etc.). Same origin, no credential.
 const WEB_SEARCH_ENDPOINT = `${MYRIAPOD_PROXY_ORIGIN}/v1/web-search`;
 const EMBED_ENDPOINT = `${MYRIAPOD_PROXY_ORIGIN}/v1/embed`;
 
@@ -1075,14 +1075,6 @@ const createAgent = async (initialState?: Partial<AgentState>, savedHistory?: Co
 				sessionAgents.get(sessionKey)!.title = currentTitle;
 			}
 
-			// Mint the session id as soon as there's something worth saving, so
-			// the URL carries ?session= and the conversation survives a reload.
-			if (!currentSessionId && shouldSaveSession(messages)) {
-				currentSessionId = crypto.randomUUID();
-				dbg(`session id minted: ${currentSessionId}`);
-				updateUrl(currentSessionId);
-			}
-
 			// Persist on terminal events (not once per streamed token).
 			if (currentSessionId && isTerminal) {
 				if (history.snapshot().records.length) updateUrl(currentSessionId);
@@ -1155,6 +1147,10 @@ const createAgent = async (initialState?: Partial<AgentState>, savedHistory?: Co
 		chatPanel.agentInterface.enableModelSelector = false;
 		chatPanel.agentInterface.enableThinkingSelector = false;
 	}
+
+	// A restored transcript renders model-written citation hrefs that no agent lifecycle event
+	// will follow, so resolve them against the ledger once the loaded messages are committed.
+	requestAnimationFrame(sanitizeChatAnchors);
 
 	refreshAgentMemory();
 	if (memoryConsent === "granted") void pipeline.resumePending();

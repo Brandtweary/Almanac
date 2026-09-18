@@ -7,6 +7,7 @@ import os
 import traceback
 import re
 import sqlite3
+import time
 import uuid
 from contextvars import ContextVar
 from pathlib import Path
@@ -53,10 +54,24 @@ def remove_contained(rows, passages):
     return kept
 
 
+# A snapshot is read only by resume(), which serves a continuation cursor the
+# client follows while its search is still on screen. Citations do not depend on
+# one: evidence is a content-addressed passage handle resolved through
+# Store.passage(), so an expired snapshot costs a repeated search and nothing
+# else. Retention is therefore a storage policy, not part of retrieval identity,
+# and is deliberately absent from the profile fingerprint.
+SNAPSHOT_TTL_SECONDS = 900
+SNAPSHOT_MAX_BYTES = 256 * 1024 * 1024
+SNAPSHOT_PRUNE_INTERVAL_SECONDS = 30
+
+
 class Service:
-    def __init__(self, store: Store, profile: Profile, dense, tokenizer, zim=None, reranker=None):
+    def __init__(self, store: Store, profile: Profile, dense, tokenizer, zim=None, reranker=None, *,
+                 snapshot_ttl=SNAPSHOT_TTL_SECONDS, snapshot_max_bytes=SNAPSHOT_MAX_BYTES):
         self.store, self.profile, self.dense, self.tokenizer = store, profile, dense, tokenizer
         self.zim, self.reranker = zim, reranker
+        self.snapshot_ttl, self.snapshot_max_bytes = snapshot_ttl, snapshot_max_bytes
+        self.snapshot_pruned_at, self.snapshot_bytes_written = None, 0
 
     def record_failure(self, stage, generation, error):
         # Traceback frames retain mechanism evidence without serializing query-bearing exception text.
@@ -212,9 +227,14 @@ class Service:
             degradation.append("dense_unavailable")
         rows = fuse({"lexical": lexical, "dense": dense},
                     {"lexical": self.profile.lexical_weight, "dense": self.profile.dense_weight}, self.profile.rrf_k)
+        known = getattr(lexical, "passages", {})
+        # Resolving a dense-only hit decodes and parses its source article. On a
+        # native archive that is tens to hundreds of milliseconds per hit and the
+        # service runs one event loop, so it never happens on the loop itself.
+        def resolve():
+            return [known.get(row["passage_id"]) or self.store.passage(generation, row["passage_id"]) for row in rows]
         passages = {}
-        for row in rows:
-            p = getattr(lexical, "passages", {}).get(row["passage_id"]) or self.store.passage(generation, row["passage_id"])
+        for p in await asyncio.to_thread(resolve):
             if document_id and p.document_id != document_id:
                 raise ContentError("index_scope_mismatch", "Candidate escaped its document scope")
             passages[p.passage_id] = p
@@ -235,9 +255,47 @@ class Service:
                 "previous": passage.previous, "next": passage.next, "kind": passage.kind,
                 "flags": passage.flags + (["text_omitted_budget"] if omit else [])}
 
+    def prune_snapshots(self, force=False):
+        """Expire continuations an unauthenticated visitor can mint without limit."""
+        now = time.monotonic()
+        # Scanning the directory on every write is wasted work at request rates,
+        # so the interval carries ordinary traffic and the byte counter bounds
+        # how far a burst can overshoot the ceiling between two scans.
+        if (not force and self.snapshot_pruned_at is not None
+                and now - self.snapshot_pruned_at < SNAPSHOT_PRUNE_INTERVAL_SECONDS
+                and self.snapshot_bytes_written * 4 < self.snapshot_max_bytes):
+            return
+        self.snapshot_pruned_at, self.snapshot_bytes_written = now, 0
+        directory = self.store.root / "snapshots"
+        deadline = time.time() - self.snapshot_ttl
+        live = []
+        for path in directory.glob("*.json*"):
+            try:
+                stat = path.stat()
+            except OSError:
+                continue  # Another worker expired it first.
+            if stat.st_mtime < deadline:
+                path.unlink(missing_ok=True)
+                continue
+            # A recent ".tmp" belongs to an atomic write still in flight; an old
+            # one was expired above as the residue of an interrupted write.
+            if path.suffix != ".tmp":
+                live.append((stat.st_mtime, stat.st_size, path))
+        total = sum(size for _mtime, size, _path in live)
+        # The newest is never evicted: a ceiling below one result set would
+        # otherwise kill a continuation before its own response was returned.
+        for _mtime, size, path in sorted(live)[:-1]:
+            if total <= self.snapshot_max_bytes:
+                break
+            path.unlink(missing_ok=True)
+            total -= size
+
     def save_snapshot(self, data, binding):
+        self.prune_snapshots()
         key = uuid.uuid4().hex
-        atomic_json(self.store.root / "snapshots" / (key + ".json"), {"binding": binding, "data": data})
+        path = self.store.root / "snapshots" / (key + ".json")
+        atomic_json(path, {"binding": binding, "data": data})
+        self.snapshot_bytes_written += path.stat().st_size
         return key
 
     def cursor(self, key, offset):
@@ -315,36 +373,42 @@ class Service:
         if request.cursor:
             key, offset, snapshot = self.resume(request.cursor, binding)
         else:
-            if request.passage_id:
-                match = HANDLE.fullmatch(request.passage_id)
-                if not match:
-                    raise ContentError("invalid_handle", "Malformed passage handle", 400)
-                generation = match[1]
-                selected = self.store.passage(generation, request.passage_id)
-                if selected.document_id != request.document_id:
-                    raise ContentError("invalid_handle", "Passage belongs to another document", 400)
-            else:
-                generation = None
-                for candidate in self.store.active_generations():
-                    try:
-                        self.store.document(candidate, request.document_id)
-                        generation = candidate
-                        break
-                    except ContentError as error:
-                        if error.code not in {"unknown_document", "source_excluded"}:
-                            raise
-                if generation is None:
-                    raise ContentError("unknown_document", "Document is outside the active library", 404)
-                selected = None
-            doc = self.store.document(generation, request.document_id)
-            passages = list(self.store.passages(generation, doc.document_id))
-            if selected:
-                # Direct expansion starts one source neighbor earlier and can continue to the end.
-                passages = [selected, *passages] if selected.kind == "article_lead" else passages[max(0, selected.ordinal - 1):]
-            hits = [self.hit(generation, p, omit=selected is None) for p in passages]
-            snapshot = {**self.base(generation), "document": {"document_id": doc.document_id, "title": doc.title,
-                "edition": doc.edition, "publisher": doc.publisher, "language": doc.language,
-                "source_revision": doc.sha256, "license": doc.license, "rights_exceptions": doc.rights_exceptions},
-                "overview": selected is None, "passages": hits}
-            key, offset = self.save_snapshot(snapshot, binding), 0
+            # Reading an uncached native article decodes and segments the whole
+            # article synchronously; on the service's single event loop that
+            # would block every other visitor and the disconnect watcher with it.
+            snapshot, key, offset = await asyncio.to_thread(self.read_snapshot, request, binding)
         return self.page(snapshot, key, offset, "passages", self.profile.read_tokens)
+
+    def read_snapshot(self, request: ReadRequest, binding):
+        if request.passage_id:
+            match = HANDLE.fullmatch(request.passage_id)
+            if not match:
+                raise ContentError("invalid_handle", "Malformed passage handle", 400)
+            generation = match[1]
+            selected = self.store.passage(generation, request.passage_id)
+            if selected.document_id != request.document_id:
+                raise ContentError("invalid_handle", "Passage belongs to another document", 400)
+        else:
+            generation = None
+            for candidate in self.store.active_generations():
+                try:
+                    self.store.document(candidate, request.document_id)
+                    generation = candidate
+                    break
+                except ContentError as error:
+                    if error.code not in {"unknown_document", "source_excluded"}:
+                        raise
+            if generation is None:
+                raise ContentError("unknown_document", "Document is outside the active library", 404)
+            selected = None
+        doc = self.store.document(generation, request.document_id)
+        passages = list(self.store.passages(generation, doc.document_id))
+        if selected:
+            # Direct expansion starts one source neighbor earlier and can continue to the end.
+            passages = [selected, *passages] if selected.kind == "article_lead" else passages[max(0, selected.ordinal - 1):]
+        hits = [self.hit(generation, p, omit=selected is None) for p in passages]
+        snapshot = {**self.base(generation), "document": {"document_id": doc.document_id, "title": doc.title,
+            "edition": doc.edition, "publisher": doc.publisher, "language": doc.language,
+            "source_revision": doc.sha256, "license": doc.license, "rights_exceptions": doc.rights_exceptions},
+            "overview": selected is None, "passages": hits}
+        return snapshot, self.save_snapshot(snapshot, binding), 0

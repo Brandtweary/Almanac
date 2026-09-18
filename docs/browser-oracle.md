@@ -4,7 +4,7 @@ The browser loads its model, role budgets and readiness from `/v1/profile`, send
 
 Reference and conversation-history tool cards keep raw arguments/results collapsed behind the existing inspector; source coverage and failures remain visible in their compact status.
 
-Researched answers include a sources footer derived from successful corpus calls in that user turn, reconstructed from original conversation history after reload or compaction. It lists documents read, or explicitly labeled search results when no document was read; links open the retained source in a new tab or download it, and do not certify the answer's claims.
+Researched answers include a sources footer reconstructed from original conversation history after reload or compaction. It lists the answer's own citations, resolved against the evidence the corpus returned in that conversation; an answer that cites nothing resolvable instead shows its retrieval for that user turn under a separate label that does not claim support. Links open the retained source in a new tab or download it, and do not certify the answer's claims.
 
 Queue status and cancellation use transient request handles, context compaction preserves an explicit source ledger and marks omitted evidence for rereading, and personal-memory failure pauses its durable queue with a visible retry control while reference chat remains usable.
 

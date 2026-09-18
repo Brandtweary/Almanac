@@ -1,6 +1,9 @@
 import asyncio
 import hashlib
 import json
+import os
+import threading
+import time
 from pathlib import Path
 import pytest
 import httpx
@@ -63,10 +66,11 @@ def validation(doc):
 
 
 def setup(tmp_path, **changes):
+    retention = {key: changes.pop(key) for key in ("snapshot_ttl", "snapshot_max_bytes") if key in changes}
     store, dense, p = Store(tmp_path / "state"), Dense(), profile(**changes)
     doc = document(tmp_path)
     generation = asyncio.run(build(store, [doc], p, dense, Tokens(), validation(doc)))
-    return Service(store, p, dense, Tokens()), doc, generation
+    return Service(store, p, dense, Tokens(), **retention), doc, generation
 
 
 def test_independent_union_and_pagination(tmp_path):
@@ -367,3 +371,91 @@ def test_html_heading_hierarchy_preserves_levels_when_headings_are_skipped():
     assert [(b.text, b.section) for b in blocks if b.kind == 'paragraph'] == [
         ('Boil.', ['Water']), ('Seal.', ['Water', 'Storage']), ('Cook.', ['Food']),
         ('Dry.', ['Food', 'Grains']), ('Soak.', ['Food', 'Beans'])]
+
+
+def snapshot_files(service):
+    return sorted((service.store.root / "snapshots").glob("*.json"))
+
+
+def test_expired_continuations_are_reclaimed_without_losing_live_ones(tmp_path):
+    service, _, _ = setup(tmp_path, snapshot_ttl=60, page_size=1)
+    first = asyncio.run(service.search(SearchRequest(query="ZX-42")))
+    assert first["cursor"]
+    assert len(snapshot_files(service)) == 1
+    aged = snapshot_files(service)[0]
+    os.utime(aged, (time.time() - 3600, time.time() - 3600))
+    # Residue of an interrupted atomic write has no reader at any age.
+    fresh_residue = service.store.root / "snapshots" / "pending.json.abc.tmp"
+    fresh_residue.write_text("{}")
+    old_residue = service.store.root / "snapshots" / "abandoned.json.def.tmp"
+    old_residue.write_text("{}")
+    os.utime(old_residue, (time.time() - 3600, time.time() - 3600))
+    service.snapshot_pruned_at = None
+    asyncio.run(service.search(SearchRequest(query="stopcock")))
+    assert not aged.exists()
+    assert not old_residue.exists() and fresh_residue.exists()
+    assert len(snapshot_files(service)) == 1
+    # An expired continuation reports itself rather than resolving to another result set.
+    with pytest.raises(ContentError) as expired:
+        asyncio.run(service.search(SearchRequest(query="ZX-42", cursor=first["cursor"])))
+    assert expired.value.code == "invalid_cursor"
+
+
+def test_snapshot_storage_stays_under_its_ceiling(tmp_path):
+    service, _, _ = setup(tmp_path, snapshot_max_bytes=8000)
+    # A burst never reaches the scan interval, so only the byte counter can hold
+    # the ceiling; the written total here is several times the cap.
+    for _ in range(24):
+        asyncio.run(service.search(SearchRequest(query="ZX-42 stopcock seal")))
+    assert sum(path.stat().st_size for path in snapshot_files(service)) <= 2 * 8000
+    service.prune_snapshots(force=True)
+    files = snapshot_files(service)
+    assert sum(path.stat().st_size for path in files) <= 8000
+    assert files, "the newest continuation survives eviction of the oldest"
+
+
+def test_uncached_source_reading_leaves_the_event_loop_free(tmp_path):
+    service, doc, _ = setup(tmp_path)
+    started = threading.Event()
+    release = threading.Event()
+    original = service.store.passages
+    def slow(*args, **kwargs):
+        started.set()
+        assert release.wait(5)
+        return original(*args, **kwargs)
+    service.store.passages = slow
+    async def check():
+        reading = asyncio.create_task(service.read(ReadRequest(document_id=doc.document_id)))
+        await asyncio.to_thread(started.wait, 5)
+        # The loop is still scheduling while the blocking read is in flight.
+        ticks = 0
+        for _ in range(5):
+            await asyncio.sleep(0)
+            ticks += 1
+        release.set()
+        assert ticks == 5
+        return await reading
+    result = asyncio.run(check())
+    assert result["passages"]
+
+
+def test_dense_hit_resolution_leaves_the_event_loop_free(tmp_path):
+    service, _, _ = setup(tmp_path)
+    started, release = threading.Event(), threading.Event()
+    original = service.store.passage
+    def slow(*args, **kwargs):
+        started.set()
+        assert release.wait(5)
+        return original(*args, **kwargs)
+    service.store.passage = slow
+    async def check():
+        searching = asyncio.create_task(service.search(SearchRequest(query="paraphrase")))
+        await asyncio.to_thread(started.wait, 5)
+        ticks = 0
+        for _ in range(5):
+            await asyncio.sleep(0)
+            ticks += 1
+        release.set()
+        assert ticks == 5
+        return await searching
+    assert asyncio.run(check())["hits"]

@@ -8,7 +8,7 @@ Almanac combines a local AI assistant with an offline reference library for home
 
 ## Working with the library
 
-Ask a question in ordinary language. Almanac searches the collection, reads relevant passages and follows up when it needs more information. Tool cards show its searches and the passages it reads. A sources list beneath each researched answer links to the documents; search-only results are labeled separately. Depending on the document, a link opens a page or downloads a file.
+Ask a question in ordinary language. Almanac searches the collection, reads relevant passages and follows up when it needs more information. Tool cards show its searches and the passages it reads. A sources list beneath each researched answer links to the documents the answer cites; when it cites none, the material it merely consulted is listed under its own label instead. Depending on the document, a link opens a page or downloads a file.
 
 ## The collection
 

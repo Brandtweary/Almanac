@@ -1,4 +1,30 @@
 import { AdmissionError } from "./queue";
+
+/** Request fields a client may set. Everything else is dropped before admission
+ *  counting and before the backend sees the body.
+ *
+ *  Both pinned backends accept far more than this: the vLLM OpenAI server declares
+ *  `extra="allow"` and honours `n`, `min_tokens`, `ignore_eos`, `prompt_logprobs`,
+ *  `logit_bias`, `chat_template` and `chat_template_kwargs`, several of which
+ *  multiply or extend generation past the role budget this gateway advertises,
+ *  or replace the release profile's pinned chat template. An allow-list is the
+ *  defensible shape here because the browser client's payload is a closed set:
+ *  anything outside it did not come from the application.
+ *
+ *  `max_completion_tokens` is admitted only so the caller can normalize it onto
+ *  `max_tokens`; `store` is sent by the client's provider library and ignored by
+ *  both pinned backends. Sampling is not client policy — the release profile
+ *  overwrites `temperature`/`top_p`/`top_k` after this filter runs. */
+export const CLIENT_COMPLETION_FIELDS = ["model", "messages", "stream", "stream_options", "store",
+  "max_tokens", "max_completion_tokens", "temperature", "top_p", "top_k", "tools", "tool_choice",
+  "reasoning_effort"] as const;
+
+export function pinnedCompletionBody(body: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(CLIENT_COMPLETION_FIELDS
+    .filter(field => body[field] !== undefined)
+    .map(field => [field, body[field]]));
+}
+
 /** The pinned vLLM chat and tokenize APIs use the same renderer with different request schemas. */
 export function vllmTokenizePayload(body: Record<string, unknown>, excludeToolsWhenNone = false): Record<string, unknown> {
   if (body.tool_choice !== undefined && !["auto", "none"].includes(body.tool_choice as string)) throw new AdmissionError("tokenizer_tool_choice_unsupported", 400);

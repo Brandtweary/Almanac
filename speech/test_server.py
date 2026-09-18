@@ -5,6 +5,7 @@ import time
 import unittest
 from types import SimpleNamespace
 import msgpack
+from websockets.exceptions import ConnectionClosed
 from server import SpeechService, read_message, MAX_TEXT
 
 
@@ -38,6 +39,15 @@ class Socket:
         await self.closed.wait()
 
 
+class Dropped(Socket):
+    """A listener that goes away mid-stream, as barge-in and mute do."""
+    async def send(self, data):
+        await super().send(data)
+        if sum(1 for message in self.sent if message["type"] == "Audio") >= 2:
+            self.closed.set()
+            raise ConnectionClosed(None, None)
+
+
 def blocked_factory():
     while True:
         time.sleep(1)
@@ -50,6 +60,13 @@ def fixture_factory():
                 time.sleep(1)
         if text == "fail":
             raise RuntimeError("fixture failure")
+        if text == "long":
+            # Long enough that only real cancellation, never completion, can
+            # return the worker to idle inside the reset budget.
+            for _ in range(2000):
+                time.sleep(.005)
+                yield [.25] * 2400
+            return
         yield [.25] * 2400
     return generate
 
@@ -78,6 +95,8 @@ class TransportTests(unittest.IsolatedAsyncioTestCase):
         for reason in ("disconnect", "timeout", "cancel"):
             service = SpeechService(fixture_factory)
             self.addAsyncCleanup(service.close)
+            # The fixture ignores cancellation, so this is the unresponsive path.
+            service.reset_timeout = .2
             await service.start()
             pid = service.worker.pid
             if reason == "timeout":
@@ -138,6 +157,27 @@ class TransportTests(unittest.IsolatedAsyncioTestCase):
             await service.handle(socket)
             self.assertIs(service.worker, worker)
             self.assertTrue(worker.is_alive())
+
+    async def test_abandoned_session_keeps_its_loaded_worker(self):
+        service = SpeechService(fixture_factory)
+        self.addAsyncCleanup(service.close)
+        await service.start()
+        worker, pid = service.worker, service.worker.pid
+        # Barge-in: the browser drops the socket while the worker is still
+        # generating, which used to cost a kill and a model reload.
+        socket = Dropped([packed({"type": "Text", "text": "long"}), packed({"type": "Eos"})])
+        await asyncio.wait_for(service.handle(socket), 5)
+        self.assertLess(len(socket.sent), 100, "generation outlived the listener")
+        self.assertIs(service.worker, worker)
+        self.assertTrue(worker.is_alive())
+        self.assertFalse(service.lock.locked())
+        self.assertFalse(service.cancel.is_set())
+        os.kill(pid, 0)
+        # The same worker serves the next sentence without reloading its model.
+        again = Socket([packed({"type": "Text", "text": "Hello"}), packed({"type": "Eos"})])
+        await asyncio.wait_for(service.handle(again), 5)
+        self.assertEqual(again.code, 1000)
+        self.assertEqual(service.worker.pid, pid)
 
     async def test_busy_client_cannot_reuse_worker(self):
         service = SpeechService(fixture_factory)

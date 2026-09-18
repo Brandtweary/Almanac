@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from .adapters import Embeddings, Qdrant, Reranker, ZimLexical
 from .extract import TokenCounter, html_blocks, decode_zim_html
 from .models import ContentError, Profile, SearchRequest, ReadRequest
-from .service import Service, request_id
+from .service import Service, SNAPSHOT_MAX_BYTES, SNAPSHOT_TTL_SECONDS, request_id
 from .store import HANDLE, Store
 from .phonemize import NativePhonemizer, PhonemizeRequest, PhonemizeBodyLimit
 
@@ -42,7 +42,9 @@ def configured_service(client):
     if profile.ranking == "reranker":
         reranker = Reranker(client, os.environ["CONTENT_RERANK_URL"], profile,
             TokenCounter(artifact(profile.reranker_tokenizer), profile.reranker_tokenizer_sha256))
-    return Service(Store(root), profile, dense, chat, ZimLexical(), reranker)
+    return Service(Store(root), profile, dense, chat, ZimLexical(), reranker,
+        snapshot_ttl=float(os.environ.get("CONTENT_SNAPSHOT_TTL_SECONDS", SNAPSHOT_TTL_SECONDS)),
+        snapshot_max_bytes=int(os.environ.get("CONTENT_SNAPSHOT_MAX_BYTES", SNAPSHOT_MAX_BYTES)))
 
 
 def create_app(service=None, phonemizer=None):
@@ -128,10 +130,16 @@ def create_app(service=None, phonemizer=None):
 
     @app.get("/v1/corpus/source/{handle}")
     async def source(handle: str, request: Request):
+        # Rendering a native article decodes and block-parses the whole article;
+        # it shares the event loop with every other request and its own
+        # disconnect watcher, so it runs in a thread under the same deadline.
+        return await cancellable(request, asyncio.to_thread(render_source, request.app.state.service, handle))
+
+    def render_source(service, handle: str):
         match = HANDLE.fullmatch(handle)
         if not match:
             raise ContentError("invalid_handle", "Malformed source handle", 400)
-        store = request.app.state.service.store
+        store = service.store
         passage = store.passage(match[1], handle)
         doc = store.document(match[1], passage.document_id)
         path = store.root / doc.original_path

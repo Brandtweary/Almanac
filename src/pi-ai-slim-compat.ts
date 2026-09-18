@@ -4,8 +4,8 @@
  * The real `@earendil-works/pi-ai/compat` runs `registerBuiltInApiProviders()`
  * at import time — instantiating every builtin provider API and statically
  * pulling `providers/all` (all ~40 provider catalogs + the image-generation
- * surface) into the main chunk, even though Myriapod only ever drives the
- * `openai-completions` API (Kimi K3 over OpenRouter / the metering proxy). The
+ * surface) into the main chunk, even though this application only ever drives the
+ * `openai-completions` API, against the local gateway. The
  * pi-ai README itself says to avoid the barrel in bundled apps for this reason.
  *
  * This module re-exports the exact surface the app + pi-agent-core consume from

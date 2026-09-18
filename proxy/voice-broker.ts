@@ -6,7 +6,8 @@ export interface TtsEndpoint {
 
 export interface VoiceBrokerConfig {
 	endpoints: TtsEndpoint[];
-	// Max concurrent voice sessions per TTS endpoint (see CAPACITY MODEL above).
+	// Max concurrent voice sessions per TTS endpoint. A lease is held for a whole
+	// narration turn, so this is a count of simultaneous speakers, not of requests.
 	capacity: number;
 	// How often the browser should heartbeat (seconds). A lease is TTL-reclaimed
 	// once its last beat is older than 3x this (covers tabs that closed without a
@@ -116,8 +117,7 @@ export class VoiceBroker {
 	}
 }
 
-import type { Hono } from "hono";
-import type { Context } from "hono";
+import type { Context, Hono, MiddlewareHandler } from "hono";
 
 /** Extract a leaseId from a request, tolerating navigator.sendBeacon — whose body
  *  may arrive as text/plain or a Blob, not JSON. Checks the query param first, then
@@ -139,8 +139,12 @@ async function leaseIdFrom(c: Context): Promise<string> {
 export function registerVoiceRoutes(
 	app: Hono,
 	broker: VoiceBroker,
+	// Lease minting is open to any visitor and the broker's capacity is small,
+	// so the gateway's per-client window is what keeps one client from holding
+	// every slot. Omitted only by tests exercising the broker itself.
+	limit: MiddlewareHandler = async (_c, next) => next(),
 ): void {
-	app.post("/voice/lease", (c) => {
+	app.post("/voice/lease", limit, (c) => {
 		const r = broker.lease();
 		if (r.granted) {
 			return c.json({
@@ -152,7 +156,7 @@ export function registerVoiceRoutes(
 		return c.json({ queued: true, position: r.position }, 202);
 	});
 
-	app.post("/voice/heartbeat", async (c) => {
+	app.post("/voice/heartbeat", limit, async (c) => {
 		const leaseId = await leaseIdFrom(c);
 		if (!leaseId) return c.json({ error: "missing leaseId" }, 400);
 		if (!broker.heartbeat(leaseId)) {
@@ -161,7 +165,7 @@ export function registerVoiceRoutes(
 		return c.json({ ok: true });
 	});
 
-	app.post("/voice/release", async (c) => {
+	app.post("/voice/release", limit, async (c) => {
 		const leaseId = await leaseIdFrom(c);
 		if (leaseId) broker.release(leaseId);
 		// Always 200 — release is best-effort cleanup (often a fire-and-forget beacon

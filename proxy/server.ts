@@ -1,6 +1,6 @@
-import { vllmTokenizePayload } from "./tokenize";
+import { pinnedCompletionBody, vllmTokenizePayload } from "./tokenize";
 import { speechBridge } from "./speech-socket";
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
 import { appendFileSync, readFileSync, realpathSync } from "node:fs";
@@ -8,6 +8,7 @@ import { resolve, sep } from "node:path";
 import { config, validateProfile, type GatewayConfig, type ReleaseProfile } from "./config";
 import { AdmissionError, CompletionQueue } from "./queue";
 import { VoiceBroker, registerVoiceRoutes } from "./voice-broker";
+import { clientIp, createLimiters, WINDOW_MS, type RouteName } from "./rate-limit";
 
 export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch = fetch, providedProfile?: ReleaseProfile) {
   if (cfg.qualificationMode && cfg.qualificationBoundary && cfg.qualificationBoundary !== "isolated-container") throw new Error("invalid qualification boundary declaration");
@@ -21,6 +22,14 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
   const app = new Hono();
   app.use("*", async (c, next) => { await next(); const policy = c.res.headers.get("Content-Security-Policy"); c.header("Content-Security-Policy", `${policy ? policy + "; " : ""}frame-ancestors 'none'`); });
   const queue = profile ? new CompletionQueue(profile.limits, log) : null;
+  // Every route below is reachable without authentication; the window is the
+  // only thing standing between one visitor and a shared local backend.
+  const limiters = createLimiters();
+  const limit = (route: RouteName): MiddlewareHandler => async (c, next) => {
+    if (!limiters[route].limited(clientIp(c, cfg.trustedProxies))) return next();
+    log({stage: "rate_limit", status: "rejected", route});
+    return c.json({error: {code: "rate_limited"}}, 429, {"Retry-After": String(Math.ceil(WINDOW_MS / 1000))});
+  };
   app.use("*", cors({origin: cfg.allowedOrigins, allowMethods: ["GET", "POST", "DELETE", "OPTIONS"], exposeHeaders: ["X-Request-Id"]}));
   app.use("*", bodyLimit({maxSize: Math.max(131072, profile?.limits.maxRequestBytes ?? 65536, profile?.limits.speechMaxBytes ?? 65536), onError: c => c.json({error: {code: "body_too_large"}}, 413)}));
   app.onError((error, c) => { log({stage: "request", status: "failed", error: error.name}); return c.json({error: {code: "gateway_failure"}}, 500); });
@@ -48,7 +57,7 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
   app.get("/ready", async c => { const r = await readiness(c.req.raw.signal); return c.json(r, r.ready ? 200 : 503); });
   app.get("/v1/requests/:id", c => { const status = queue?.status(c.req.param("id")); return status ? c.json(status) : c.json({error: {code: "request_unknown"}}, 404); });
   app.delete("/v1/requests/:id", c => queue?.cancel(c.req.param("id")) ? c.json({state: "interrupted"}) : c.json({error: {code: "request_unknown"}}, 404));
-  for (const tool of ["search", "read"]) app.post(`/v1/corpus/${tool}`, async c => {
+  for (const tool of ["search", "read"]) app.post(`/v1/corpus/${tool}`, limit("corpus"), async c => {
     const body = await c.req.json().catch(() => null);
     if (!body || typeof body !== "object" || Array.isArray(body)) return c.json({error: {code: "invalid_request"}}, 400);
     try {
@@ -56,7 +65,7 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
       const data = await upstream.json(); return c.json(data, upstream.status as 200);
     } catch (error) { log({stage: `corpus_${tool}`, status: "failed", error: error instanceof Error ? error.name : "unknown"}); return c.json({error: {code: "corpus_unavailable"}}, 502); }
   });
-  app.post("/v1/phonemize", async c => {
+  app.post("/v1/phonemize", limit("phonemize"), async c => {
     const body = await c.req.text();
     if (new TextEncoder().encode(body).length > 131072) return c.json({error: {code: "body_too_large"}}, 413);
     try {
@@ -86,18 +95,24 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
     if (!result.ok || !Array.isArray(tokens.tokens) || tokens.tokens.some((x: unknown) => !Number.isSafeInteger(x))) throw new AdmissionError("tokenizer_failed", 502);
     return tokens.tokens.length;
   }
-  app.post("/v1/tokenize", async c => {
+  app.post("/v1/tokenize", limit("tokenize"), async c => {
     if (!profile || !cfg.llmBase) return c.json({error: {code: "runtime_unconfigured"}}, 503);
-    const body = await c.req.json().catch(() => null);
-    if (!body || !Array.isArray(body.messages) || body.model !== profile.model.id) return c.json({error: {code: "invalid_request"}}, 400);
+    const raw = await c.req.json().catch(() => null);
+    if (!raw || typeof raw !== "object" || Array.isArray(raw) || !Array.isArray(raw.messages) || raw.model !== profile.model.id) return c.json({error: {code: "invalid_request"}}, 400);
+    // Counting must measure the same render the backend will perform, so the
+    // same filter applies here as on the completion route.
+    const body = pinnedCompletionBody(raw);
     try { return c.json({tokens: await countTokens(body, AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(15000)]))}); }
     catch (error) { log({stage: "tokenize", status: "failed", error: error instanceof Error ? error.name : "unknown"}); return c.json({error: {code: error instanceof AdmissionError ? error.code : "tokenizer_failed"}}, 502); }
   });
-  app.post("/v1/chat/completions", async c => {
+  app.post("/v1/chat/completions", limit("completions"), async c => {
     if (!profile || !queue || !cfg.llmBase) return c.json({error: {code: "runtime_unconfigured"}}, 503);
     const raw = await c.req.text();
     if (new TextEncoder().encode(raw).length > profile.limits.maxRequestBytes) return c.json({error: {code: "body_too_large"}}, 413);
-    let body: Record<string, unknown>; try { body = JSON.parse(raw); } catch { return c.json({error: {code: "invalid_json"}}, 400); }
+    let parsed: Record<string, unknown>; try { parsed = JSON.parse(raw); } catch { return c.json({error: {code: "invalid_json"}}, 400); }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return c.json({error: {code: "invalid_completion"}}, 400);
+    // Client fields outside the application's own payload never reach the backend.
+    const body = pinnedCompletionBody(parsed);
     const id = c.req.header("X-Request-Id") ?? crypto.randomUUID();
     const conversation = c.req.header("X-Conversation-Id") ?? id;
     const priority = c.req.header("X-Request-Priority") ?? "foreground";
@@ -156,7 +171,7 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
       return c.json({error: {code: err.code, message: err.code}, request_id: id}, err.status as 503);
     }
   });
-  app.get("/v1/web-search", async c => {
+  app.get("/v1/web-search", limit("webSearch"), async c => {
     const q = c.req.query("q")?.trim();
     if (!q || q.length > 4096) return c.json({error: {code: "invalid_query"}}, 400);
     try {
@@ -182,13 +197,14 @@ async function embeddingIdentity(signal: AbortSignal): Promise<string> {
 		version: info.version, serving_sha: info.sha, model_dtype: info.model_dtype, normalize: true });
 }
 
-// Open (rate-limited) embedding passthrough. Proxies text to the self-hosted
-// embedding-inference container and returns the vectors — the browser can't reach
-// the GPU-host localhost directly, and CORS forbids a cross-origin call. Mirrors
-// the input contract is {inputs: string[]}; output adds encoder lineage to the
-// validated vectors as {encoder, embeddings}. NOT metered. Used by the memory pipeline's
-// mint-time dedup (one call per term write).
-app.post("/v1/embed", async (c) => {
+// Open (per-client rate-limited) embedding passthrough. Proxies text to the local
+// embedding-inference service and returns the vectors — the browser cannot reach
+// that service directly, and CORS forbids a cross-origin call. Input contract is
+// {inputs: string[]}; output adds encoder lineage to the validated vectors as
+// {encoder, embeddings}. Used by the personal-memory pipeline's mint-time dedup
+// (one call per term write). The same encoder backs corpus dense retrieval, so
+// the window here protects retrieval for every visitor.
+app.post("/v1/embed", limit("embed"), async (c) => {
 	let body: { inputs?: unknown };
 	try {
 		body = (await c.req.json()) as { inputs?: unknown };
@@ -243,7 +259,7 @@ app.post("/v1/embed", async (c) => {
 });
 
   let sttActive = 0;
-  app.on("POST", ["/v1/audio/transcriptions", "/api/asr-http"], async c => {
+  app.on("POST", ["/v1/audio/transcriptions", "/api/asr-http"], limit("speech"), async c => {
     if (!profile || !cfg.sttBase) return c.json({error: {code: "speech_unavailable"}}, 503);
     if (sttActive >= profile.limits.speechConcurrency) return c.json({error: {code: "speech_busy"}}, 429);
     sttActive++;
@@ -256,9 +272,9 @@ app.post("/v1/embed", async (c) => {
     } catch (error) { log({stage: "speech", status: "failed", error: error instanceof Error ? error.name : "unknown"}); return c.json({error: {code: "speech_failed"}}, 502); }
     finally { sttActive--; }
   });
-  if (profile && cfg.ttsBase) registerVoiceRoutes(app, new VoiceBroker({endpoints: [{ttsUrl: "/api/tts_streaming"}], capacity: profile.limits.speechConcurrency, heartbeatSec: 30}));
+  if (profile && cfg.ttsBase) registerVoiceRoutes(app, new VoiceBroker({endpoints: [{ttsUrl: "/api/tts_streaming"}], capacity: profile.limits.speechConcurrency, heartbeatSec: 30}), limit("voice"));
   else app.post("/voice/lease", c => c.json({error: {code: "speech_unavailable"}}, 503));
-  app.get("/v1/corpus/source/:handle", async c => {
+  app.get("/v1/corpus/source/:handle", limit("source"), async c => {
     try {
       const upstream = await fetcher(`${cfg.contentBase}/v1/corpus/source/${encodeURIComponent(c.req.param("handle"))}`, {signal: c.req.raw.signal});
       return new Response(upstream.body, {status: upstream.status, headers: {"Content-Type": upstream.headers.get("Content-Type") ?? "application/octet-stream", "Content-Disposition": upstream.headers.get("Content-Disposition") ?? "attachment", "Content-Security-Policy": "sandbox; default-src 'none'", "X-Content-Type-Options": "nosniff"}});

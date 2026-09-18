@@ -1,8 +1,8 @@
 // Memory consent modal — the one-time opt-in for the personal memory.
 //
-// Myriapod's thesis is sovereign, local memory, so asking permission to remember
-// is the feature, not an apology. Shown once on the visitor's first interaction
-// (first send OR first mic toggle); the choice persists per browser and can be
+// Personal memory is local and user-owned, so asking permission to remember is
+// part of the feature. Shown once on the visitor's first interaction (first send
+// OR first mic toggle); the choice persists per browser and can be
 // changed later in Settings → Memory. Reuses the generic modal shell (cw-modal-*).
 
 import { html, render } from "lit";

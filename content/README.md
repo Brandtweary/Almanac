@@ -32,8 +32,12 @@ all dense identities/vectors, then atomically switches `active.json`. Each failu
 and full worker traceback. It leaves the previous generation active. Changing source/extractor or
 encoder/segmentation identity produces a new generation. Ranking settings, output budgets and
 qualification receipts identify the query profile separately and reuse compatible existing indexes. Unchanged original/extractor pairs reuse
-validated extraction bytes while new encoder identities rebuild dense vectors. Historical generations and search snapshots
-are retained; there is no automatic deletion policy that can invalidate a conversation's sources.
+validated extraction bytes while new encoder identities rebuild dense vectors. Historical generations are retained; no automatic deletion policy can invalidate
+a conversation's sources, which are content-addressed passage handles rather than stored result sets.
+Search/read snapshots are only the continuation cursors of a result set still on screen, so they expire:
+`CONTENT_SNAPSHOT_TTL_SECONDS` (900) and `CONTENT_SNAPSHOT_MAX_BYTES` (256 MiB, oldest evicted first,
+never the newest) bound what an unauthenticated visitor can accumulate on disk. Following an expired
+cursor reports `invalid_cursor` and the search is repeated.
 The deployment data root can move because stored original paths are relative to it.
 With `managed_originals=True`, verified installer-managed immutable objects use same-filesystem
 hardlinks; cross-filesystem objects require a copy and corresponding staging space. Arbitrary user

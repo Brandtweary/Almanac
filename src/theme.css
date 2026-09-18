@@ -1,5 +1,5 @@
 /* ============================================================================
-   Myriapod theme — black base, white text, neon-green accents
+   Almanac theme — black base, white text, neon-green accents
    ============================================================================
    Overrides pi-web-ui's shadcn/Tailwind CSS-variable tokens. Loaded after the
    prebuilt stylesheet so these win. We override BOTH :root and .dark with the

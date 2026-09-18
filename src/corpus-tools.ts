@@ -67,16 +67,27 @@ export function resolveCorpusCitation(href: string, ledger: EvidenceLedger, orig
 	const source = ledger.resolve(handle);
 	return source ? { kind: "known", handle, source } : { kind: "unknown", handle };
 }
+/** A streaming answer is re-scanned on every frame; exact text keys a bounded parse cache. */
+const LINK_CACHE = new Map<string, string[]>();
+const LINK_CACHE_LIMIT = 512;
+export function markdownLinkHrefs(text: string): string[] {
+	const cached = LINK_CACHE.get(text);
+	if (cached) return cached;
+	const hrefs: string[] = [];
+	marked.walkTokens(marked.lexer(text), token => { if (token.type === "link") hrefs.push(token.href); });
+	if (LINK_CACHE.size >= LINK_CACHE_LIMIT) LINK_CACHE.delete(LINK_CACHE.keys().next().value!);
+	LINK_CACHE.set(text, hrefs);
+	return hrefs;
+}
 /** Parse rendered Markdown links; quoted code is not counted as a citation. */
 export function inspectCorpusCitations(text: string, ledger: EvidenceLedger, origin: string): { known: EvidenceRecord[]; unknown: string[] } {
 	const known: EvidenceRecord[] = [];
 	const unknown: string[] = [];
-	marked.walkTokens(marked.lexer(text), token => {
-		if (token.type !== "link") return;
-		const result = resolveCorpusCitation(token.href, ledger, origin);
+	for (const href of markdownLinkHrefs(text)) {
+		const result = resolveCorpusCitation(href, ledger, origin);
 		if (result.kind === "known") known.push(result.source);
 		else if (result.kind === "unknown") unknown.push(result.handle);
-	});
+	}
 	return { known, unknown };
 }
 

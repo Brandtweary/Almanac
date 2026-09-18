@@ -40,4 +40,6 @@ SearXNG must enable JSON output. Successful empty search, unavailable search and
 
 The gateway serves both static files and APIs. The [Caddy example](templates/Caddyfile.example) mounts it under `/almanac/`, including WebSocket speech, so hosted requests retain the gateway's admission limits. Build with `VITE_BASE_PATH=/almanac/` and leave service overrides unset to inherit that prefix; the proxy strips the prefix before forwarding to the gateway. Microphone access requires a secure browser context: localhost is supported for local operation, while a public host uses HTTPS.
 
+A publicly reachable installation depends on the gateway's per-client rate limits, which identify a client by socket peer unless `TRUSTED_PROXIES` names that peer. A terminator on the same host is covered by the loopback default; one on another host must be listed there and must set `X-Forwarded-For`, or every visitor counts against a single window.
+
 The [user-service template](templates/almanac-gateway.service) supervises a direct gateway installation. Prepared container releases carry their own pinned runtime configuration. Keep inference, content and speech ports internal; expose only the application gateway deliberately.

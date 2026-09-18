@@ -1,8 +1,9 @@
 // Build-time stub for @mistralai/mistralai.
 //
-// myriapod only ever drives the OpenRouter provider, so pi-ai's Mistral provider
-// (dynamically imported by the provider registry, never invoked here) is dead
-// weight — and it drags in optional OpenTelemetry instrumentation that would
+// The application only ever drives the local gateway's OpenAI-compatible
+// provider, so pi-ai's Mistral provider (dynamically imported by the provider
+// registry, never invoked here) is dead weight — and it drags in optional
+// OpenTelemetry instrumentation that would
 // otherwise force `@opentelemetry/api` + `@opentelemetry/semantic-conventions`
 // into the build just to satisfy rollup's static resolution.
 //

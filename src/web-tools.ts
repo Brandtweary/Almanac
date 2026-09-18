@@ -31,7 +31,8 @@ export async function webSearch(
 ): Promise<{ results: WebSearchResult[]; degraded: boolean }> {
 	const url = `${endpoint}?q=${encodeURIComponent(query)}&limit=${encodeURIComponent(String(limit))}`;
 	const res = await fetch(url, {
-		// A gateway bearer is attached only when explicitly supplied.
+		// The bundled gateway needs no credential; a bearer is attached only when
+		// a deployment points this tool at an endpoint that requires one.
 		headers: bearer ? { Authorization: `Bearer ${bearer}` } : {},
 		signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),
 	});

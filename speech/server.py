@@ -35,29 +35,48 @@ def read_message(raw: bytes | str) -> dict:
     return value
 
 
-def synthesis_worker(factory, requests, output):
+def synthesis_worker(factory, requests, output, cancel):
     try:
         generate = factory()
         output.put(("ready", None))
         while True:
             text = requests.get()
+            abandoned = False
             for pcm in generate(text):
                 # Bound the queue in audio frames, not model-sized chunks.
                 for start in range(0, len(pcm), 1920):
-                    output.put(("audio", pcm[start:start + 1920]))
-            output.put(("done", None))
+                    # A put that blocks forever on an undrained queue is why an
+                    # abandoned session used to cost a process kill and a model
+                    # reload; the timeout is what makes cancellation possible.
+                    while not abandoned:
+                        try:
+                            output.put(("audio", pcm[start:start + 1920]), timeout=.1)
+                            break
+                        except queue.Full:
+                            abandoned = cancel.is_set()
+                    if abandoned:
+                        break
+                if abandoned or cancel.is_set():
+                    abandoned = True
+                    break
+            output.put(("cancelled" if abandoned else "done", None))
     except Exception:
         logger.exception("Speech generation failed")
         output.put(("error", None))
 
 
 class SpeechService:
-    def __init__(self, factory, timeout: float = 120):
+    def __init__(self, factory, timeout: float = 120, reset_timeout: float = 2):
         self.factory = factory
         self.worker = None
         self.requests = None
         self.output = None
+        self.cancel = None
         self.timeout = timeout
+        # How long a worker has to acknowledge cancellation before it is killed
+        # instead. One generation chunk is the unit; an unresponsive worker is
+        # still reaped, it just no longer costs a reload in the ordinary case.
+        self.reset_timeout = reset_timeout
         self.lock = asyncio.Lock()
 
     async def receive(self):
@@ -77,30 +96,16 @@ class SpeechService:
         ctx = multiprocessing.get_context("spawn")
         self.requests = ctx.Queue(maxsize=1)
         self.output = ctx.Queue(maxsize=8)
+        self.cancel = ctx.Event()
         self.worker = ctx.Process(target=synthesis_worker,
-            args=(self.factory, self.requests, self.output), daemon=True)
+            args=(self.factory, self.requests, self.output, self.cancel), daemon=True)
         self.worker.start()
         if (await self.receive())[0] != "ready":
             raise RuntimeError("Speech worker initialization failed")
 
-    async def close(self):
-        async def reap():
-            worker = self.worker
-            if worker is not None:
-                if worker.is_alive():
-                    worker.kill()
-                while worker.is_alive():
-                    await asyncio.sleep(.01)
-                if worker.pid is not None:
-                    worker.join()
-                worker.close()
-                self.worker = None
-            for channel in (self.requests, self.output):
-                if channel is not None:
-                    channel.cancel_join_thread()
-                    channel.close()
-            self.requests = self.output = None
-        task = asyncio.create_task(reap())
+    async def uninterruptible(self, operation):
+        """Reaping and recovery own native resources and never half-complete."""
+        task = asyncio.create_task(operation())
         cancelled = False
         while not task.done():
             try:
@@ -110,6 +115,49 @@ class SpeechService:
         task.result()
         if cancelled:
             raise asyncio.CancelledError
+
+    async def reap(self):
+        worker = self.worker
+        if worker is not None:
+            if worker.is_alive():
+                worker.kill()
+            while worker.is_alive():
+                await asyncio.sleep(.01)
+            if worker.pid is not None:
+                worker.join()
+            worker.close()
+            self.worker = None
+        for channel in (self.requests, self.output):
+            if channel is not None:
+                channel.cancel_join_thread()
+                channel.close()
+        self.requests = self.output = self.cancel = None
+
+    async def close(self):
+        await self.uninterruptible(self.reap)
+
+    async def recover(self):
+        """Return an abandoned session's worker to idle without a model reload."""
+        if self.worker is None or not self.worker.is_alive():
+            return await self.reap()
+        self.cancel.set()
+        try:
+            async with asyncio.timeout(self.reset_timeout):
+                while True:
+                    kind, _value = await self.receive()
+                    if kind in {"done", "cancelled"}:
+                        return
+                    if kind == "error":
+                        return await self.reap()
+        except (TimeoutError, RuntimeError):
+            # A worker that will not acknowledge cancellation is reaped as before.
+            return await self.reap()
+        finally:
+            if self.cancel is not None:
+                self.cancel.clear()
+
+    async def reset(self):
+        await self.uninterruptible(self.recover)
 
     async def handle(self, socket):
         query = parse_qs(urlsplit(socket.request.path).query, keep_blank_values=True)
@@ -125,6 +173,7 @@ class SpeechService:
         async with self.lock:
             complete = False
             engaged = False
+            synthesizing = False
             try:
                 async with asyncio.timeout(self.timeout):
                     await socket.send(msgpack.packb({"type": "Ready"}, use_bin_type=True))
@@ -154,6 +203,7 @@ class SpeechService:
                             return
                         await startup
                         self.requests.put_nowait(text)
+                        synthesizing = True
                         while not closed.done():
                             try:
                                 kind, value = self.output.get_nowait()
@@ -185,8 +235,12 @@ class SpeechService:
                 await socket.close(1011, type(exc).__name__)
             finally:
                 if engaged and not complete:
-                    # Reap native work before another connection can use admission.
-                    await self.close()
+                    # Abandoned sessions are the common case — barge-in, mute, a
+                    # new chat. Native work still finishes before admission is
+                    # released, but a worker that is mid-generation is cancelled
+                    # rather than killed, so the next sentence needs no reload.
+                    # A worker still loading its model has nothing to cancel.
+                    await (self.reset() if synthesizing else self.close())
 
 
 def load_generator(assets: Path, threads: int):

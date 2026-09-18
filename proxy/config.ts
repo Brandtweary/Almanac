@@ -14,6 +14,10 @@ export const config = {
   frontendDir: resolve(process.env.FRONTEND_DIR ?? `${import.meta.dir}/../dist`),
   logPath: process.env.GATEWAY_LOG ?? `${import.meta.dir}/gateway.jsonl`,
   allowedOrigins: (process.env.ALLOWED_ORIGIN ?? "http://localhost:5173").split(","),
+  // Socket peers whose X-Forwarded-For may name the real client for per-client
+  // rate limits. Loopback covers a TLS terminator on the same host; "*" trusts
+  // any peer and is correct only when nothing can reach the gateway directly.
+  trustedProxies: (process.env.TRUSTED_PROXIES ?? "127.0.0.1,::1").split(",").map(x => x.trim()).filter(Boolean),
 };
 export type GatewayConfig = typeof config;
 export interface ReleaseProfile {

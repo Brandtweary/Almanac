@@ -2,7 +2,7 @@
 
 This exploratory, product-specific screen compared ten hosted model endpoints as Almanac's Pi chat and background agents. It informed which model to qualify locally first; it is not a general intelligence ranking or evidence of local admission.
 
-The reported runs took place on **17 September 2026, 00:05–00:57 UTC**. All questions were development cases. The baseline used nine cases per model; follow-up research used five cases for five candidates after clarifying the production citation instruction. Four basic Bash cases were a separate, secondary signal for a future CLI. Bash is not a browser tool.
+The reported runs took place on **17 September 2026, 00:05–00:57 UTC**. All questions were development cases. The baseline used nine cases per model; follow-up research used five cases for five candidates after clarifying the production citation instruction. Four basic Bash cases were a separate, secondary signal of general instruction-following. Bash is not a browser tool or an application capability.
 
 ## Results
 

@@ -194,10 +194,11 @@ const DEFAULT_VOICE = ENV.VITE_TTS_VOICE ?? "alba";
 // Classifier-free-guidance strength. Override with VITE_TTS_CFG_ALPHA.
 const DEFAULT_CFG_ALPHA = ENV.VITE_TTS_CFG_ALPHA ? Number(ENV.VITE_TTS_CFG_ALPHA) : 1.5;
 
-// AUTH: the token rides the `auth_id` query param — a browser WS can't set headers, so
-// a query param is the only path. A self-hosted TTS endpoint may or may not check it;
-// override with VITE_TTS_AUTH if yours does. The default is the conventional demo token.
-const DEFAULT_API_KEY = ENV.VITE_TTS_AUTH ?? "public_token";
+// AUTH: a browser WebSocket cannot set headers, so a token can only ride the
+// `auth_id` query parameter. The bundled gateway and speech backend own their own
+// backend authentication and drop this value; it is sent only when a deployment
+// points VITE_TTS_BASE at an endpoint that checks one and sets VITE_TTS_AUTH.
+const TTS_AUTH = ENV.VITE_TTS_AUTH;
 
 // The wire format is PCM at 24 kHz (PcmMessagePack). The shared AudioContext is created
 // at this rate (see main.ts) so frames play without any resampling.
@@ -428,9 +429,10 @@ export class KyutaiTtsSynthesizer implements SpeechSynthesizer {
 			voice: this.config.voice ?? DEFAULT_VOICE,
 			format: "PcmMessagePack",
 			cfg_alpha: String(this.config.cfgAlpha ?? DEFAULT_CFG_ALPHA),
-			// See the auth caveat above — header isn't settable from a browser WS.
-			auth_id: this.config.apiKey ?? DEFAULT_API_KEY,
 		});
+		// See the auth caveat above — a header isn't settable from a browser WS.
+		const auth = this.config.apiKey ?? TTS_AUTH;
+		if (auth) params.set("auth_id", auth);
 		const url = `${base}?${params.toString()}`;
 
 		this.ready = false;
