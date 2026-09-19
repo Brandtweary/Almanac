@@ -102,9 +102,20 @@ export function inspectCorpusCitations(text: string, ledger: EvidenceLedger, ori
 	return { known, unknown };
 }
 
+/** The model acts on this text, so a failure says which one happened. A deadline
+ *  leaves the library installed and the query answerable; reported as an absent
+ *  corpus it reads as a broken deployment and is never retried or narrowed. */
+function corpusFailure(kind: string, status: number, body: string): string {
+	const code = /"code"\s*:\s*"([a-z_]+)"/.exec(body)?.[1] ?? "";
+	if (code === "corpus_timeout" || status === 504)
+		return `Corpus ${kind} exceeded its deadline. The library is installed and reachable; this query was too expensive to complete in time. Retry it, narrow it to fewer or more specific terms, or scope it to one document.`;
+	if (code === "rate_limited") return `Corpus ${kind} was rate limited. Wait before searching again and make the next query count.`;
+	return `Corpus ${kind} failed (HTTP ${status}): ${body}`;
+}
+
 async function corpusRequest(kind: "search" | "read", params: unknown, ledger: EvidenceLedger, signal?: AbortSignal) {
 	const response = await fetch(`${GATEWAY_BASE}/corpus/${kind}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(params), signal });
-	if (!response.ok) throw new Error(`Corpus ${kind} failed (HTTP ${response.status}): ${await response.text()}`);
+	if (!response.ok) throw new Error(corpusFailure(kind, response.status, await response.text()));
 	const data = await response.json();
 	const passages = kind === "search" ? data.hits : data.passages;
 	if (!Array.isArray(passages) || typeof data.generation !== "string" || typeof data.profile_id !== "string" || !["ok", "degraded", "unqualified"].includes(data.status)) throw new Error("Corpus returned an invalid result envelope");

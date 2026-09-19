@@ -9,6 +9,7 @@ import re
 import sqlite3
 import time
 import uuid
+import weakref
 from contextvars import ContextVar
 from pathlib import Path
 from urllib.parse import quote
@@ -76,16 +77,31 @@ FAILURE_LOG_MAX_BYTES = 64 * 1024 * 1024
 # bounded, because it is a write filter rather than an accounting ledger.
 FAILURE_FINGERPRINTS_MAX = 512
 
+# Lexical retrieval over a native archive localizes each article hit by decoding,
+# block-parsing and segmenting the whole article, which is Python-bound work that
+# shares one interpreter. Run concurrently, searches interleave instead of
+# queueing: measured on the served library, three simultaneous first-time
+# searches each returned in about the time all three needed together, so none
+# finished early and all three passed the caller's deadline, while the same three
+# run one after another returned in a third of that. Admission keeps the
+# aggregate work identical and hands it out in arrival order, so the first
+# request is answered at a single search's cost rather than the batch's.
+LEXICAL_CONCURRENCY = 1
+
 
 class Service:
+    lexical_concurrency = LEXICAL_CONCURRENCY
+
     def __init__(self, store: Store, profile: Profile, dense, tokenizer, zim=None, reranker=None, *,
                  snapshot_ttl=SNAPSHOT_TTL_SECONDS, snapshot_max_bytes=SNAPSHOT_MAX_BYTES,
-                 failure_log_max_bytes=FAILURE_LOG_MAX_BYTES):
+                 failure_log_max_bytes=FAILURE_LOG_MAX_BYTES,
+                 lexical_concurrency=LEXICAL_CONCURRENCY):
         self.store, self.profile, self.dense, self.tokenizer = store, profile, dense, tokenizer
         self.zim, self.reranker = zim, reranker
         self.snapshot_ttl, self.snapshot_max_bytes = snapshot_ttl, snapshot_max_bytes
         self.snapshot_pruned_at, self.snapshot_bytes_written = None, 0
         self.failure_log_max_bytes, self.failure_counts = failure_log_max_bytes, {}
+        self.lexical_concurrency = max(1, lexical_concurrency)
 
     def rotate_failures(self, pending):
         """Keep the failure store and its one predecessor inside the allotment."""
@@ -183,7 +199,22 @@ class Service:
                 high = middle
         return query[:low], True
 
+    def lexical_gate(self):
+        # One semaphore per loop, created on first use: the running service has
+        # a single loop, while a test drives an instance from a fresh one.
+        if "lexical_gates" not in self.__dict__:
+            self.lexical_gates = weakref.WeakKeyDictionary()
+        loop = asyncio.get_running_loop()
+        gate = self.lexical_gates.get(loop)
+        if gate is None:
+            gate = self.lexical_gates[loop] = asyncio.Semaphore(self.lexical_concurrency)
+        return gate
+
     async def lexical(self, generation, query, document_id):
+        async with self.lexical_gate():
+            return await self._lexical(generation, query, document_id)
+
+    async def _lexical(self, generation, query, document_id):
         native = self.store.native(generation)
         if native is not None:
             if self.zim is None:

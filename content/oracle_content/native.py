@@ -28,6 +28,17 @@ from .store import atomic_json, HANDLE
 KIND = "native-zim-article-v1"
 POLICIES = {"canonical-html", "appropedia-explicit-open-english-v1", "appropedia-open-english-v2"}
 
+# One lexical search localizes up to `lexical_depth` articles from this archive,
+# and each localization decodes, block-parses and segments a whole article —
+# hundreds of milliseconds for an ordinary page and seconds for a long one. A
+# cache smaller than that working set is evicted by the very search that filled
+# it, so the repeat of a broad query costs what the first one did; the residency
+# here covers a search's articles and leaves room for the next query to overlap
+# it. The per-entry ceiling keeps one enormous article from owning the cache.
+PASSAGE_CACHE_DOCUMENTS = 96
+PASSAGE_CACHE_BYTES = 256 * 1024 * 1024
+PASSAGE_CACHE_ENTRY_BYTES = 8 * 1024 * 1024
+
 
 class NativeLexicalHits(list):
     """Carry already-localized evidence across the asynchronous retrieval boundary."""
@@ -267,8 +278,9 @@ class NativeReader:
             row.previous = rows[ordinal - 1].passage_id if ordinal else None
             row.next = rows[ordinal + 1].passage_id if ordinal + 1 < len(rows) else None
         size = sum(len(row.model_dump_json().encode()) for row in rows)
-        if size <= 8 * 1024 * 1024:
-            while self.cache and (len(self.cache) >= 16 or self.cache_bytes + size > 32 * 1024 * 1024):
+        if size <= PASSAGE_CACHE_ENTRY_BYTES:
+            while self.cache and (len(self.cache) >= PASSAGE_CACHE_DOCUMENTS
+                                  or self.cache_bytes + size > PASSAGE_CACHE_BYTES):
                 _, (_, old_size) = self.cache.popitem(last=False)
                 self.cache_bytes -= old_size
             self.cache[document_id] = (rows, size)

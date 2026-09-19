@@ -38,6 +38,11 @@ Search/read snapshots are only the continuation cursors of a result set still on
 `CONTENT_SNAPSHOT_TTL_SECONDS` (900) and `CONTENT_SNAPSHOT_MAX_BYTES` (256 MiB, oldest evicted first,
 never the newest) bound what an unauthenticated visitor can accumulate on disk. Following an expired
 cursor reports `invalid_cursor` and the search is repeated.
+A native archive has no extracted text catalog, so lexical retrieval localizes each article hit by
+decoding, block-parsing and segmenting the whole article — interpreter-bound work that gains nothing
+from running searches at the same time. `CONTENT_LEXICAL_CONCURRENCY` (1) admits searches into that
+stage in arrival order, so the first is answered at one search's cost instead of every search
+returning at the cost of all of them.
 Retrieval-stage failures record their stage and traceback to `failures.jsonl` under a fixed disk
 allotment: `CONTENT_FAILURE_LOG_MAX_BYTES` (64 MiB) covers the live file and one rotated predecessor
 together, so ordinary request traffic cannot grow the store without limit. A repeating identical

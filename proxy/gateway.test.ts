@@ -102,3 +102,17 @@ test("pinned model sampling applies before counting and generation",async()=>{
  expect(result.status).toBe(200);expect(bodies).toHaveLength(2);expect(bodies[0]).toEqual(bodies[1]);expect(bodies[0]).toMatchObject({temperature:1,top_p:.95,top_k:64});
  const bad=createGateway(cfg,mock(),{...profile,model:{...profile.model,sampling:{temperature:1,top_p:.95,top_k:0}}});expect(bad.profile).toBeNull();
 });
+
+test("a corpus that is slow is reported as slow, and an absent one as absent",async()=>{
+ const slow=(async(_url:any,init:any)=>new Promise<Response>((_resolve,reject)=>{
+  init.signal.addEventListener("abort",()=>reject(init.signal.reason));
+ })) as unknown as typeof fetch;
+ const {app}=createGateway({...cfg,corpusTimeoutMs:1000},slow,profile);
+ const late=await app.request("/v1/corpus/search",{method:"POST",body:JSON.stringify({query:"compost"})});
+ expect(late.status).toBe(504);
+ expect(await late.json()).toEqual({error:{code:"corpus_timeout"}});
+ const down=(async()=>{throw new TypeError("connection refused");}) as unknown as typeof fetch;
+ const absent=await createGateway(cfg,down,profile).app.request("/v1/corpus/search",{method:"POST",body:JSON.stringify({query:"compost"})});
+ expect(absent.status).toBe(502);
+ expect(await absent.json()).toEqual({error:{code:"corpus_unavailable"}});
+});

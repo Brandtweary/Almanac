@@ -79,3 +79,35 @@ def test_native_localization_does_not_occupy_the_event_loop():
     assert ticks > 5, (
         f"only {ticks} concurrent ticks completed during a 0.2s localization — "
         "the loop was blocked")
+
+
+def test_concurrent_lexical_requests_queue_instead_of_interleaving():
+    """Localization is interpreter-bound, so overlapping it buys no throughput.
+
+    Run together, two searches each finish at the cost of both and neither is
+    answered early; admitted in arrival order, the first is answered at its own
+    cost. The gate is what makes the second search wait rather than share.
+    """
+    service = Service.__new__(Service)
+    service.store = _Store()
+    service.zim = _Zim()
+    service.profile = SimpleNamespace(lexical_depth=5, rrf_k=60)
+
+    live, peak = 0, 0
+
+    def slow_localize(generation, path, hits, query, document_id):
+        nonlocal live, peak
+        live += 1
+        peak = max(peak, live)
+        time.sleep(0.2)
+        live -= 1
+        return []
+
+    service._localize_native_hits = slow_localize
+
+    async def exercise():
+        await asyncio.gather(service.lexical("generation", "one", None),
+                             service.lexical("generation", "two", None))
+
+    asyncio.run(exercise())
+    assert peak == 1, f"{peak} localizations ran at once; concurrent searches share the interpreter"

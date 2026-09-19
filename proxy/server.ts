@@ -94,10 +94,22 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
   for (const tool of ["search", "read"]) app.post(`/v1/corpus/${tool}`, limit("corpus"), async c => {
     const body = await c.req.json().catch(() => null);
     if (!body || typeof body !== "object" || Array.isArray(body)) return c.json({error: {code: "invalid_request"}}, 400);
+    // A deadline, a caller that left and an absent service are three different
+    // answers: reported as one, a slow search reaches the model as a library
+    // that is not installed, which is a fact about the deployment rather than
+    // about the query, and nothing in the message suggests narrowing or
+    // repeating it. The timeout signal is held separately because that is the
+    // only way to tell afterwards which of the two aborted the fetch.
+    const deadline = AbortSignal.timeout(cfg.corpusTimeoutMs);
     try {
-      const upstream = await fetcher(`${cfg.contentBase}/v1/corpus/${tool}`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body), signal: AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(30000)])});
+      const upstream = await fetcher(`${cfg.contentBase}/v1/corpus/${tool}`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body), signal: AbortSignal.any([c.req.raw.signal, deadline])});
       const data = await upstream.json(); return c.json(data, upstream.status as 200);
-    } catch (error) { log({stage: `corpus_${tool}`, status: "failed", error: error instanceof Error ? error.name : "unknown"}); return c.json({error: {code: "corpus_unavailable"}}, 502); }
+    } catch (error) {
+      if (c.req.raw.signal.aborted) { log({stage: `corpus_${tool}`, status: "cancelled"}); return c.json({error: {code: "cancelled"}}, 499 as 200); }
+      if (deadline.aborted) { log({stage: `corpus_${tool}`, status: "failed", error: "deadline"}); return c.json({error: {code: "corpus_timeout"}}, 504); }
+      log({stage: `corpus_${tool}`, status: "failed", error: error instanceof Error ? error.name : "unknown"});
+      return c.json({error: {code: "corpus_unavailable"}}, 502);
+    }
   });
   app.post("/v1/phonemize", limit("phonemize"), async c => {
     const body = await c.req.text();

@@ -8,6 +8,11 @@ export const config = {
   contentBase: process.env.CONTENT_BASE ?? "http://127.0.0.1:8791",
   searxngBase: process.env.SEARXNG_BASE ?? "http://127.0.0.1:8888",
   embedBase: process.env.EMBED_BASE ?? "http://127.0.0.1:8899",
+  // The content service cancels its own retrieval at the release profile's
+  // `request_timeout` and answers 504, so it owns the corpus deadline. This is
+  // the backstop above it: set below that deadline it discards work that is
+  // still progressing and reports a corpus that is answering as absent.
+  corpusTimeoutMs: Math.max(Number(process.env.CORPUS_TIMEOUT_MS ?? 65000), 1000),
   sttBase: process.env.STT_BASE ?? "",
   ttsBase: process.env.VOICE_TTS_BASE ?? "",
   profilePath: process.env.RELEASE_PROFILE ?? "",
