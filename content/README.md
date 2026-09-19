@@ -83,7 +83,10 @@ This explicit ranking choice still requires quality calibration. Archives withou
 
 See [API contracts](docs/api.md). `Service.candidates` exposes branch ranks and the fused candidate
 pool for evaluation without a public diagnostic endpoint. Run mechanical tests with
-`python -m pytest tests`; they make no external network calls. Whole-stack offline, real archive,
+`python -m pytest tests`; they make no external network calls. `pytest` and
+`pytest-asyncio` are development dependencies of the service's own environment —
+install them into the virtual environment that runs it, so the suite runs against the
+interpreter and packages the service actually uses. Whole-stack offline, real archive,
 layout fidelity, large-pack performance and target-hardware quality remain release measurements.
 
 Implementation references: [SQLite FTS5](https://www.sqlite.org/fts5.html),
