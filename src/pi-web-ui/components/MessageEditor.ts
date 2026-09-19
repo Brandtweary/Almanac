@@ -273,13 +273,15 @@ export class MessageEditor extends LitElement {
 										</div>
 									`
 									: html`
-										${Button({
-											variant: "ghost",
-											size: "icon",
-											className: "h-8 w-8",
-											onClick: this.handleAttachmentClick,
-											children: icon(Paperclip, "sm"),
-										})}
+										<span title="Attach a document — PDF, Office files, images or plain text">
+											${Button({
+												variant: "ghost",
+												size: "icon",
+												className: "h-8 w-8",
+												onClick: this.handleAttachmentClick,
+												children: icon(Paperclip, "sm"),
+											})}
+										</span>
 									`
 								: ""
 						}

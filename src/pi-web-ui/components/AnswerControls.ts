@@ -61,7 +61,7 @@ export class AnswerControls extends LitElement {
 	}
 
 	private renderCopy() {
-		const label = this.copyStatus === "failed" ? "Copy blocked by the browser" : "Copy the answer and its sources";
+		const label = this.copyStatus === "failed" ? "Copy blocked by the browser" : "Copy";
 		return html`<button @click=${() => void this.copy()} class=${BUTTON_CLASS} title=${label} aria-label=${label}>
 			${this.copyStatus === "copied" ? icon(Check, "sm") : icon(Copy, "sm")}
 			${this.copyStatus === "copied" ? html`<span>Copied!</span>` : this.copyStatus === "failed" ? html`<span>Copy failed</span>` : nothing}
@@ -73,12 +73,12 @@ export class AnswerControls extends LitElement {
 		if (state === "unavailable" || !this.speechText.trim()) return nothing;
 		const speaking = state === "speaking";
 		const label = speaking
-			? "Stop reading this answer"
+			? "Stop reading"
 			: state === "muted"
 				? "Voice is muted — unmute with the stop-audio control"
 				: state === "busy"
 					? "Voice is busy — wait for the current audio to finish"
-					: "Read this answer aloud";
+					: "Read aloud";
 		return html`<button
 			@click=${() => toggleAnswerSpeech(this.answerKey, this.speechText)}
 			class=${BUTTON_CLASS}

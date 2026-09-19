@@ -32,3 +32,13 @@
 .cw-tour h2:focus { outline: none; }
 
 button.cw-stop-response, button.cw-stop-response:hover { color: var(--destructive); }
+
+/* The vendored dialog's close control carries no padding of its own, so its
+   glyph sits flush against the corner it is positioned into. The rule lives
+   here rather than on the component because that markup comes from the
+   package. */
+dialog button.absolute.top-4.right-4,
+[role="dialog"] button.absolute.top-4.right-4 {
+	padding: 0.125rem;
+	margin: -0.125rem;
+}

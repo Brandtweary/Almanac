@@ -62,7 +62,7 @@ export class StopAudioButton {
 		const muted = this.seam.isMuted();
 		const label = muted
 			? "Voice muted — double-click to unmute"
-			: "Stop the agent's voice (Ctrl+Alt+Space) · double-click to mute";
+			: "Stop voice playback (Ctrl+Alt+Space) · double-click to mute";
 		const svg = createElement(muted ? VolumeX : Volume2);
 		svg.setAttribute("width", "18");
 		svg.setAttribute("height", "18");
