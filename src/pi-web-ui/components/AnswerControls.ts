@@ -7,7 +7,7 @@ import { answerSpeechState, subscribeAnswerSpeech, toggleAnswerSpeech } from "..
 type CopyState = "idle" | "copied" | "failed";
 
 const BUTTON_CLASS =
-	"flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted-foreground";
+	"flex items-center gap-1 px-1 py-0.5 text-xs rounded hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted-foreground";
 
 /**
  * Per-answer controls, below the sources footer: copy the answer with its sources, and read it
@@ -64,7 +64,7 @@ export class AnswerControls extends LitElement {
 		const label = this.copyStatus === "failed" ? "Copy blocked by the browser" : "Copy the answer and its sources";
 		return html`<button @click=${() => void this.copy()} class=${BUTTON_CLASS} title=${label} aria-label=${label}>
 			${this.copyStatus === "copied" ? icon(Check, "sm") : icon(Copy, "sm")}
-			<span>${this.copyStatus === "copied" ? "Copied!" : this.copyStatus === "failed" ? "Copy failed" : ""}</span>
+			${this.copyStatus === "copied" ? html`<span>Copied!</span>` : this.copyStatus === "failed" ? html`<span>Copy failed</span>` : nothing}
 		</button>`;
 	}
 
@@ -87,7 +87,7 @@ export class AnswerControls extends LitElement {
 			aria-label=${label}
 		>
 			${speaking || state === "muted" ? icon(VolumeX, "sm") : icon(Volume2, "sm")}
-			<span>${speaking ? "Stop" : ""}</span>
+			${speaking ? html`<span>Stop</span>` : nothing}
 		</button>`;
 	}
 
@@ -95,7 +95,7 @@ export class AnswerControls extends LitElement {
 		if (!this.copyText && !this.speechText) return nothing;
 		// Read once per render so a published speech transition repaints this row.
 		void this.speechTick;
-		return html`<div class="mx-4 mt-1 flex items-center gap-1" aria-live="polite">
+		return html`<div class="mx-4 mt-1 flex items-center gap-0.5" aria-live="polite">
 			${this.renderCopy()}${this.renderSpeech()}
 		</div>`;
 	}
