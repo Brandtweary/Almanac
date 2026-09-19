@@ -1,6 +1,6 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
-import { EvidenceLedger, inspectCorpusCitations, validateEvidence, type EvidenceRecord } from "./corpus-tools.js";
+import { EvidenceLedger, inspectCorpusCitations, markdownLinkHrefs, resolveCorpusCitation, sourceDisplayName, validateEvidence, type EvidenceRecord } from "./corpus-tools.js";
 import { isUserMessage } from "./user-messages.js";
 
 /** "cited" reports the answer's own validated citations; "consulted" reports retrieval that the answer never cited. */
@@ -17,8 +17,56 @@ function byDocument(records: readonly EvidenceRecord[]): EvidenceRecord[] {
 	for (const record of records) if (!unique.has(documentKey(record))) unique.set(documentKey(record), record);
 	return [...unique.values()];
 }
-const answerText = (message: AssistantMessage): string =>
+/** The answer's prose, with tool calls and citation markup left exactly as the model wrote them. */
+export const answerText = (message: AssistantMessage): string =>
 	message.content.filter(part => part.type === "text").map(part => part.text).join("\n");
+
+/** An answer is a completed reply carrying prose, as opposed to a turn that only calls tools. */
+export const isAnswerMessage = (message: AssistantMessage): boolean =>
+	message.stopReason !== "toolUse" && message.content.some(part => part.type === "text" && part.text.trim() !== "");
+
+const absoluteSourceUrl = (url: string, base: string): string => {
+	try { return new URL(url, base).href; } catch { return url; }
+};
+
+/** Inline links, with an optional angle-bracketed target and an optional title. */
+const MARKDOWN_LINK = /\[([^\]]*)\]\(\s*(<[^>\s]*>|[^()\s]+)(?:\s+"[^"]*")?\s*\)/g;
+
+/**
+ * Citation handles are resolvable only inside this conversation, so text leaving the browser
+ * carries the source link instead. A handle the corpus never returned loses its target and is
+ * labelled, exactly as the rendered transcript labels it.
+ */
+function resolveCitationsForExport(text: string, ledger: EvidenceLedger, origin: string): string {
+	const linked = new Set(markdownLinkHrefs(text));
+	return text.replace(MARKDOWN_LINK, (match, label: string, target: string) => {
+		const href = target.startsWith("<") ? target.slice(1, -1) : target;
+		if (!linked.has(href)) return match;
+		const citation = resolveCorpusCitation(href, ledger, origin);
+		if (citation.kind === "not-corpus") return match;
+		if (citation.kind === "unknown") return `${label} [unverified source]`;
+		return `[${label}](${absoluteSourceUrl(citation.source.source_url, origin)})`;
+	});
+}
+
+/**
+ * The answer as a reader of the pasted text needs it: the prose with its citations pointing at
+ * real source links, followed by the same footer the transcript shows, whose heading keeps
+ * retrieval that the answer never cited distinguishable from the answer's own support.
+ */
+export function answerCopyText(
+	message: AssistantMessage, evidence: AnswerSources | undefined, ledger: EvidenceLedger, origin?: string,
+): string {
+	const base = origin ?? globalThis.location?.origin ?? "http://localhost";
+	const body = resolveCitationsForExport(answerText(message), ledger, base).trim();
+	if (!evidence?.sources.length) return body;
+	const heading = evidence.kind === "cited"
+		? "Sources — cited in this answer:"
+		: "Consulted — retrieved while researching; not cited in the answer:";
+	const listed = evidence.sources.map(source =>
+		`- ${sourceDisplayName(source)} — ${absoluteSourceUrl(source.source_url, base)}`);
+	return [body, "", heading, ...listed].join("\n");
+}
 
 /**
  * The footer reports the answer's own citations, validated against the evidence the corpus
@@ -45,7 +93,7 @@ export function collectAnswerSources(messages: readonly AgentMessage[], origin?:
 			for (const part of message.content) if (part.type === "toolCall" &&
 				(part.name === "corpus_search" || part.name === "corpus_read")) calls.set(part.id, part.name);
 			if (!active) continue;
-			if (message.stopReason !== "toolUse" && message.content.some(part => part.type === "text" && part.text.trim())) {
+			if (isAnswerMessage(message)) {
 				const cited = byDocument(inspectCorpusCitations(answerText(message), ledger, base).known);
 				answers.set(answerIdentity(message), cited.length
 					? { kind: "cited", sources: cited }

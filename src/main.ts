@@ -76,6 +76,7 @@ import { PcmRecorder, WhisperClient } from "./stt.js";
 import { KyutaiTtsSynthesizer, TTS_SAMPLE_RATE } from "./tts.js";
 import { type ConsentChoice, showConsentModal } from "./consent-modal.js";
 import { installMemoryButton } from "./memory-button.js";
+import { installAnswerSpeech, refreshAnswerSpeech, refreshAnswerSpeechUntilSilent } from "./answer-speech.js";
 import { installStopAudioButton } from "./stop-audio-button.js";
 
 // Register custom message + tool renderers
@@ -1055,6 +1056,8 @@ const createAgent = async (initialState?: Partial<AgentState>, savedHistory?: Co
 				if (voiceTurnSpeaking && !ttsMuted && synth && !voiceQueue && !voiceTurnCut) {
 					voiceQueue = new AsyncStringQueue();
 					synth.speak(voiceQueue).catch((err) => dbgError("voice TTS speak failed (non-fatal):", err));
+					refreshAnswerSpeech(); // the turn now owns the speaker: the per-answer controls are inert
+
 				}
 				voiceQueue?.push(event.assistantMessageEvent.delta);
 			} else if (type === "message_end") {
@@ -1108,6 +1111,7 @@ const createAgent = async (initialState?: Partial<AgentState>, savedHistory?: Co
 					voiceQueue = null;
 					voiceTurnCut = false; // reset the barge-in guard for the next turn
 				}
+				refreshAnswerSpeechUntilSilent(); // the turn released the speaker; its tail is still draining
 				// The turn is over → one pipeline tick (consent-gated; fire-and-forget;
 				// every completed exchange retains its own queued tick).
 				if (memoryConsent === "granted") {
@@ -1520,6 +1524,7 @@ async function initApp() {
 		voiceQueue?.close();
 		voiceQueue = null;
 		voiceTurnCut = true; // don't reopen a speaker for the rest of this turn after a cut
+		refreshAnswerSpeech();
 	};
 
 	// --- Voice-broker lease lifecycle (all no-ops when VOICE_BROKER_ENABLED is off) ---
@@ -1869,8 +1874,20 @@ async function initApp() {
 			localStorage.setItem(TTS_MUTE_KEY, ttsMuted ? "1" : "0");
 			if (ttsMuted) cutVoiceAudio(); // enabling mute also cuts any audio in flight
 			stopAudioButton.refresh();
+			refreshAnswerSpeech(); // mute governs the per-answer read-aloud controls too
 		},
 		isMuted: () => ttsMuted,
+	});
+
+	// Per-answer read-aloud. The one-shot path chunks through the same speech filter the voice
+	// turn uses, so citation destinations are never spoken. A reading is admitted only while
+	// nothing else owns the speaker, and it cuts exactly as the stop-audio control does.
+	installAnswerSpeech({
+		speak: async (text: string) => { await (await ensureSynth()).speak(text); },
+		stop: () => synth?.stop(),
+		isSpeaking: () => synth?.isSpeaking() ?? false,
+		isMuted: () => ttsMuted,
+		isTurnSpeaking: () => voiceTurnSpeaking,
 	});
 
 	try { await loadUserGraph(); } catch {

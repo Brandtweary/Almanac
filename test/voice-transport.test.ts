@@ -75,6 +75,28 @@ test('total socket outage reports unavailable once, without real network access'
  synth.dispose();
 });
 
+test('speaker ownership is reported while an utterance runs and released by a cut', async () => {
+ class ClosedSocket {
+  static OPEN = 1; static CONNECTING = 0; static CLOSING = 2; static CLOSED = 3;
+  readyState = 3; binaryType = ''; onmessage = null; onerror = null;
+  addEventListener() {} close() {}
+ }
+ Object.assign(globalThis, {WebSocket: ClosedSocket});
+ const synth = new KyutaiTtsSynthesizer({port: {postMessage() {}}} as unknown as AudioWorkletNode, {});
+ assert.equal(synth.isSpeaking(), false);
+ const utterance = synth.speak('A useful answer.');
+ assert.equal(synth.isSpeaking(), true, 'a running utterance owns the speaker');
+ synth.stop();
+ assert.equal(synth.isSpeaking(), false, 'a cut releases it immediately');
+ await utterance;
+ assert.equal(synth.isSpeaking(), false, 'a superseded run never re-reports ownership');
+ const second = synth.speak('Another useful answer.');
+ assert.equal(synth.isSpeaking(), true);
+ await second;
+ assert.equal(synth.isSpeaking(), false, 'a finished utterance releases the speaker');
+ synth.dispose();
+});
+
 test('cancel while microphone permission is pending releases the late stream', async () => {
  const {VoiceController} = await import('../src/voice.js');
  const permission = deferred<MediaStream>();

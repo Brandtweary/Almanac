@@ -1,11 +1,13 @@
-import { collectAnswerSources, answerIdentity } from "../../answer-sources.js";
+import { collectAnswerSources, answerCopyText, answerIdentity, answerText, isAnswerMessage } from "../../answer-sources.js";
+import { EvidenceLedger } from "../../corpus-tools.js";
 import { renderAnswerSources } from "./AnswerSources.js";
+import "./AnswerControls.js";
 import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
 import type {
 	AssistantMessage as AssistantMessageType,
 	ToolResultMessage as ToolResultMessageType,
 } from "@earendil-works/pi-ai";
-import { html, LitElement, type TemplateResult } from "lit";
+import { html, LitElement, nothing, type TemplateResult } from "lit";
 import { property } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import { renderMessage } from "./message-renderer-registry.js";
@@ -30,6 +32,10 @@ export class MessageList extends LitElement {
 	private buildRenderItems() {
 		const currentSources = collectAnswerSources(this.messages);
 		const archivedSources = collectAnswerSources(this.sourceMessages);
+		// Copied text resolves citation handles against every passage this conversation has seen,
+		// including the raw archive a compaction rewrote out of the live history.
+		const ledger = new EvidenceLedger();
+		ledger.restore([...this.sourceMessages, ...this.messages]);
 		// Map tool results by call id for quick lookup
 		const resultByCallId = new Map<string, ToolResultMessageType>();
 		for (const message of this.messages) {
@@ -63,6 +69,7 @@ export class MessageList extends LitElement {
 				index++;
 			} else if (msg.role === "assistant") {
 				const amsg = msg as AssistantMessageType;
+				const evidence = archivedSources.get(answerIdentity(amsg)) ?? currentSources.get(answerIdentity(amsg));
 				items.push({
 					key: `msg:${index}`,
 					template: html`<assistant-message
@@ -74,7 +81,13 @@ export class MessageList extends LitElement {
 						.hideToolCalls=${false}
 						.hidePendingToolCalls=${this.isStreaming}
 						.onCostClick=${this.onCostClick}
-					></assistant-message>${renderAnswerSources(archivedSources.get(answerIdentity(amsg)) ?? currentSources.get(answerIdentity(amsg)))}`,
+					></assistant-message>${renderAnswerSources(evidence)}${isAnswerMessage(amsg)
+						? html`<answer-controls
+								.answerKey=${answerIdentity(amsg)}
+								.copyText=${answerCopyText(amsg, evidence, ledger)}
+								.speechText=${answerText(amsg)}
+							></answer-controls>`
+						: nothing}`,
 				});
 				index++;
 			} else {

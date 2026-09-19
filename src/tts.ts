@@ -240,6 +240,8 @@ export class KyutaiTtsSynthesizer implements SpeechSynthesizer {
 	private aborted = false;
 	// Whether any Audio frame arrived during the current run() (reset per run).
 	private sawAudio = false;
+	// Whether a run() is generating right now; only the newest run clears it (see isSpeaking).
+	private running = false;
 	// One-shot latch so the "voice unavailable" signal fires at most once per synth.
 	private voiceUnavailableNotified = false;
 	// Monotonic session epoch. Each socket is stamped with the gen that was current
@@ -284,10 +286,18 @@ export class KyutaiTtsSynthesizer implements SpeechSynthesizer {
 		return this.run(asyncFrom(chunkText(fullText)));
 	}
 
+	// Whether this synthesizer still owns the speaker: an utterance is generating, or its
+	// paced frames have not all been released yet. The worklet's own lookahead buffer plays
+	// out after the last release, so a false reading trails real audio by PLAYBACK_LOOKAHEAD_MS.
+	isSpeaking(): boolean {
+		return this.running || this.paceQueue.length > 0;
+	}
+
 	// Barge-in: cut audio immediately. Clears the worklet's frame buffer and
 	// closes the WS so no further frames arrive. Cheap to call when idle.
 	stop(): void {
 		this.aborted = true;
+		this.running = false;
 		// Bump the epoch so any session still unwinding is now stale: its remaining
 		// frames are dropped by the gen guard instead of leaking into the worklet.
 		this.gen++;
@@ -323,6 +333,7 @@ export class KyutaiTtsSynthesizer implements SpeechSynthesizer {
 		// capture our gen so the loop below can notice if a still-newer utterance
 		// supersedes us mid-flight and stop opening sessions.
 		const myGen = ++this.gen;
+		this.running = true;
 		this.closeWs();
 		this.aborted = false;
 		this.sawAudio = false;
@@ -384,6 +395,8 @@ export class KyutaiTtsSynthesizer implements SpeechSynthesizer {
 				dbgWarn(`[tts] onVoiceUnavailable callback threw: ${String(err)}`);
 			}
 		}
+		// A superseded run leaves the flag to whichever run now owns the speaker.
+		if (myGen === this.gen) this.running = false;
 	}
 
 	// Open a fresh TTS WS, wait for Ready, and return it with a promise that resolves
