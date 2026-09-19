@@ -5,17 +5,27 @@ import { GATEWAY_BASE } from "./local-model.js";
 
 export interface SourceEvidence {
 	passage_id: string; document_id: string; source_revision: string; extraction_revision: string;
-	title: string; edition: string; section: string[];
+	title: string; collection?: string; edition: string; section: string[];
 	page: { index: number | null; label: string | null; coordinates: number[] | null; anchor: string | null };
 	excerpt: string; complete: boolean; previous: string | null; next: string | null; flags: string[];
 	source: { url: string; sha256: string; media_type: string; origin: string };
 }
-export interface EvidenceRecord { passage_id: string; document_id: string; source_revision: string; extraction_revision: string; title: string; source_url: string }
+export interface EvidenceRecord { passage_id: string; document_id: string; source_revision: string; extraction_revision: string; title: string; collection?: string; source_url: string }
 const HANDLE = /^p:[a-f0-9]{64}:[a-f0-9]{64}$/;
+/**
+ * A document title alone can be a bare series number. The collection the corpus records
+ * for the document carries the rest of the name; evidence that has none keeps its title.
+ */
+export function sourceDisplayName(record: { title: string; collection?: string }): string {
+	const collection = record.collection?.trim();
+	if (!collection || record.title.toLowerCase().includes(collection.toLowerCase())) return record.title;
+	return `${collection} — ${record.title}`;
+}
 export function validateEvidence(value: unknown): SourceEvidence {
 	const p = value as SourceEvidence;
 	if (!p || !HANDLE.test(p.passage_id) || [p.document_id, p.source_revision, p.extraction_revision, p.title].some(v => typeof v !== "string" || !v) ||
 		typeof p.excerpt !== "string" || typeof p.complete !== "boolean" || !Array.isArray(p.section) || p.section.some(v => typeof v !== "string") ||
+		(p.collection !== undefined && typeof p.collection !== "string") ||
 		!p.source || typeof p.source.url !== "string" || !/^[a-f0-9]{64}$/.test(p.source_revision) || p.source.sha256 !== p.source_revision || !p.page || !Array.isArray(p.flags) || p.flags.some(v => typeof v !== "string")) throw new Error("Corpus returned invalid source evidence");
 	// The gateway serves immutable originals. Never trust a document-supplied URL as a local route.
 	const expected = `/v1/corpus/source/${encodeURIComponent(p.passage_id)}`;
@@ -28,7 +38,7 @@ export class EvidenceLedger {
 		for (const p of passages) {
 			const prior = this.entries.get(p.passage_id);
 			if (prior && (prior.document_id !== p.document_id || prior.source_revision !== p.source_revision || prior.extraction_revision !== p.extraction_revision)) throw new Error("Source identity changed for an immutable handle");
-			this.entries.set(p.passage_id, { passage_id: p.passage_id, document_id: p.document_id, source_revision: p.source_revision, extraction_revision: p.extraction_revision, title: p.title, source_url: `${GATEWAY_BASE}/corpus/source/${encodeURIComponent(p.passage_id)}` });
+			this.entries.set(p.passage_id, { passage_id: p.passage_id, document_id: p.document_id, source_revision: p.source_revision, extraction_revision: p.extraction_revision, title: p.title, ...(p.collection ? { collection: p.collection } : {}), source_url: `${GATEWAY_BASE}/corpus/source/${encodeURIComponent(p.passage_id)}` });
 		}
 	}
 	records(): EvidenceRecord[] { return [...this.entries.values()]; }
@@ -36,7 +46,8 @@ export class EvidenceLedger {
 		for (const message of messages) {
 			if (message.role === "corpus-ledger") for (const entry of message.entries) {
 				if (entry && HANDLE.test(entry.passage_id) && typeof entry.title === "string" && typeof entry.document_id === "string" && typeof entry.source_revision === "string" && typeof entry.extraction_revision === "string") {
-					this.entries.set(entry.passage_id, { ...entry, source_url: `${GATEWAY_BASE}/corpus/source/${encodeURIComponent(entry.passage_id)}` });
+					const { collection, ...rest } = entry;
+					this.entries.set(entry.passage_id, { ...rest, ...(typeof collection === "string" && collection ? { collection } : {}), source_url: `${GATEWAY_BASE}/corpus/source/${encodeURIComponent(entry.passage_id)}` });
 				}
 			}
 			if (message.role === "toolResult" && (message.toolName === "corpus_search" || message.toolName === "corpus_read") && !message.isError) {

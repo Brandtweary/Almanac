@@ -7,7 +7,10 @@ import mimetypes
 import logging
 import os
 from pathlib import Path
+import re
 import time
+import unicodedata
+import urllib.parse
 import uuid
 import httpx
 from fastapi import FastAPI, Request
@@ -25,6 +28,40 @@ LOG.setLevel(logging.INFO)
 if not LOG.handlers:
     LOG.addHandler(logging.StreamHandler())
 LOG.propagate = False
+
+# Media types a browser renders directly. Every source response carries the route's
+# sandbox policy and `nosniff`, so an inline document is displayed in an opaque origin
+# with scripting and subresource loading denied. Anything outside this set is saved.
+INLINE_MEDIA_TYPES = frozenset({"text/plain", "text/html", "application/pdf",
+                                "image/jpeg", "image/png", "image/gif", "image/webp"})
+
+
+def source_filename(doc, media_type):
+    """The document's own title reduced to a filename, with the served type's extension.
+
+    A content-addressed handle is an identity, not a name: without this the browser
+    falls back to the request path and saves the handle itself, untyped.
+    """
+    # Apostrophes close up rather than splitting a word; everything else unsafe separates.
+    spaced = re.sub(r"[^\w.\- ]", " ", re.sub(r"['‘’ʼ`]", "", doc.title))
+    stem = re.sub(r"\s+", " ", spaced).strip(" .-")[:96].strip(" .-")
+    return (stem or doc.document_id) + (mimetypes.guess_extension(media_type) or "")
+
+
+def disposition(media_type, filename):
+    """Display a renderable source; save anything else under a typed, readable name.
+
+    `filename*` carries the real name. The plain `filename` is the ASCII fallback an
+    older client reads, so it keeps the extension even when the title transliterates
+    away entirely.
+    """
+    kind = "inline" if media_type in INLINE_MEDIA_TYPES else "attachment"
+    stem, dot, extension = filename.rpartition(".")
+    if not dot:
+        stem, extension = filename, ""
+    folded = unicodedata.normalize("NFKD", stem).encode("ascii", "ignore").decode()
+    fallback = (re.sub(r"[^A-Za-z0-9._\- ]", "", folded).strip(" .-") or "source") + dot + extension
+    return f"{kind}; filename=\"{fallback}\"; filename*=UTF-8''{urllib.parse.quote(filename, safe='')}"
 
 
 def configured_service(client):
@@ -164,8 +201,10 @@ def create_app(service=None, phonemizer=None):
                 attribution += f"Edition: {doc.edition}\n"
             if doc.publisher:
                 attribution += f"Attribution: {doc.publisher}\n"
-            return Response(attribution + "\n" + text, media_type="text/plain", headers=headers)
-        return FileResponse(path, media_type=doc.media_type, filename=doc.document_id + (mimetypes.guess_extension(doc.media_type) or ""), headers=headers)
+            return Response(attribution + "\n" + text, media_type="text/plain",
+                headers={**headers, "Content-Disposition": disposition("text/plain", source_filename(doc, "text/plain"))})
+        name = source_filename(doc, doc.media_type)
+        return FileResponse(path, media_type=doc.media_type, headers={**headers, "Content-Disposition": disposition(doc.media_type, name)})
 
     return app
 

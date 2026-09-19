@@ -175,3 +175,22 @@ def test_default_license_and_rights_discussion_do_not_exclude_open_articles():
     assert selection(public_domain, 'appropedia-open-english-v2') == (True, None, 'Public domain')
     private = html + '<span data-template="Page data" data-param="license" data-value="proprietary"></span>'
     assert selection(private, 'appropedia-open-english-v2') == (False, 'explicit_other_license', None)
+
+
+def test_native_article_is_displayed_under_its_own_title_and_names_its_archive(tmp_path):
+    import httpx
+    from oracle_content.app import create_app
+    doc, p, token_path = fixture(tmp_path)
+    store, dense = Store(tmp_path / "state"), NativeDense()
+    generation = build(store, doc, p, dense, token_path)
+    service = Service(store, p, dense, TokenCounter(str(token_path), p.encoder_tokenizer_sha256), ZimLexical())
+    hit = next(h for h in asyncio.run(service.search(SearchRequest(query="ZX42")))["hits"] if h["title"] == "Valve")
+    assert hit["collection"] == "Archive"
+    async def check():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=create_app(service)), base_url="http://test") as client:
+            response = await client.get("/v1/corpus/source/" + hit["passage_id"])
+            assert response.status_code == 200 and "rotating seal" in response.text
+            header = response.headers["content-disposition"]
+            assert hit["passage_id"] not in header
+            assert header.startswith('inline; filename="Valve.txt"')
+    asyncio.run(check())

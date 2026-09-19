@@ -204,40 +204,54 @@ class Service:
         safe_query = " ".join(re.findall(r"[^\W_]+", query))
         for index, path in enumerate(paths):
             hits = await self.zim.search(str(self.store.root / path), safe_query, self.profile.lexical_depth, title_query=query)
-            article_branches, article_weights = {}, {}
-            with self.store.connect(generation) as db:
-                for article_rank, article in enumerate(hits, 1):
-                    scope = " AND id=?" if document_id else ""
-                    args = (path, article, document_id) if document_id else (path, article)
-                    found = db.execute("SELECT id FROM documents WHERE original_path=? AND article_path=?" + scope, args).fetchone()
-                    if not found:
-                        continue
-                    # Localize within each native article hit, never rebuild the whole archive's lexical index.
-                    local = sqlite3.connect(":memory:")
-                    try:
-                        local.execute("CREATE VIRTUAL TABLE article USING fts5(id UNINDEXED,text,tokenize='porter unicode61')")
-                        for row in db.execute("SELECT id,data FROM passages WHERE document_id=? ORDER BY ordinal", (found[0],)):
-                            passage = Passage.model_validate_json(row[1])
-                            local.execute("INSERT INTO article VALUES(?,?)", (row[0], passage.lexical_text))
-                        lexical_query = " OR ".join('"' + token.replace('"', '""') + '"'
-                            for token in re.findall(r"[^\W_]+(?:[-./][^\W_]+)*", query, re.UNICODE))
-                        localized = local.execute("SELECT id,bm25(article) FROM article WHERE article MATCH ? ORDER BY bm25(article),id LIMIT ?",
-                                                  (lexical_query, self.profile.lexical_depth)).fetchall() if lexical_query else []
-                    finally:
-                        local.close()
-                    if not localized:
-                        # Native title/redirect/stem matches still locate an article even without literal passage terms.
-                        localized = [(r[0], 0) for r in db.execute(
-                            "SELECT id FROM passages WHERE document_id=? ORDER BY ordinal LIMIT ?",
-                            (found[0], self.profile.lexical_depth))]
-                    if localized:
-                        article_branches[article] = localized
-                        article_weights[article] = 1 / (self.profile.rrf_k + article_rank)
-            native = fuse(article_branches, article_weights, self.profile.rrf_k)
+            native = await asyncio.to_thread(self._localize_native_hits, generation, path, hits, query, document_id)
             branches[f"zim{index}"] = [(r["passage_id"], r["score"]) for r in native[:self.profile.lexical_depth]]
         if len(branches) == 1:
             return rows
         return [(row["passage_id"], row["score"]) for row in fuse(branches, {k: 1 for k in branches}, self.profile.rrf_k)][:self.profile.lexical_depth]
+
+    def _localize_native_hits(self, generation, path, hits, query, document_id):
+        """Rank passages inside each native article hit, off the event loop.
+
+        Opening catalog connections, building a fresh in-memory FTS5 table per
+        article and running BM25 over it is pure CPU and disk work costing tens
+        to hundreds of milliseconds, and the service has one event loop: run
+        inline in a coroutine it stalls every other in-flight request for its
+        duration, since a coroutine yields only at an await. `native.py` keeps
+        the same work in `_localize` for the same reason. The catalog connection
+        is opened here rather than handed in because a sqlite3 connection
+        belongs to the thread that created it.
+        """
+        article_branches, article_weights = {}, {}
+        with self.store.connect(generation) as db:
+            for article_rank, article in enumerate(hits, 1):
+                scope = " AND id=?" if document_id else ""
+                args = (path, article, document_id) if document_id else (path, article)
+                found = db.execute("SELECT id FROM documents WHERE original_path=? AND article_path=?" + scope, args).fetchone()
+                if not found:
+                    continue
+                # Localize within each native article hit, never rebuild the whole archive's lexical index.
+                local = sqlite3.connect(":memory:")
+                try:
+                    local.execute("CREATE VIRTUAL TABLE article USING fts5(id UNINDEXED,text,tokenize='porter unicode61')")
+                    for row in db.execute("SELECT id,data FROM passages WHERE document_id=? ORDER BY ordinal", (found[0],)):
+                        passage = Passage.model_validate_json(row[1])
+                        local.execute("INSERT INTO article VALUES(?,?)", (row[0], passage.lexical_text))
+                    lexical_query = " OR ".join('"' + token.replace('"', '""') + '"'
+                        for token in re.findall(r"[^\W_]+(?:[-./][^\W_]+)*", query, re.UNICODE))
+                    localized = local.execute("SELECT id,bm25(article) FROM article WHERE article MATCH ? ORDER BY bm25(article),id LIMIT ?",
+                                              (lexical_query, self.profile.lexical_depth)).fetchall() if lexical_query else []
+                finally:
+                    local.close()
+                if not localized:
+                    # Native title/redirect/stem matches still locate an article even without literal passage terms.
+                    localized = [(r[0], 0) for r in db.execute(
+                        "SELECT id FROM passages WHERE document_id=? ORDER BY ordinal LIMIT ?",
+                        (found[0], self.profile.lexical_depth))]
+                if localized:
+                    article_branches[article] = localized
+                    article_weights[article] = 1 / (self.profile.rrf_k + article_rank)
+        return fuse(article_branches, article_weights, self.profile.rrf_k)
 
     async def candidates(self, query, document_id=None, generation=None):
         """Evaluation seam: independent ranks and fused pool before reranking/packing."""
@@ -308,12 +322,25 @@ class Service:
         return {"generation": generation, "branches": {"lexical": lexical, "dense": dense},
                 "rows": remove_contained(rows, passages), "passages": passages, "degradation": degradation}
 
+    def collection(self, generation, doc):
+        """The work a document sits inside, for display alongside a title that alone says little.
+
+        A native archive contributes the pack title declared when it was prepared, the
+        same label for every article it holds; a staged document contributes its own
+        publisher. The catalog records no finer grouping, so a document whose series
+        lives only in its body text carries no series here.
+        """
+        native = self.store.native(generation)
+        label = native.template.title if native is not None else doc.publisher
+        return label if label and label.casefold() != doc.title.casefold() else ""
+
     def hit(self, generation, passage, omit=False):
         generation = HANDLE.fullmatch(passage.passage_id)[1]
         doc = self.store.document(generation, passage.document_id)
         return {"passage_id": passage.passage_id, "document_id": doc.document_id,
                 "source_revision": passage.source_revision, "extraction_revision": passage.extraction_revision,
-                "title": doc.title, "edition": doc.edition, "section": passage.section, "page": passage.page,
+                "title": doc.title, "collection": self.collection(generation, doc),
+                "edition": doc.edition, "section": passage.section, "page": passage.page,
                 "excerpt": "" if omit else passage.text,
                 "complete": not omit and not any(f in passage.flags for f in ("continued_source_block", "text_omitted")),
                 "source": {"url": "/v1/corpus/source/" + quote(passage.passage_id, safe=""),
@@ -420,11 +447,25 @@ class Service:
             generation, rows, degradation = pool["generation"], pool["rows"], pool["degradation"]
             if self.profile.ranking == "reranker":
                 candidates = rows[:self.profile.reranker_depth]
+                # A query paired with a near-limit passage can exceed the
+                # cross-encoder's pair window, which is ordinary long input and
+                # not an outage: `rank` refuses the whole batch for one such
+                # pair, so the overflowing candidates are set aside here and
+                # keep their fusion rank. Recording this as a service fault
+                # would fill the bounded diagnostic store with non-faults and
+                # fail a require_qualified request over a long question.
+                scorable = [r for r in candidates
+                            if self.tokenizer.pair_count(query, pool["passages"][r["passage_id"]].embedding_text)
+                            <= self.profile.reranker_max_tokens]
+                if len(scorable) != len(candidates):
+                    degradation.append("reranker_window_exceeded")
                 try:
                     if self.reranker is None:
                         raise ValueError("reranker unavailable")
-                    scores = await self.reranker.rank(query, [pool["passages"][r["passage_id"]] for r in candidates])
-                    rows = sorted(candidates, key=lambda row: (-scores[row["passage_id"]], -row["score"], row["passage_id"]))
+                    if scorable:
+                        scores = await self.reranker.rank(query, [pool["passages"][r["passage_id"]] for r in scorable])
+                        omitted = [r for r in candidates if r["passage_id"] not in scores]
+                        rows = sorted(scorable, key=lambda row: (-scores[row["passage_id"]], -row["score"], row["passage_id"])) + omitted
                 except Exception as exc:
                     self.record_failure("reranker", generation, exc)
                     degradation.append("reranker_unavailable")
@@ -475,6 +516,7 @@ class Service:
             passages = [selected, *passages] if selected.kind == "article_lead" else passages[max(0, selected.ordinal - 1):]
         hits = [self.hit(generation, p, omit=selected is None) for p in passages]
         snapshot = {**self.base(generation), "document": {"document_id": doc.document_id, "title": doc.title,
+            "collection": self.collection(generation, doc),
             "edition": doc.edition, "publisher": doc.publisher, "language": doc.language,
             "source_revision": doc.sha256, "license": doc.license, "rights_exceptions": doc.rights_exceptions},
             "overview": selected is None, "passages": hits}

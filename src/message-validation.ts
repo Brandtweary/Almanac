@@ -62,7 +62,7 @@ export function validConversationMessage(value: unknown): value is AgentMessage 
     case "system-notification": return typeof value.message === "string";
     case "voice-pending": return typeof value.timestamp === "string";
     case "corpus-ledger": return Array.isArray(value.entries) && value.entries.every(entry => record(entry) &&
-      ["passage_id", "document_id", "source_revision", "extraction_revision", "title"].every(key => typeof entry[key] === "string") && optionalString(entry, "source_url"));
+      ["passage_id", "document_id", "source_revision", "extraction_revision", "title"].every(key => typeof entry[key] === "string") && optionalString(entry, "source_url") && optionalString(entry, "collection"));
     default: return false;
   }
 }

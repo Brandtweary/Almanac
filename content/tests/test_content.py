@@ -291,6 +291,55 @@ def test_source_original_is_independent_of_changed_acquisition_path(tmp_path):
     asyncio.run(check())
 
 
+def test_source_is_named_by_its_title_and_displayed_when_renderable(tmp_path):
+    service, doc, generation = setup(tmp_path)
+    handle = next(service.store.passages(generation)).passage_id
+    async def check():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=create_app(service)), base_url="http://test") as client:
+            header = (await client.get("/v1/corpus/source/" + handle)).headers["content-disposition"]
+            # A content-addressed handle identifies the passage; it never names the file.
+            assert handle not in header
+            assert header.startswith("inline; ")
+            assert 'filename="Fixture manual.txt"' in header
+    asyncio.run(check())
+
+
+def test_source_of_an_unrenderable_type_is_saved_under_a_typed_name(tmp_path):
+    from oracle_content.app import disposition, source_filename
+    doc = document(tmp_path).model_copy(update={"media_type": "application/epub+zip", "title": "Frédéric’s / manual"})
+    name = source_filename(doc, doc.media_type)
+    header = disposition(doc.media_type, name)
+    assert name == "Frédérics manual.epub"
+    assert header.startswith("attachment; ")
+    assert 'filename="Frederics manual.epub"' in header
+    assert "filename*=UTF-8''Fr%C3%A9d%C3%A9rics%20manual.epub" in header
+
+
+def test_source_filename_falls_back_to_document_identity_when_a_title_has_no_name(tmp_path):
+    from oracle_content.app import source_filename
+    doc = document(tmp_path).model_copy(update={"title": "///"})
+    assert source_filename(doc, "text/plain") == doc.document_id + ".txt"
+
+
+def test_hits_carry_the_collection_a_document_belongs_to(tmp_path):
+    p, store, dense = profile(), Store(tmp_path / "state"), Dense()
+    doc = document(tmp_path).model_copy(update={"publisher": "Field Engineering Series"})
+    generation = asyncio.run(build(store, [doc], p, dense, Tokens(), validation(doc)))
+    service = Service(store, p, dense, Tokens())
+    result = asyncio.run(service.search(SearchRequest(query="ZX-42")))
+    assert result["hits"] and all(h["collection"] == "Field Engineering Series" for h in result["hits"])
+    snapshot = asyncio.run(service.read(ReadRequest(document_id=doc.document_id)))
+    assert snapshot["document"]["collection"] == "Field Engineering Series"
+
+
+def test_collection_is_empty_when_it_would_only_repeat_the_title(tmp_path):
+    p, store, dense = profile(), Store(tmp_path / "state"), Dense()
+    doc = document(tmp_path).model_copy(update={"publisher": "fixture MANUAL"})
+    generation = asyncio.run(build(store, [doc], p, dense, Tokens(), validation(doc)))
+    result = asyncio.run(Service(store, p, dense, Tokens()).search(SearchRequest(query="ZX-42")))
+    assert result["hits"] and all(h["collection"] == "" for h in result["hits"])
+
+
 def test_failed_document_extraction_has_durable_status(tmp_path):
     doc = document(tmp_path, text="")
     store = Store(tmp_path / "state")

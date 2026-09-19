@@ -1,6 +1,6 @@
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
-import { EvidenceLedger, createCorpusTools, validateEvidence, resolveCorpusCitation } from "../src/corpus-tools.js";
+import { EvidenceLedger, createCorpusTools, validateEvidence, resolveCorpusCitation, sourceDisplayName } from "../src/corpus-tools.js";
 import { validateProfile, loadReleaseProfile, GATEWAY_BASE } from "../src/local-model.js";
 import { admitPayload, beginRequest, serializeModelRequest } from "../src/oracle-runtime.js";
 import { compactContext } from "../src/oracle-context.js";
@@ -116,4 +116,19 @@ test("already-aborted requests fail before publishing or scheduling request stat
  let requests=0;globalThis.fetch=async()=>{requests++;return Response.json({});};
  assert.throws(()=>{const request=beginRequest('chat','cancelled',controller.signal);request.finish('interrupted');},{name:'AbortError'});
  assert.equal(requests,0);
+});
+
+test("a collection nests a citation name through storage, and evidence without one keeps its title", () => {
+ const series = { ...source, title: "Technical Paper #7", collection: "Field Engineering Papers" };
+ const ledger = new EvidenceLedger(); ledger.remember([validateEvidence(series)]);
+ assert.equal(sourceDisplayName(ledger.resolve(id)!), "Field Engineering Papers — Technical Paper #7");
+ const restored = new EvidenceLedger(); restored.restore([ledger.message()]);
+ assert.equal(sourceDisplayName(restored.resolve(id)!), "Field Engineering Papers — Technical Paper #7");
+ // Nothing is invented for a document the catalog records no collection for.
+ const plain = new EvidenceLedger(); plain.remember([validateEvidence(source)]);
+ assert.equal(sourceDisplayName(plain.resolve(id)!), "Reference");
+ assert.equal(plain.resolve(id)!.collection, undefined);
+ // A collection already spoken by the title is not repeated.
+ assert.equal(sourceDisplayName({ title: "Appropedia solar stills", collection: "Appropedia" }), "Appropedia solar stills");
+ assert.throws(() => validateEvidence({ ...source, collection: 7 }), /evidence/);
 });

@@ -3,7 +3,7 @@ import { speechBridge } from "./speech-socket";
 import { Hono, type MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
-import { appendFileSync, readFileSync, realpathSync } from "node:fs";
+import { appendFileSync, readFileSync, realpathSync, renameSync, statSync } from "node:fs";
 import { resolve, sep } from "node:path";
 import { config, validateProfile, type GatewayConfig, type ReleaseProfile } from "./config";
 import { AdmissionError, CompletionQueue } from "./queue";
@@ -11,13 +11,46 @@ import { VoiceBroker, registerVoiceRoutes } from "./voice-broker";
 import { clientIp, createLimiters, WINDOW_MS, type RouteName } from "./rate-limit";
 import { Subscribers } from "./subscribers";
 
+// Fingerprints tracked before the table resets; the reset costs a repeat of
+// an old fault rather than unbounded memory on a varied stream.
+const GATEWAY_LOG_FINGERPRINTS_MAX = 4096;
+
 export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch = fetch, providedProfile?: ReleaseProfile) {
   if (cfg.qualificationMode && cfg.qualificationBoundary && cfg.qualificationBoundary !== "isolated-container") throw new Error("invalid qualification boundary declaration");
   // The installer validates host publication and network isolation before supplying this declaration.
   if (cfg.qualificationMode && !["127.0.0.1", "::1", "localhost"].includes(cfg.host) && cfg.qualificationBoundary !== "isolated-container") throw new Error("qualification mode requires loopback binding or an installer-validated isolated-container boundary");
   let profile: ReleaseProfile | null = null;
   let profileError = "release_profile_missing";
-  const log = (event: object) => { try { appendFileSync(cfg.logPath, JSON.stringify({at: new Date().toISOString(), ...event}) + "\n"); } catch (error) { console.error("gateway log write failed", error); } };
+  // Every route here is reachable without authentication, so this log is written
+  // by ordinary visitor traffic — rate-limit rejections and every failed stage.
+  // An unconditional append therefore grows with the fault rate rather than with
+  // anything an operator chose, and one hammered route buries every other
+  // failure's evidence. Bounded the way the content service bounds its own fault
+  // store: a fixed allotment split between the live file and one rotated
+  // predecessor, with an identical repeating event folded onto occurrences
+  // 1, 2, 4, 8, ... so the rate survives without the volume.
+  const logOccurrences = new Map<string, number>();
+  const rotatedLogPath = cfg.logPath.endsWith(".jsonl") ? cfg.logPath.slice(0, -6) + ".1.jsonl" : cfg.logPath + ".1";
+  const log = (event: object) => {
+    try {
+      const fields = event as Record<string, unknown>;
+      const fingerprint = JSON.stringify([fields.stage, fields.status, fields.route, fields.code, fields.error]);
+      if (logOccurrences.size >= GATEWAY_LOG_FINGERPRINTS_MAX) logOccurrences.clear();
+      const occurrence = (logOccurrences.get(fingerprint) ?? 0) + 1;
+      logOccurrences.set(fingerprint, occurrence);
+      // Between powers of two the ordinal on the next written record carries the rate.
+      if (occurrence & (occurrence - 1)) return;
+      const line = JSON.stringify({at: new Date().toISOString(), occurrence, ...event}) + "\n";
+      // Each of the two files is held under half the allotment, so their sum
+      // never exceeds it. A record larger than half rotates on every write and
+      // the log degrades to the two most recent records rather than growing.
+      const half = Math.max(Math.floor(cfg.logMaxBytes / 2), 1);
+      let size = 0;
+      try { size = statSync(cfg.logPath).size; } catch { size = 0; }
+      if (size > 0 && size + Buffer.byteLength(line) > half) renameSync(cfg.logPath, rotatedLogPath);
+      appendFileSync(cfg.logPath, line);
+    } catch (error) { console.error("gateway log write failed", error); }
+  };
   try { if (providedProfile) profile = validateProfile(providedProfile, cfg.qualificationMode); else if (cfg.profilePath) profile = validateProfile(JSON.parse(readFileSync(cfg.profilePath, "utf8")), cfg.qualificationMode); }
   catch (error) { profileError = "release_profile_invalid"; log({stage: "profile", status: "failed", error: String(error)}); }
   const app = new Hono();
@@ -315,7 +348,7 @@ app.post("/v1/embed", limit("embed"), async (c) => {
     } catch { return c.notFound(); }
     return new Response(Bun.file(filePath), {headers: {"X-Content-Type-Options": "nosniff"}});
   });
-  return {app, queue, profile};
+  return {app, queue, profile, log};
 }
 const {app, profile} = createGateway();
 const speech = speechBridge(config.ttsBase, profile?.limits.speechConcurrency ?? 0, profile?.limits.speechTimeoutMs ?? 1000, profile?.limits.speechMaxBytes ?? 1024);

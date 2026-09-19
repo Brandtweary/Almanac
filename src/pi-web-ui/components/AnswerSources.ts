@@ -1,5 +1,6 @@
 import { html, nothing } from "lit";
 import type { AnswerSources } from "../../answer-sources.js";
+import { sourceDisplayName } from "../../corpus-tools.js";
 
 export function renderAnswerSources(evidence?: AnswerSources) {
 	if (!evidence?.sources.length) return nothing;
@@ -9,7 +10,7 @@ export function renderAnswerSources(evidence?: AnswerSources) {
 		<div class="font-medium">${heading}</div>
 		<div class="text-xs">${cited ? "Cited in this answer" : "Retrieved while researching; not cited in the answer"}</div>
 		<ul class="mt-1 list-disc pl-5">${evidence.sources.map(source => html`<li>
-			<a class="text-primary underline" href=${source.source_url} target="_blank" rel="noopener noreferrer">${source.title}</a>
+			<a class="text-primary underline" href=${source.source_url} target="_blank" rel="noopener noreferrer">${sourceDisplayName(source)}</a>
 		</li>`)}</ul>
 	</section>`;
 }

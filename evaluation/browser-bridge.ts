@@ -65,6 +65,11 @@ export async function startBrowserBridge(options: {dist: string; output?:string;
      for await(const chunk of upstream.body!){response.write(Buffer.from(chunk));buffer+=decoder.decode(chunk,{stream:true});let end:number;
       while((end=buffer.indexOf("\n"))>=0){const line=buffer.slice(0,end).trim();buffer=buffer.slice(end+1);if(line==="data: [DONE]"){providerFinished=true;continue;}if(!line.startsWith("data:"))continue;const frame=JSON.parse(line.slice(5));record.frames.push(frame);options.onReceiptEvent?.({type:"provider-frame",at:Date.now(),id,frame});if(frame.provider)record.provider=frame.provider;if(frame.usage){record.costUSD=frame.usage.cost;record.inputTokens=frame.usage.prompt_tokens;record.outputTokens=frame.usage.completion_tokens;}}
      }
+     // A stream is finished when its terminal frame says so, not when the body
+     // ends. A truncated reply can carry content and even a usage frame, and
+     // treating EOF as completion hands the evaluation a partial answer as a
+     // whole one.
+     if(!providerFinished)throw new Error("provider_stream_truncated");
      response.end();
     }
     if(typeof record.costUSD==="number"&&Number.isFinite(record.costUSD))costUSD+=record.costUSD;else unknownBilling=true;

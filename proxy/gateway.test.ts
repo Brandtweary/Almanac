@@ -83,6 +83,17 @@ test("untrusted source downloads retain a sandbox policy through gateway middlew
  expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
 });
 
+test("a readable source keeps the content service's own disposition and name", async()=>{
+ const named="inline; filename=\"Understanding Composting.txt\"; filename*=UTF-8''Understanding%20Composting.txt";
+ const fetcher = (async()=>new Response('article text',{headers:{'Content-Type':'text/plain; charset=utf-8','Content-Disposition':named}})) as unknown as typeof fetch;
+ const {app}=createGateway(cfg,fetcher,profile);
+ const response=await app.request('/v1/corpus/source/fixture');
+ // Forcing a download here is what leaves the browser naming the file after the handle.
+ expect(response.headers.get('Content-Disposition')).toBe(named);
+ expect(response.headers.get('Content-Type')).toBe('text/plain; charset=utf-8');
+ expect((response.headers.get('Content-Security-Policy')??'')).toContain("sandbox; default-src 'none'");
+});
+
 test("pinned model sampling applies before counting and generation",async()=>{
  const bodies:any[]=[];const base=mock();
  const fetcher=(async(url:any,init:any)=>{if(String(url).endsWith("/apply-template")||String(url).endsWith("/v1/chat/completions"))bodies.push(JSON.parse(init.body));return base(url,init);}) as typeof fetch;

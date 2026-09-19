@@ -120,4 +120,35 @@ class StockReviewTests(unittest.TestCase):
         from .adjudicate import apply_review
         with self.assertRaises(ValueError):apply_review({'status':'unadjudicated'},'new',{'receiptSHA256':'old'})
 
+
+class SpendCollection(unittest.TestCase):
+    """A receipt's nesting depth is the provider's choice, not a budget limit."""
+
+    def _receipt(self,depth,identity='gen-deep',cost=1.5):
+        leaf={'id':identity,'usage':{'cost':cost}}
+        node=leaf
+        for _ in range(depth):node={'wrapper':[node]}
+        return node
+
+    def test_deep_but_decodable_receipt_keeps_its_charge(self):
+        import tempfile
+        from .spend import collect_spend
+        directory=Path(tempfile.mkdtemp())
+        (directory/'deep.json').write_text(json.dumps(self._receipt(2000)))
+        report=collect_spend([directory])
+        self.assertEqual(report['unreadable'],[])
+        self.assertEqual(report['providerGenerations'],1)
+        self.assertEqual(report['reportedCostUSD'],1.5)
+
+    def test_input_past_the_decoder_limit_is_one_unreadable_row(self):
+        import tempfile
+        from .spend import collect_spend
+        directory=Path(tempfile.mkdtemp())
+        (directory/'over.json').write_text('['*200000+']'*200000)
+        (directory/'ordinary.json').write_text(json.dumps(self._receipt(1,identity='gen-ordinary',cost=2.0)))
+        report=collect_spend([directory])
+        self.assertEqual([row['file'] for row in report['unreadable']],[str(directory/'over.json')])
+        self.assertEqual(report['providerGenerations'],1)
+        self.assertEqual(report['reportedCostUSD'],2.0)
+
 if __name__=='__main__': unittest.main()

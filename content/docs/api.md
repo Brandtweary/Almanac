@@ -9,7 +9,7 @@ or filesystem-management endpoint is public. FastAPI `/openapi.json` exposes req
 | `GET /health`, `GET /capabilities` | None | `ready`, `generation`, `profile_id`, `qualified`, `coverage` |
 | `POST /v1/corpus/search` | `query`, optional `document_id`, `cursor`, `require_qualified` | Common envelope, `hits`, `cursor` |
 | `POST /v1/corpus/read` | `document_id`, optional `passage_id`, `cursor` | Common envelope, `document`, `overview`, `passages`, `cursor` |
-| `GET /v1/corpus/source/{handle}` | URL-encoded returned passage handle | Immutable original download; ZIM article text |
+| `GET /v1/corpus/source/{handle}` | URL-encoded returned passage handle | Immutable original bytes; ZIM article text |
 
 Common envelope: `generation`, `profile_id`, `status` (`ok`, `unqualified`, `degraded`),
 `degradation` (stage codes), `coverage`. Coverage identifies `active_packs`, `pending_packs`,
@@ -22,10 +22,13 @@ Each hit or read passage contains:
 
 - `passage_id`: opaque `p:<generation digest>:<source span digest>`.
 - `document_id`, `source_revision` (original SHA256), `extraction_revision`, `title`, `edition`.
+- `collection`: the work the document sits inside — the pack title for a native archive, the document's own publisher otherwise, and empty when it would only repeat the title. The catalog records no finer grouping, so a series named only in a document's body text is absent here.
 - `section`: heading array; `page`: zero-based `index`, printed `label`, `coordinates`, `anchor`.
 - `excerpt`, `complete`, `kind`, `flags`, `previous`, `next`.
 - `source`: same-origin `url`, `sha256`, `media_type`, upstream `origin`, and
   `representation` (`original` or `article_text` for the text-only ZIM article route).
+
+The source route names its response after the document's own title with the served type's extension, and marks a browser-renderable type `inline` under the route's sandbox policy; every other type is an `attachment`.
 
 Null page metadata is unknown, never inferred from a PDF page index. Figures are explicitly
 marked as needing visual inspection; the text-only model cannot inspect their geometry.

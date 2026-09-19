@@ -13,6 +13,9 @@ export const config = {
   profilePath: process.env.RELEASE_PROFILE ?? "",
   frontendDir: resolve(process.env.FRONTEND_DIR ?? `${import.meta.dir}/../dist`),
   logPath: process.env.GATEWAY_LOG ?? `${import.meta.dir}/gateway.jsonl`,
+  // The diagnostic log is written by unauthenticated request traffic, so it
+  // carries a fixed disk allotment rather than growing with the fault rate.
+  logMaxBytes: Math.max(Number(process.env.GATEWAY_LOG_MAX_BYTES ?? 8388608), 2),
   subscriberDb: process.env.SUBSCRIBER_DB ?? `${import.meta.dir}/subscribers.db`,
   allowedOrigins: (process.env.ALLOWED_ORIGIN ?? "http://localhost:5173").split(","),
   // Socket peers whose X-Forwarded-For may name the real client for per-client
