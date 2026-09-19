@@ -12,7 +12,7 @@ export const config = {
   // `request_timeout` and answers 504, so it owns the corpus deadline. This is
   // the backstop above it: set below that deadline it discards work that is
   // still progressing and reports a corpus that is answering as absent.
-  corpusTimeoutMs: Math.max(Number(process.env.CORPUS_TIMEOUT_MS ?? 65000), 1000),
+  corpusTimeoutMs: Math.max(Number(process.env.CORPUS_TIMEOUT_MS ?? 45000), 1000),
   sttBase: process.env.STT_BASE ?? "",
   ttsBase: process.env.VOICE_TTS_BASE ?? "",
   profilePath: process.env.RELEASE_PROFILE ?? "",
