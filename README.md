@@ -51,37 +51,28 @@ without the assistant.
 - **Web search:** Optional online discovery through a local SearXNG service, for questions the
   installed library cannot answer.
 
-## How it works
+## The stack
 
-The application is a browser front end running the Pi agent loop, with a Bun/Hono gateway
-behind it. The browser owns the conversation: it decides which tools to call, keeps chats,
-glossary, and running context in IndexedDB, and compacts long research turns while preserving
-the source handles it has collected. The gateway serves the built application and forwards
-requests to explicitly configured local services — inference, embeddings, the corpus, search,
-and speech — holding no provider keys and no billing state. Inference is served by vLLM from a
-pinned model snapshot; the checked-in runtime descriptor is a 30B NVFP4 release at a
-131,072-token context on a single 32 GB NVIDIA GPU. Before a completion is admitted, the
-gateway serializes the whole payload through the inference server's own template and tokenizer,
-so tool schemas and chat formatting are counted rather than estimated. One completion runs at a
-time, foreground work takes the next slot, conversations rotate within a priority, and a full
-queue rejects explicitly instead of quietly dropping work. Every route reachable without
-authentication carries a per-client rate-limit window.
+Everything below runs on the machine you install it on. Nothing calls out to a hosted model,
+and the gateway holds no provider keys and no billing state.
 
-A separate Python service owns the library. Each archive is ingested into an immutable
-generation: original bytes are retained, text is extracted into ordered blocks, and both a
-SQLite FTS5 lexical index and a Qdrant vector index are built over it, the latter through a
-pinned local sentence-transformer encoder. A search runs the lexical and dense branches
-independently, fuses their ranks, and optionally applies a local reranker; archives that carry
-their own full-text index are searched natively rather than indexed a second time. Results come
-back as content-addressed passage handles that name an exact source and extraction version, so
-a citation still resolves after the conversation has been compacted, and the original document
-behind it can be opened or downloaded under its own name. Speech is local on both ends:
-recorded audio is resampled in the browser and posted to a faster-whisper endpoint, and replies
-stream back sentence by sentence from a CPU Pocket TTS service over a MessagePack WebSocket
-bridge, where interrupting cancels generation mid-stream rather than talking over you.
+| | |
+|---|---|
+| **Language model** | Muse Glimmer 30B, NVFP4, 131,072-token context |
+| **Inference server** | vLLM, from a pinned model snapshot |
+| **Hardware target** | One 32 GB consumer GPU |
+| **Interface** | Browser front end running the Pi agent loop |
+| **Gateway** | Bun / Hono, one completion at a time |
+| **Library service** | Python, over an immutable ingested generation of each archive |
+| **Lexical search** | SQLite FTS5, plus each archive's own native index where it has one |
+| **Semantic search** | Qdrant, embedded with `all-MiniLM-L6-v2` |
+| **Speech in** | faster-whisper, local |
+| **Speech out** | Pocket TTS on CPU, stock Alba voice |
+| **Web search** | SearXNG, local, optional |
+| **Your data** | IndexedDB, in your browser |
 
-For more depth: [browser runtime](./docs/browser-oracle.md), [gateway](./proxy/README.md),
-[content service](./content/README.md), [CPU speech](./speech/README.md),
+Longer descriptions, for anyone installing or modifying it: [browser runtime](./docs/browser-oracle.md),
+[gateway](./proxy/README.md), [content service](./content/README.md), [CPU speech](./speech/README.md),
 [self-hosting](./docs/self-hosting.md), and [web search](./docs/web-search.md).
 
 ## Installation
