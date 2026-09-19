@@ -13,6 +13,7 @@ export const config = {
   profilePath: process.env.RELEASE_PROFILE ?? "",
   frontendDir: resolve(process.env.FRONTEND_DIR ?? `${import.meta.dir}/../dist`),
   logPath: process.env.GATEWAY_LOG ?? `${import.meta.dir}/gateway.jsonl`,
+  subscriberDb: process.env.SUBSCRIBER_DB ?? `${import.meta.dir}/subscribers.db`,
   allowedOrigins: (process.env.ALLOWED_ORIGIN ?? "http://localhost:5173").split(","),
   // Socket peers whose X-Forwarded-For may name the real client for per-client
   // rate limits. Loopback covers a TLS terminator on the same host; "*" trusts

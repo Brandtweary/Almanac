@@ -24,10 +24,13 @@ class Tokens:
 
 
 class Dense:
-    def __init__(self):
+    def __init__(self, window=None):
         self.points = {}
         self.fail = False
         self.puts = 0
+        self.queries = []
+        # The encoder refuses input past its window; a caller fits what it sends.
+        self.window = window
     async def create(self, generation):
         self.points.setdefault(generation, {})
     async def put(self, generation, passages):
@@ -38,8 +41,11 @@ class Dense:
     async def validate(self, generation, ids):
         assert set(self.points[generation]) == set(ids)
     async def search(self, generation, query, document_id=None):
+        self.queries.append(query)
         if self.fail:
             raise RuntimeError("dense unavailable")
+        if self.window is not None and Tokens().count(query) > self.window:
+            raise ValueError("embedding input exceeds tokenizer window")
         return [(p.passage_id, 0.9) for p in self.points[generation].values()
                 if "paraphrase" in p.text and (not document_id or p.document_id == document_id)]
 
@@ -68,7 +74,8 @@ def validation(doc):
 def setup(tmp_path, **changes):
     retention = {key: changes.pop(key) for key in
                  ("snapshot_ttl", "snapshot_max_bytes", "failure_log_max_bytes") if key in changes}
-    store, dense, p = Store(tmp_path / "state"), Dense(), profile(**changes)
+    p = profile(**changes)
+    store, dense = Store(tmp_path / "state"), Dense(p.encoder_max_tokens)
     doc = document(tmp_path)
     generation = asyncio.run(build(store, [doc], p, dense, Tokens(), validation(doc)))
     return Service(store, p, dense, Tokens(), **retention), doc, generation
@@ -104,6 +111,52 @@ def test_dense_failure_label_and_required_profile(tmp_path):
     assert len(result["hits"]) == 1
     with pytest.raises(ContentError, match="qualified"):
         asyncio.run(service.search(SearchRequest(query="ZX", require_qualified=True)))
+
+
+def test_overlong_query_truncates_only_the_dense_branch(tmp_path):
+    """A query past the encoder window narrows dense retrieval instead of losing it.
+
+    The window belongs to the sentence encoder alone, so the lexical branch
+    searches the whole query; the response reports the narrower dense
+    contribution rather than presenting it as full coverage.
+    """
+    service, _, _ = setup(tmp_path, query_max_chars=4000)
+    window = service.profile.encoder_max_tokens
+    query = "paraphrase stopcock " * (window + 10)
+    lexical_queries = []
+    original = service.lexical
+    async def capture(generation, value, document_id):
+        lexical_queries.append(value)
+        return await original(generation, value, document_id)
+    service.lexical = capture
+
+    result = asyncio.run(service.search(SearchRequest(query=query.strip())))
+
+    assert result["status"] == "degraded" and "dense_query_truncated" in result["degradation"]
+    assert result["hits"], "a truncated dense query still returns evidence"
+    assert lexical_queries == [query.strip()], "the lexical branch reads the whole query"
+    encoded = service.dense.queries[-1]
+    assert Tokens().count(encoded) <= window and query.startswith(encoded)
+    assert encoded, "the fitted query keeps as much of the original as the window holds"
+
+
+def test_overlong_query_records_no_diagnostic_failure(tmp_path):
+    """The diagnostic store holds faults, and an over-long query is not one.
+
+    Request traffic would otherwise fill a fixed disk allotment with records of
+    ordinary input and push genuine faults out of it.
+    """
+    service, _, _ = setup(tmp_path, query_max_chars=4000)
+    query = "paraphrase stopcock " * (service.profile.encoder_max_tokens + 10)
+    asyncio.run(service.search(SearchRequest(query=query.strip())))
+    assert failure_rows(service) == []
+
+
+def test_query_within_the_encoder_window_is_encoded_whole(tmp_path):
+    service, _, _ = setup(tmp_path)
+    result = asyncio.run(service.search(SearchRequest(query="ZX-42 stopcock")))
+    assert service.dense.queries[-1] == "ZX-42 stopcock"
+    assert "dense_query_truncated" not in result["degradation"]
 
 
 def test_lexical_failure_never_returns_dense_only(tmp_path, monkeypatch):
@@ -453,7 +506,7 @@ def test_repeated_identical_failure_folds_by_fingerprint(tmp_path):
     service.dense.fail = True
     for _ in range(16):
         result = asyncio.run(service.search(SearchRequest(query="ZX-42")))
-        assert result["degradation"] == ["dense_unavailable"], "overflow behaviour is unchanged"
+        assert result["degradation"] == ["dense_unavailable"], "recording never alters the response"
     rows = failure_rows(service)
     assert [row["count"] for row in rows] == [1, 2, 4, 8, 16]
     assert len({row["fingerprint"] for row in rows}) == 1

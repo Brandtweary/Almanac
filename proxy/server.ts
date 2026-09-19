@@ -9,6 +9,7 @@ import { config, validateProfile, type GatewayConfig, type ReleaseProfile } from
 import { AdmissionError, CompletionQueue } from "./queue";
 import { VoiceBroker, registerVoiceRoutes } from "./voice-broker";
 import { clientIp, createLimiters, WINDOW_MS, type RouteName } from "./rate-limit";
+import { Subscribers } from "./subscribers";
 
 export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch = fetch, providedProfile?: ReleaseProfile) {
   if (cfg.qualificationMode && cfg.qualificationBoundary && cfg.qualificationBoundary !== "isolated-container") throw new Error("invalid qualification boundary declaration");
@@ -170,6 +171,26 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
       log({id, stage: "completion", status: "failed", code: err.code});
       return c.json({error: {code: err.code, message: err.code}, request_id: id}, err.status as 503);
     }
+  });
+  // An address left on the About page. The shape check bounds what is stored and
+  // rejects obvious nonsense; deliverability is not established here and no mail
+  // is ever sent from this process. The store is opened when the gateway starts,
+  // so a path that cannot be written reports itself before a visitor's address
+  // depends on it.
+  const SIGNUP_MAX_CHARS = 254;
+  const SIGNUP_ADDRESS = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  let subscribers: Subscribers | null = null;
+  try { subscribers = new Subscribers(cfg.subscriberDb); }
+  catch (error) { log({stage: "signup_store", status: "failed", error: error instanceof Error ? error.name : "unknown"}); }
+  app.post("/v1/signup", limit("signup"), async c => {
+    if (!subscribers) return c.json({error: {code: "signup_unavailable"}}, 503);
+    const body = await c.req.json().catch(() => null);
+    const email = body && typeof body === "object" && typeof (body as {email?: unknown}).email === "string"
+      ? (body as {email: string}).email.trim().toLowerCase() : "";
+    if (!email || email.length > SIGNUP_MAX_CHARS || !SIGNUP_ADDRESS.test(email)) return c.json({error: {code: "invalid_request"}}, 400);
+    try { subscribers.add(email, clientIp(c, cfg.trustedProxies)); }
+    catch (error) { log({stage: "signup", status: "failed", error: error instanceof Error ? error.name : "unknown"}); return c.json({error: {code: "signup_unavailable"}}, 503); }
+    return c.json({ok: true});
   });
   app.get("/v1/web-search", limit("webSearch"), async c => {
     const q = c.req.query("q")?.trim();

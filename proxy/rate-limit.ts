@@ -22,6 +22,9 @@ export const ROUTE_LIMITS = {
 	phonemize: 120,
 	speech: 20,
 	voice: 60,
+	// A form submitted by hand, so the window is sized for a visitor correcting
+	// a typo rather than for any rate of legitimate traffic.
+	signup: 5,
 } as const;
 export type RouteName = keyof typeof ROUTE_LIMITS;
 

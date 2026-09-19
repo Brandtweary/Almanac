@@ -2,7 +2,7 @@ import {test, expect} from "bun:test";
 import {createGateway} from "./server";
 import {config, type ReleaseProfile} from "./config";
 const profile: ReleaseProfile = {id:"fixture", qualified:true, receipts:["fixture"], model:{id:"fixture",name:"Fixture",contextWindow:4096,maxTokens:512,reasoning:false,input:["text"],artifactDigest:"a".repeat(64),tokenizerDigest:"b".repeat(64),templateDigest:"c".repeat(64),parser:"llama.cpp",quantization:"fixture"}, roles:Object.fromEntries(["chat","audit","memory","summary","compaction"].map(x=>[x,{maxInputTokens:3000,maxOutputTokens:256,maxStageOutputTokens:1024}])),limits:{queueCapacity:4,queueTimeoutMs:1000,executionTimeoutMs:1000,maxRequestBytes:10000,backgroundMaxTokens:256,speechConcurrency:1,speechTimeoutMs:1000,speechMaxBytes:10000}};
-const cfg = {...config, profilePath:"", llmBase:"http://model.invalid",logPath:"/dev/null"};
+const cfg = {...config, profilePath:"", llmBase:"http://model.invalid",logPath:"/dev/null", subscriberDb:":memory:"};
 function mock(ready=true) { return (async (url: string | URL | Request) => {
  const path=String(url); if(path.endsWith("/capabilities")) return Response.json({ready, qualified:true});
  if(path.endsWith("/health")) return Response.json({status:"ok"});

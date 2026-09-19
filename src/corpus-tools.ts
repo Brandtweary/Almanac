@@ -1,7 +1,7 @@
 import { marked } from "marked";
 import type { AgentTool, AgentMessage } from "@earendil-works/pi-agent-core";
 import { Type } from "typebox";
-import { MYRIAPOD_PROXY_BASE } from "./myriapod-model.js";
+import { GATEWAY_BASE } from "./local-model.js";
 
 export interface SourceEvidence {
 	passage_id: string; document_id: string; source_revision: string; extraction_revision: string;
@@ -28,7 +28,7 @@ export class EvidenceLedger {
 		for (const p of passages) {
 			const prior = this.entries.get(p.passage_id);
 			if (prior && (prior.document_id !== p.document_id || prior.source_revision !== p.source_revision || prior.extraction_revision !== p.extraction_revision)) throw new Error("Source identity changed for an immutable handle");
-			this.entries.set(p.passage_id, { passage_id: p.passage_id, document_id: p.document_id, source_revision: p.source_revision, extraction_revision: p.extraction_revision, title: p.title, source_url: `${MYRIAPOD_PROXY_BASE}/corpus/source/${encodeURIComponent(p.passage_id)}` });
+			this.entries.set(p.passage_id, { passage_id: p.passage_id, document_id: p.document_id, source_revision: p.source_revision, extraction_revision: p.extraction_revision, title: p.title, source_url: `${GATEWAY_BASE}/corpus/source/${encodeURIComponent(p.passage_id)}` });
 		}
 	}
 	records(): EvidenceRecord[] { return [...this.entries.values()]; }
@@ -36,7 +36,7 @@ export class EvidenceLedger {
 		for (const message of messages) {
 			if (message.role === "corpus-ledger") for (const entry of message.entries) {
 				if (entry && HANDLE.test(entry.passage_id) && typeof entry.title === "string" && typeof entry.document_id === "string" && typeof entry.source_revision === "string" && typeof entry.extraction_revision === "string") {
-					this.entries.set(entry.passage_id, { ...entry, source_url: `${MYRIAPOD_PROXY_BASE}/corpus/source/${encodeURIComponent(entry.passage_id)}` });
+					this.entries.set(entry.passage_id, { ...entry, source_url: `${GATEWAY_BASE}/corpus/source/${encodeURIComponent(entry.passage_id)}` });
 				}
 			}
 			if (message.role === "toolResult" && (message.toolName === "corpus_search" || message.toolName === "corpus_read") && !message.isError) {
@@ -56,7 +56,7 @@ export function resolveCorpusCitation(href: string, ledger: EvidenceLedger, orig
 	else {
 		try {
 			const url = new URL(href, origin);
-			const prefix = new URL(`${MYRIAPOD_PROXY_BASE}/corpus/source/`, origin);
+			const prefix = new URL(`${GATEWAY_BASE}/corpus/source/`, origin);
 			if (url.origin === prefix.origin && url.pathname.startsWith(prefix.pathname)) {
 				const raw = url.pathname.slice(prefix.pathname.length);
 				try { handle = decodeURIComponent(raw); } catch { return { kind: "unknown", handle: raw }; }
@@ -92,7 +92,7 @@ export function inspectCorpusCitations(text: string, ledger: EvidenceLedger, ori
 }
 
 async function corpusRequest(kind: "search" | "read", params: unknown, ledger: EvidenceLedger, signal?: AbortSignal) {
-	const response = await fetch(`${MYRIAPOD_PROXY_BASE}/corpus/${kind}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(params), signal });
+	const response = await fetch(`${GATEWAY_BASE}/corpus/${kind}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(params), signal });
 	if (!response.ok) throw new Error(`Corpus ${kind} failed (HTTP ${response.status}): ${await response.text()}`);
 	const data = await response.json();
 	const passages = kind === "search" ? data.hits : data.passages;

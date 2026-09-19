@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import ts from "typescript";
 import { EvidenceLedger, resolveCorpusCitation, validateEvidence } from "../src/corpus-tools.js";
-import { MYRIAPOD_PROXY_BASE } from "../src/myriapod-model.js";
+import { GATEWAY_BASE } from "../src/local-model.js";
 
 const source = ts.createSourceFile("main.ts", readFileSync(new URL("../src/main.ts", import.meta.url), "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 
@@ -71,14 +71,14 @@ const context: Record<string, unknown> = {
 	chatPanel: { querySelectorAll: () => anchors },
 	evidenceLedger, resolveCorpusCitation, URL,
 	window: { location: { origin: "http://localhost" } },
-	MYRIAPOD_PROXY_BASE,
+	GATEWAY_BASE,
 };
 const program = `${declaration("SAFE_HREF_SCHEME")}\n${declaration("sanitizeChatAnchors")}\nglobalThis.run = sanitizeChatAnchors;`;
 vm.runInNewContext(ts.transpileModule(program, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText, context);
 (context.run as () => void)();
 
 const [known, invented, script, external] = anchors;
-assert.equal(known.href, new URL(`${MYRIAPOD_PROXY_BASE}/corpus/source/${encodeURIComponent(passage)}`, "http://localhost").href);
+assert.equal(known.href, new URL(`${GATEWAY_BASE}/corpus/source/${encodeURIComponent(passage)}`, "http://localhost").href);
 assert.equal(known.target, "_blank");
 assert.equal(known.rel, "noopener noreferrer");
 assert.equal(known.getAttribute("aria-invalid"), null);

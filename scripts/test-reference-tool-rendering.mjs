@@ -16,7 +16,7 @@ import '/src/pi-web-ui/components/Messages.ts';
 import {registerReferenceToolRenderers} from '/src/reference-tool-renderers.ts';
 import {registerWebToolRenderer} from '/src/web-tools.ts';
 registerWebToolRenderer();
-const qualificationMode=true;const migrateLocalAccess=async()=>{};const loadReleaseProfile=async()=>{};const proxyChatModel=()=>({id:'fixture'});const MYRIAPOD_PROXY_BASE='/v1';
+const qualificationMode=true;const migrateLocalAccess=async()=>{};const loadReleaseProfile=async()=>{};const proxyChatModel=()=>({id:'fixture'});const GATEWAY_BASE='/v1';
 ${servingJs}
 await resolveServingPath();${registration}
 const fixtures=[

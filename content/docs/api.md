@@ -48,6 +48,11 @@ index/profile readiness failures 503. Lexical failure blocks search. Dense failu
 lexical results `degraded`; reranker failure labels fused results `degraded`. A source checksum
 failure never serves different bytes under an old handle.
 
+A query longer than the sentence encoder's window is accepted, not rejected: the dense branch
+encodes the leading portion that fits and the results carry `dense_query_truncated`, so a narrower
+dense contribution is visible rather than reported as full coverage. The lexical branch searches the
+whole query, and indexed passages are never truncated.
+
 The server logs generated request IDs, methods, statuses and durations, excluding queries,
 conversation text and memory. A failing retrieval stage additionally records its stage, exception
 type and traceback frames — never query-bearing text — to `failures.jsonl`, which rotates within the

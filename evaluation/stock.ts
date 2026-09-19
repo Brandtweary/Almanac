@@ -6,7 +6,7 @@ import {AsyncLocalStorage} from "node:async_hooks";
 import {createHash} from "node:crypto";
 import {runAgentLoop,type AgentMessage,type AgentTool,type StreamFn} from "@earendil-works/pi-agent-core";
 import type {Model,ThinkingLevel} from "@earendil-works/pi-ai";
-import {MYRIAPOD_PROXY_BASE} from "../src/myriapod-model.ts";
+import {GATEWAY_BASE} from "../src/local-model.ts";
 import {streamSimple} from "../src/pi-ai-slim-compat.ts";
 import {buildOraclePrompt} from "../src/oracle-prompts.ts";
 import {ConversationHistory,createConversationHistoryTool} from "../src/conversation-history.ts";
@@ -36,7 +36,7 @@ export function installFixtureTransport(){
  if(installed)return;installed=true;
  globalThis.fetch=async(input,init)=>{
   const url=typeof input==="string"?input:input instanceof URL?input.href:input.url;
-  if(url.startsWith(`${MYRIAPOD_PROXY_BASE}/corpus/`)){
+  if(url.startsWith(`${GATEWAY_BASE}/corpus/`)){
    const library=libraries.getStore()?.library;if(!library)throw new Error("No scenario library context");
    const kind=url.split("/").at(-1);
    if(kind!=="search"&&kind!=="read")return new Response("not found",{status:404});

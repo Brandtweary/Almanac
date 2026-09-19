@@ -2,8 +2,8 @@ import type { Model, ThinkingLevel } from "@earendil-works/pi-ai";
 import { appPath, absoluteServiceUrl } from "./app-paths.js";
 
 const ENV = (import.meta.env ?? {}) as Record<string, string | undefined>;
-export const MYRIAPOD_PROXY_BASE = absoluteServiceUrl(ENV.VITE_PROXY_BASE ?? appPath("v1"));
-export const MYRIAPOD_PROXY_PROVIDER = "local-oracle";
+export const GATEWAY_BASE = absoluteServiceUrl(ENV.VITE_PROXY_BASE ?? appPath("v1"));
+export const GATEWAY_PROVIDER = "local-oracle";
 export type OracleRole = "chat" | "audit" | "memory" | "summary" | "compaction";
 export interface RoleBudget { maxInputTokens: number; maxOutputTokens: number; maxStageOutputTokens?: number; thinkingLevel?: ThinkingLevel }
 export interface ReleaseProfile {
@@ -14,12 +14,12 @@ export interface ReleaseProfile {
 }
 let profile: ReleaseProfile | undefined;
 export let qualificationMode = false;
-export let MYRIAPOD_MODEL_ID = "unconfigured";
-export let MYRIAPOD_REASONING_EFFORT: string | undefined;
-export let MYRIAPOD_THINKING_LEVEL: ThinkingLevel | "off" = "off";
-export let MYRIAPOD_MODEL: Model<"openai-completions"> = {
-	id: "unconfigured", name: "Local model unavailable", api: "openai-completions", provider: MYRIAPOD_PROXY_PROVIDER,
-	baseUrl: MYRIAPOD_PROXY_BASE, reasoning: false, input: ["text"],
+export let LOCAL_MODEL_ID = "unconfigured";
+export let LOCAL_REASONING_EFFORT: string | undefined;
+export let LOCAL_THINKING_LEVEL: ThinkingLevel | "off" = "off";
+export let LOCAL_MODEL: Model<"openai-completions"> = {
+	id: "unconfigured", name: "Local model unavailable", api: "openai-completions", provider: GATEWAY_PROVIDER,
+	baseUrl: GATEWAY_BASE, reasoning: false, input: ["text"],
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 0, maxTokens: 0,
 };
 export function releaseProfile(): ReleaseProfile {
@@ -48,15 +48,15 @@ export function validateProfile(value: unknown): ReleaseProfile {
 	return p;
 }
 export async function loadReleaseProfile(): Promise<void> {
-	const res = await fetch(`${MYRIAPOD_PROXY_BASE}/profile`, { signal: AbortSignal.timeout(10000) });
+	const res = await fetch(`${GATEWAY_BASE}/profile`, { signal: AbortSignal.timeout(10000) });
 	if (!res.ok) throw new Error(`Local runtime unavailable (HTTP ${res.status})`);
 	const data = await res.json();
 	qualificationMode = data.qualificationMode === true;
 	if (!data.ready && !qualificationMode) throw new Error(`Local oracle is not ready: ${data.status ?? "missing corpus or release profile"}`);
 	profile = validateProfile(data.profile);
-	MYRIAPOD_MODEL_ID = profile.model.id;
-	MYRIAPOD_REASONING_EFFORT = profile.model.reasoningEffort;
-	MYRIAPOD_THINKING_LEVEL = profile.roles.chat.thinkingLevel ?? "off";
-	MYRIAPOD_MODEL = { ...MYRIAPOD_MODEL, ...profile.model, maxTokens: profile.roles.chat.maxOutputTokens };
+	LOCAL_MODEL_ID = profile.model.id;
+	LOCAL_REASONING_EFFORT = profile.model.reasoningEffort;
+	LOCAL_THINKING_LEVEL = profile.roles.chat.thinkingLevel ?? "off";
+	LOCAL_MODEL = { ...LOCAL_MODEL, ...profile.model, maxTokens: profile.roles.chat.maxOutputTokens };
 }
-export function proxyChatModel(): Model<"openai-completions"> { return { ...MYRIAPOD_MODEL }; }
+export function proxyChatModel(): Model<"openai-completions"> { return { ...LOCAL_MODEL }; }

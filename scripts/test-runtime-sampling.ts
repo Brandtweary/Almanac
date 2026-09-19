@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { admitPayload } from "../src/oracle-runtime.ts";
-import { loadReleaseProfile, validateProfile } from "../src/myriapod-model.ts";
+import { loadReleaseProfile, validateProfile } from "../src/local-model.ts";
 const profile={id:"sampling-fixture",model:{id:"fixture",name:"Fixture",contextWindow:8192,maxTokens:256,reasoning:true,input:["text"],sampling:{temperature:1,top_p:.95,top_k:64}},roles:Object.fromEntries(["chat","audit","memory","summary","compaction"].map(role=>[role,{maxInputTokens:7936,maxOutputTokens:256,maxStageOutputTokens:1024}])),limits:{queueTimeoutMs:1000,executionTimeoutMs:1000}};
 test("candidate sampling and output normalization precede exact measurement for every role",async()=>{
  const original=globalThis.fetch;const counts:any[]=[];

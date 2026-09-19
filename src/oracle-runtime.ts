@@ -1,13 +1,13 @@
 import type { StreamFn } from "@earendil-works/pi-agent-core";
 import { streamSimple } from "./pi-ai-slim-compat.js";
-import { MYRIAPOD_MODEL, MYRIAPOD_PROXY_BASE, releaseProfile, type OracleRole } from "./myriapod-model.js";
+import { LOCAL_MODEL, GATEWAY_BASE, releaseProfile, type OracleRole } from "./local-model.js";
 
 export interface RequestState { id: string; state: string; position?: number; role: OracleRole }
 const listeners = new Set<(state: RequestState) => void>();
 export function subscribeRequests(fn: (state: RequestState) => void): () => void { listeners.add(fn); return () => listeners.delete(fn); }
 function emit(state: RequestState): void { for (const fn of listeners) fn(state); }
 export async function countRequestTokens(payload: unknown, role: OracleRole, signal?: AbortSignal): Promise<number> {
-	const response = await fetch(`${MYRIAPOD_PROXY_BASE}/tokenize`, {
+	const response = await fetch(`${GATEWAY_BASE}/tokenize`, {
 		method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...(payload as object), role }), signal,
 	});
 	if (!response.ok) throw new Error(`Context measurement unavailable (HTTP ${response.status}); request was not sent`);
@@ -30,7 +30,7 @@ export async function admitPayload(payload: unknown, role: OracleRole, signal?: 
 export function beginRequest(role: OracleRole, conversationId: string, signal?: AbortSignal) {
 	signal?.throwIfAborted();
 	const id = crypto.randomUUID();
-	const endpoint = `${MYRIAPOD_PROXY_BASE}/requests/${id}`;
+	const endpoint = `${GATEWAY_BASE}/requests/${id}`;
 	let stopped = false;
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	const cancel = () => { void fetch(endpoint, { method: "DELETE", keepalive: true }).catch(() => {}); emit({ id, role, state: "interrupted" }); };
@@ -72,7 +72,7 @@ export function createLocalStreamFn(role: OracleRole, getConversationId: () => s
 /** Ask the installed provider serializer for its exact wire payload without sending it. */
 export async function serializeModelRequest(context: Parameters<StreamFn>[1], role: OracleRole = "chat"): Promise<unknown> {
 	let captured: unknown;
-	const stream = streamSimple(MYRIAPOD_MODEL, context, {
+	const stream = streamSimple(LOCAL_MODEL, context, {
 		apiKey: "local", reasoning: releaseProfile().roles[role].thinkingLevel, maxTokens: releaseProfile().roles[role].maxOutputTokens, maxRetries: 0,
 		onPayload(payload) { captured = payload; throw new Error("Local serialization capture"); },
 	});

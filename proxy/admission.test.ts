@@ -4,7 +4,7 @@ import {RateLimiter, ROUTE_LIMITS} from "./rate-limit";
 import {config, type ReleaseProfile} from "./config";
 
 const profile: ReleaseProfile = {id:"fixture", qualified:true, receipts:["fixture"], model:{id:"fixture",name:"Fixture",contextWindow:4096,maxTokens:512,reasoning:false,input:["text"],artifactDigest:"a".repeat(64),tokenizerDigest:"b".repeat(64),templateDigest:"c".repeat(64),parser:"llama.cpp",quantization:"fixture"}, roles:Object.fromEntries(["chat","audit","memory","summary","compaction"].map(x=>[x,{maxInputTokens:3000,maxOutputTokens:256,maxStageOutputTokens:1024}])),limits:{queueCapacity:4,queueTimeoutMs:1000,executionTimeoutMs:1000,maxRequestBytes:100000,backgroundMaxTokens:256,speechConcurrency:1,speechTimeoutMs:1000,speechMaxBytes:10000}};
-const cfg = {...config, profilePath:"", llmBase:"http://model.invalid", logPath:"/dev/null", ttsBase:"ws://speech.invalid/api/tts_streaming"};
+const cfg = {...config, profilePath:"", llmBase:"http://model.invalid", logPath:"/dev/null", subscriberDb:":memory:", ttsBase:"ws://speech.invalid/api/tts_streaming"};
 function mock(record?: {url: string, body: any}[]) {
   return (async (url: string | URL | Request, init?: RequestInit) => {
     const path = String(url);

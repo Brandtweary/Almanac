@@ -4,7 +4,7 @@ import { Graph } from "../src/kg/graph.js";
 import { RecallSession } from "../src/recall-session.js";
 import { ConversationHistory, createConversationHistoryTool, historyWithoutPersonalMemory } from "../src/conversation-history.js";
 import { createLocalStreamFn, serializeModelRequest, countRequestTokens } from "../src/oracle-runtime.js";
-import { loadReleaseProfile, proxyChatModel } from "../src/myriapod-model.js";
+import { loadReleaseProfile, proxyChatModel } from "../src/local-model.js";
 import { formatTranscript } from "../src/pipeline.js";
 
 const fetchOriginal = globalThis.fetch;

@@ -4,7 +4,7 @@ import { isDeepStrictEqual } from "node:util";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { StreamFn } from "@earendil-works/pi-agent-core";
 import { createLocalStreamFn, serializeModelRequest, countRequestTokens } from "../src/oracle-runtime.ts";
-import { loadReleaseProfile, proxyChatModel, releaseProfile, MYRIAPOD_PROXY_BASE, type OracleRole } from "../src/myriapod-model.ts";
+import { loadReleaseProfile, proxyChatModel, releaseProfile, GATEWAY_BASE, type OracleRole } from "../src/local-model.ts";
 import { objectDigest, type StockCase } from "./stock-cases.ts";
 import type { CandidateProfile } from "./stock.ts";
 
@@ -35,8 +35,8 @@ function install(gateway:string) {
  globalThis.fetch=async(input,init)=>{
   const request=input instanceof Request?input:undefined;
   const address=request?.url??String(input);
-  if(!address.startsWith(MYRIAPOD_PROXY_BASE+"/"))return network(input,init);
-  const target=base+address.slice(MYRIAPOD_PROXY_BASE.length);
+  if(!address.startsWith(GATEWAY_BASE+"/"))return network(input,init);
+  const target=base+address.slice(GATEWAY_BASE.length);
   const body=init?.body?JSON.parse(String(init.body)):request?.body?await request.clone().json():undefined;
   const trace=traces.getStore();const completion=address.endsWith("/chat/completions");
   const row:any=completion?{request:body}:undefined;

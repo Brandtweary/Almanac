@@ -97,9 +97,5 @@ Almanac's browser interface uses the vendored [pi-web-ui](./src/pi-web-ui/) and 
 through Pi's agent library. The application is [MIT licensed](./LICENSE); the vendored interface
 retains its [upstream MIT notice](./src/pi-web-ui/LICENSE).
 
-Some source filenames and browser storage keys keep a `myriapod` prefix from an earlier iteration of
-this repository. They are load-bearing identifiers: renaming a storage key discards the saved
-conversations and personal memory of an existing installation.
-
 Books, maps and model weights retain their own licenses and attribution requirements. The
 application's license does not grant redistribution rights to the contents of a library.

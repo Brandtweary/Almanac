@@ -1,7 +1,7 @@
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 import { EvidenceLedger, createCorpusTools, validateEvidence, resolveCorpusCitation } from "../src/corpus-tools.js";
-import { validateProfile, loadReleaseProfile, MYRIAPOD_PROXY_BASE } from "../src/myriapod-model.js";
+import { validateProfile, loadReleaseProfile, GATEWAY_BASE } from "../src/local-model.js";
 import { admitPayload, beginRequest, serializeModelRequest } from "../src/oracle-runtime.js";
 import { compactContext } from "../src/oracle-context.js";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
@@ -17,7 +17,7 @@ test("citation handles survive stored-ledger restoration and cannot become arbit
  const restored = new EvidenceLedger(); restored.restore([ledger.message()]);
  assert.equal(restored.resolve(id)?.document_id, "manual");
  assert.equal(restored.resolve("invented"), undefined);
- assert.equal(resolveCorpusCitation(`${MYRIAPOD_PROXY_BASE}/corpus/source/%ZZ`, restored, "http://localhost").kind, "unknown");
+ assert.equal(resolveCorpusCitation(`${GATEWAY_BASE}/corpus/source/%ZZ`, restored, "http://localhost").kind, "unknown");
  assert.throws(() => validateEvidence({ ...source, source: { ...source.source, url: "javascript:alert(1)" } }), /source link/);
  assert.throws(() => validateEvidence({ ...source, source_revision: "different-edition" }), /evidence/);
 });
@@ -104,10 +104,10 @@ test("non-streaming completions reject unknown usage before publishing accountin
 
 test("exhausted stage budget stops before any provider or tokenizer request", async () => {
  const { createLocalStreamFn } = await import("../src/oracle-runtime.js");
- const { MYRIAPOD_MODEL } = await import("../src/myriapod-model.js");
+ const { LOCAL_MODEL } = await import("../src/local-model.js");
  let calls = 0;
  globalThis.fetch = async () => { calls++; throw new Error("No network call is permitted after exhaustion"); };
- await assert.rejects(createLocalStreamFn("memory", () => "session", () => 0)(MYRIAPOD_MODEL, { messages: [] }), /budget exhausted/);
+ await assert.rejects(createLocalStreamFn("memory", () => "session", () => 0)(LOCAL_MODEL, { messages: [] }), /budget exhausted/);
  assert.equal(calls, 0);
 });
 

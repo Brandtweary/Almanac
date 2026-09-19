@@ -1,6 +1,6 @@
 import { validatedTokenUsage } from "../token-usage.js";
 import { admitPayload, beginRequest } from "../oracle-runtime.js";
-import { releaseProfile, type OracleRole } from "../myriapod-model.js";
+import { releaseProfile, type OracleRole } from "../local-model.js";
 // Shared machinery for the memory pipeline's LLM legs: the completion seam,
 // injected-context stripping, the existing-memory dump, and the thin-turn guard.
 // The agents themselves (prompts + tool loops) live in src/pipeline*.ts.

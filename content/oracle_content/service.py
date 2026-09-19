@@ -156,6 +156,33 @@ class Service:
             raise ContentError("profile_mismatch", "Active corpus uses a different release profile")
         return generation
 
+    def fit_dense_query(self, query):
+        """Fit a query to the sentence encoder's window, reporting whether it was cut.
+
+        The accepted query length is several times the encoder window, so a query
+        that overflows it is ordinary input rather than a fault: the dense branch
+        answers on the leading portion that fits and the result set carries
+        `dense_query_truncated`, which keeps a narrower dense contribution visible
+        instead of presenting it as full coverage. The lexical branch always sees
+        the whole query, and indexing never truncates — a shortened passage would
+        misrepresent what the corpus holds.
+
+        Returns the query to encode and whether anything was removed. The search
+        is over character prefixes because token counts are not additive: the
+        prefix and query tokenize together.
+        """
+        prefixed, window = self.profile.query_prefix + query, self.profile.encoder_max_tokens
+        if self.tokenizer.count(prefixed) <= window:
+            return query, False
+        low, high = 0, len(query)
+        while high - low > 1:
+            middle = (low + high) // 2
+            if self.tokenizer.count(self.profile.query_prefix + query[:middle]) <= window:
+                low = middle
+            else:
+                high = middle
+        return query[:low], True
+
     async def lexical(self, generation, query, document_id):
         native = self.store.native(generation)
         if native is not None:
@@ -246,14 +273,17 @@ class Service:
             raise ContentError("profile_mismatch", "Active corpus uses a different release profile")
         if document_id:
             self.store.document(generation, document_id)
+        dense_query, dense_truncated = self.fit_dense_query(query)
         lexical, dense = await asyncio.gather(self.lexical(generation, query, document_id),
-            self.dense.search(generation, query, document_id), return_exceptions=True)
+            self.dense.search(generation, dense_query, document_id), return_exceptions=True)
         if isinstance(lexical, BaseException):
             if isinstance(lexical, asyncio.CancelledError):
                 raise lexical
             self.record_failure("lexical", generation, lexical)
             raise ContentError("lexical_unavailable", "Lexical retrieval failed; search was not completed") from lexical
         degradation = []
+        if dense_truncated:
+            degradation.append("dense_query_truncated")
         if self.store.manifest(generation).get("kind") == "native-zim-article-v1" and self.store.manifest(generation).get("dense_stage") != "complete":
             degradation.append("dense_index_incomplete")
         if isinstance(dense, BaseException):

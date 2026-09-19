@@ -7,10 +7,10 @@ import { defineConfig, loadEnv, type Plugin } from "vite";
 // coding agent can read directly (no copy-paste from the console). The browser
 // side lives in src/debug.ts. Disabled automatically in production builds (the
 // middleware only registers on the dev server).
-const DEBUG_LOG_FILE = "/tmp/myriapod-debug.log";
+const DEBUG_LOG_FILE = "/tmp/almanac-debug.log";
 function debugLogPlugin(): Plugin {
 	return {
-		name: "myriapod-debug-log",
+		name: "almanac-debug-log",
 		configureServer(server) {
 			server.middlewares.use("/__log", (req, res) => {
 				if (req.method !== "POST") {
@@ -55,7 +55,7 @@ function cspPlugin(env: Record<string, string>): Plugin {
 		"object-src 'none'",
 	].join("; ");
 	return {
-		name: "myriapod-csp",
+		name: "almanac-csp",
 		apply: "build",
 		transformIndexHtml() {
 			return [

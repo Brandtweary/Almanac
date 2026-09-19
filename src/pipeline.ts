@@ -18,7 +18,7 @@ import { Graph } from "./kg/graph.js";
 import type { GraphAsset } from "./kg/types.js";
 import type { EmbedFn } from "./kg/embed.js";
 import type { makeCompletion } from "./kg/ingest.js";
-import { releaseProfile } from "./myriapod-model.js";
+import { releaseProfile } from "./local-model.js";
 import { createLocalStreamFn, serializeModelRequest, countRequestTokens } from "./oracle-runtime.js";
 import { createPipelineTools, type ReviewFlag } from "./pipeline-tools.js";
 import type { PhonemizeFn } from "./stt-phonemize.js";

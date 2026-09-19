@@ -119,7 +119,7 @@ export class VoiceController {
 		try {
 			await this.seam.onStart?.(this.stream);
 		} catch (err) {
-			console.error("[myriapod] voice onStart seam threw", err);
+			console.error("[almanac] voice onStart seam threw", err);
 			if (generation === this.generation) this.cancel();
 		}
 	}

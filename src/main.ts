@@ -39,16 +39,16 @@ import { getTranslations, icon, setTranslations } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import {
-	MYRIAPOD_MODEL,
-	MYRIAPOD_MODEL_ID,
-	MYRIAPOD_PROXY_BASE,
-	MYRIAPOD_PROXY_PROVIDER,
-	MYRIAPOD_REASONING_EFFORT,
-	MYRIAPOD_THINKING_LEVEL,
+	LOCAL_MODEL,
+	LOCAL_MODEL_ID,
+	GATEWAY_BASE,
+	GATEWAY_PROVIDER,
+	LOCAL_REASONING_EFFORT,
+	LOCAL_THINKING_LEVEL,
 	proxyChatModel,
 	loadReleaseProfile,
 	releaseProfile,
-} from "./myriapod-model.js";
+} from "./local-model.js";
 import readmeDoc from "../README.md?raw";
 import aboutDoc from "../about-almanac.md?raw";
 import { MemoryTab } from "./settings.js";
@@ -150,14 +150,15 @@ setAppStorage(storage);
 
 // The local gateway is the sole serving path. Legacy credentials are deleted by
 // key, without reading their values; saved chats and personal memory stay intact.
-const MYRIAPOD_PROXY_ORIGIN = MYRIAPOD_PROXY_BASE.replace(/\/v1\/?$/, "");
+const GATEWAY_ORIGIN = GATEWAY_BASE.replace(/\/v1\/?$/, "");
 async function migrateLocalAccess(): Promise<void> {
 	for (const key of ["openrouter", "myriapod-family", "myriapod-anon", "myriapod"]) await providerKeys.delete(key);
 }
 // The gateway's web-search endpoint, alongside its other /v1 routes
 // (/v1/chat/completions etc.). Same origin, no credential.
-const WEB_SEARCH_ENDPOINT = `${MYRIAPOD_PROXY_ORIGIN}/v1/web-search`;
-const EMBED_ENDPOINT = `${MYRIAPOD_PROXY_ORIGIN}/v1/embed`;
+const WEB_SEARCH_ENDPOINT = `${GATEWAY_ORIGIN}/v1/web-search`;
+const SIGNUP_ENDPOINT = `${GATEWAY_ORIGIN}/v1/signup`;
+const EMBED_ENDPOINT = `${GATEWAY_ORIGIN}/v1/embed`;
 
 // Voice-concurrency broker (OFF by default). When VITE_VOICE_BROKER is unset the
 // voice path makes no lease calls, and SttClient/KyutaiTtsSynthesizer are built with
@@ -167,16 +168,16 @@ const EMBED_ENDPOINT = `${MYRIAPOD_PROXY_ORIGIN}/v1/embed`;
 // live at the proxy ORIGIN (same as web-search), so the build-time CSP is untouched.
 const VOICE_BROKER_ENABLED =
 	import.meta.env.VITE_VOICE_BROKER === "1" || import.meta.env.VITE_VOICE_BROKER === "true";
-const VOICE_LEASE_ENDPOINT = `${MYRIAPOD_PROXY_ORIGIN}/voice/lease`;
-const VOICE_HEARTBEAT_ENDPOINT = `${MYRIAPOD_PROXY_ORIGIN}/voice/heartbeat`;
-const VOICE_RELEASE_ENDPOINT = `${MYRIAPOD_PROXY_ORIGIN}/voice/release`;
+const VOICE_LEASE_ENDPOINT = `${GATEWAY_ORIGIN}/voice/lease`;
+const VOICE_HEARTBEAT_ENDPOINT = `${GATEWAY_ORIGIN}/voice/heartbeat`;
+const VOICE_RELEASE_ENDPOINT = `${GATEWAY_ORIGIN}/voice/release`;
 
 type ServingPath = { model: Model<"openai-completions">; baseUrl: string; auth: string };
 let servingPath: ServingPath;
 async function resolveServingPath(): Promise<ServingPath> {
 	await migrateLocalAccess();
 	await loadReleaseProfile();
-	return { model: proxyChatModel(), baseUrl: MYRIAPOD_PROXY_BASE, auth: "" };
+	return { model: proxyChatModel(), baseUrl: GATEWAY_BASE, auth: "" };
 }
 const openSettings = async () => {
 	SettingsDialog.open([new MemoryTab({
@@ -281,6 +282,8 @@ let voiceLease: { leaseId: string; ttsUrl: string } | null = null;
 let voiceHeartbeatTimer: ReturnType<typeof setInterval> | null = null;
 // Persistent "speak-but-don't-listen" mute (double-click the stop-audio button),
 // remembered per browser. When set, the speaker is never opened on message_start.
+// The key string is fixed by installations already storing it; a different name
+// reads as an absent preference and silently resets it.
 const TTS_MUTE_KEY = "myriapod:tts-muted";
 let ttsMuted = localStorage.getItem(TTS_MUTE_KEY) === "1";
 
@@ -587,7 +590,7 @@ async function ensureMemoryConsent(): Promise<void> {
 function addIngestionCostToSession(promptTokens: number, completionTokens: number, sessionKey: string): void {
 	const owner = sessionAgents.get(sessionKey);
 	if (!owner) return;
-	const c = MYRIAPOD_MODEL.cost;
+	const c = LOCAL_MODEL.cost;
 	const inCost = (promptTokens / 1_000_000) * c.input;
 	const outCost = (completionTokens / 1_000_000) * c.output;
 	type Usage = {
@@ -869,7 +872,7 @@ const createAgent = async (initialState?: Partial<AgentState>, savedHistory?: Co
 	if (creation !== agentCreation) return;
 	servingPath = resolvedPath;
 	const baseState: Partial<AgentState> = initialState ?? {
-		thinkingLevel: MYRIAPOD_THINKING_LEVEL,
+		thinkingLevel: LOCAL_THINKING_LEVEL,
 		messages: [],
 		tools: [],
 	};
@@ -1135,7 +1138,7 @@ const createAgent = async (initialState?: Partial<AgentState>, savedHistory?: Co
 
 	await chatPanel.setAgent(agent, {
 		onApiKeyRequired: async (provider: string) => {
-			if (provider === MYRIAPOD_PROXY_PROVIDER) return true;
+			if (provider === GATEWAY_PROVIDER) return true;
 			return false;
 		},
 		toolsFactory: () => [],
@@ -1182,8 +1185,8 @@ const loadSession = async (sessionId: string): Promise<boolean> => {
 		currentTitle = metadata?.title || "";
 
 		await createAgent({
-			model: MYRIAPOD_MODEL,
-			thinkingLevel: MYRIAPOD_THINKING_LEVEL,
+			model: LOCAL_MODEL,
+			thinkingLevel: LOCAL_THINKING_LEVEL,
 			messages: sessionData.messages,
 			tools: [],
 		}, sessionData.rawHistory, sessionData.revision ?? 0);
@@ -1237,6 +1240,42 @@ const setView = (view: "chat" | "about") => {
 	renderHeader();
 };
 
+// The About page's email sign-up. The address goes to the gateway and nowhere
+// else; the inline status text is written imperatively so the view keeps no
+// reactive state of its own.
+async function handleSignup(event: Event): Promise<void> {
+	event.preventDefault();
+	const form = event.currentTarget as HTMLFormElement;
+	const input = form.querySelector<HTMLInputElement>(".cw-signup-input");
+	const status = form.querySelector<HTMLElement>(".cw-signup-status");
+	const button = form.querySelector<HTMLButtonElement>(".cw-signup-btn");
+	if (!input || !status || !button) return;
+	const email = input.value.trim();
+	if (!email) return;
+	button.disabled = true;
+	status.textContent = "…";
+	try {
+		const response = await fetch(SIGNUP_ENDPOINT, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ email }),
+		});
+		if (response.ok) {
+			status.textContent = "Saved.";
+			input.value = "";
+			return;
+		}
+		status.textContent = response.status === 429
+			? "Too many attempts — try again in a minute."
+			: response.status === 400
+				? "That address doesn't look right."
+				: "Couldn't save it just now.";
+	} catch {
+		status.textContent = "Couldn't reach the server.";
+	}
+	button.disabled = false;
+}
+
 const renderAbout = () => html`
 	<div class="flex-1 overflow-y-auto">
 		<div class="cw-about max-w-2xl mx-auto">
@@ -1246,6 +1285,20 @@ const renderAbout = () => html`
 					'<a target="_blank" rel="noreferrer" href="$1',
 				),
 			)}
+			<form class="cw-signup" @submit=${handleSignup}>
+				<label class="cw-signup-label" for="cw-signup-email">Email sign-up</label>
+				<input
+					id="cw-signup-email"
+					class="cw-signup-input"
+					type="email"
+					name="email"
+					required
+					placeholder="you@example.com"
+					aria-label="Email address"
+				/>
+				<button class="cw-signup-btn" type="submit">Submit</button>
+				<span class="cw-signup-status" role="status" aria-live="polite"></span>
+			</form>
 		</div>
 	</div>
 `;
@@ -1848,7 +1901,7 @@ async function initApp() {
 			endpoint: EMBED_ENDPOINT,
 			getBearer: () => "",
 		}),
-		phonemize: makePhonemizeClient({ endpoint: `${MYRIAPOD_PROXY_BASE}/phonemize`, getBearer: () => "" }),
+		phonemize: makePhonemizeClient({ endpoint: `${GATEWAY_BASE}/phonemize`, getBearer: () => "" }),
 		getModel: () => servingPath.model,
 		getBaseUrl: () => servingPath.baseUrl,
 		getModelId: () => servingPath.model.id,

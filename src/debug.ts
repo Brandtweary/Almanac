@@ -1,6 +1,6 @@
 // Lightweight browser instrumentation. Every message logs to the devtools
-// console (prefixed `[myriapod]`, neon green) AND, in dev, ships to the Vite
-// dev server's /__log endpoint, which appends it to /tmp/myriapod-debug.log
+// console (prefixed `[almanac]`, neon green) AND, in dev, ships to the Vite
+// dev server's /__log endpoint, which appends it to /tmp/almanac-debug.log
 // so the coding agent can read it without copy-paste. See debugLogPlugin in
 // vite.config.ts. Disabled automatically in production builds.
 
@@ -41,17 +41,17 @@ function ship(level: string, args: unknown[]): void {
 
 export function dbg(...args: unknown[]): void {
 	if (!import.meta.env?.DEV) return;
-	ORIG.log("%c[myriapod]", STYLE, ...args);
+	ORIG.log("%c[almanac]", STYLE, ...args);
 	ship("LOG", args);
 }
 
 export function dbgWarn(...args: unknown[]): void {
-	ORIG.warn("%c[myriapod]", STYLE, ...args);
+	ORIG.warn("%c[almanac]", STYLE, ...args);
 	ship("WARN", args);
 }
 
 export function dbgError(...args: unknown[]): void {
-	ORIG.error("%c[myriapod]", STYLE, ...args);
+	ORIG.error("%c[almanac]", STYLE, ...args);
 	ship("ERROR", args);
 }
 

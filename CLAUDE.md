@@ -11,14 +11,14 @@ Browser-local voice/text agent with optional personal memory and a mandatory bac
 ## Architecture and documentation
 
 - `src/main.ts` owns the browser lifecycle, Pi agent, sessions, consent, prompt and voice wiring; `docs/browser-oracle.md` describes its serving and context contracts.
-- `src/myriapod-model.ts` loads `/v1/profile`; `oracle-runtime.ts` shares role admission, exact request-token counting, queue status and cancellation across callers.
+- `src/local-model.ts` loads `/v1/profile`; `oracle-runtime.ts` shares role admission, exact request-token counting, queue status and cancellation across callers.
 - `src/corpus-tools.ts` exposes search/read and immutable evidence handles; `oracle-context.ts` preserves evidence identity through bounded context and compaction.
 - `src/kg/` implements a term glossary, not a graph: labels, descriptions, aliases, literal matching, optional stemming and encoder-aware similarity.
 - `src/pipeline.ts`, `pipeline-tools.ts`, `memory-storage.ts`, `memory-archive.ts` and `memory-state.ts` own consent-gated personal-memory work and durable role evidence; `docs/memory-transactions.md` specifies durable stage coverage and atomic publication.
 - `src/stt.ts` uses batch Whisper HTTP transcription; `src/tts.ts` uses the Kyutai msgpack streaming protocol and local playback. Audio controls remain explicit, with typed chat independent of speech failures.
 - `speech/` provides the CPU Pocket TTS backend with public stock Alba, verified offline assets and cancellation-safe MessagePack streaming; its source recipe and attribution are in `speech/README.md`.
 - `src/pi-web-ui/` is the vendored Lit/Tailwind interface; the pinned Pi agent libraries provide the agent loop. `src/pi-ai-slim-compat.ts` limits browser provider imports.
-- `proxy/` contains the Bun/Hono gateway, one-active-completion queue and bounded speech forwarding; `proxy/README.md` describes routes and configuration.
+- `proxy/` contains the Bun/Hono gateway, one-active-completion queue and bounded speech forwarding; `proxy/README.md` describes routes and configuration. The About page's email sign-up writes to a SQLite file the gateway only ever appends to; no mail is sent and no route reads it back.
 - `content/` contains the Python corpus service, staged ingestion, immutable SQLite catalog, native ZIM lexical integration and persistent dense-index adapters.
 - `deploy/` contains the single setup entry, acquisition manifests and offline packaging; `docs/install.md` is the installation contract.
 - `evaluation/` separates retrieval, source reading, tool research and retained-role evaluation; hosted screening belongs only to developer evaluation.

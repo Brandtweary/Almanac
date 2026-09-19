@@ -105,7 +105,7 @@ const message = (text: string) => [{ role: "user", content: text, timestamp: 1 }
 {
   const original = globalThis.fetch;
   try {
-    const { loadReleaseProfile } = await import("../src/myriapod-model.js");
+    const { loadReleaseProfile } = await import("../src/local-model.js");
     const budget = { maxInputTokens: 100, maxOutputTokens: 50, maxStageOutputTokens: 500 };
     globalThis.fetch = async () => new Response(JSON.stringify({ ready: true, profile: {
       id: "fixture", model: { id: "fixture", name: "Fixture", contextWindow: 200, maxTokens: 50, reasoning: false, input: ["text"] },
