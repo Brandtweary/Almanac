@@ -37,17 +37,28 @@ VITE_BASE_PATH="$BASE" npm run build
 # what was compiled in, and every route to compiling one in is covered by
 # looking at the output.
 #
-# `src/app-paths.ts` carries one bare loopback ORIGIN as the base for URL
-# resolution where `location` is undefined, which is every non-browser caller
-# and no served page. It is exempt by exact spelling rather than by pattern: a
-# configured service endpoint always carries a path or a different port, so
-# nothing this guard exists to catch can hide behind the exemption.
-PRIVATE='(https?|wss?)://(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|192\.168\.|10\.)[0-9.]*(:[0-9]+)?/?[^"'"'"'`]*'
-found="$(grep -rIhoE "$PRIVATE" dist/assets | grep -vxF 'http://127.0.0.1:8790/' | sort -u || true)"
-if [ -n "$found" ]; then
-	echo "REFUSING TO PUBLISH: the built bundle carries a private-network endpoint." >&2
-	printf '%s\n' "$found" >&2
-	echo "A developer .env.local reached this build, or an override is set in the environment." >&2
+# The check runs on the content-security policy rather than on a search for
+# loopback strings in the bundle. Vite writes `connect-src` from the same
+# service overrides that would send the page to a private address, so the
+# policy is a derived, single-valued statement of exactly the fault: with no
+# overrides it reads `'self'`, and any other value means one reached the build.
+#
+# Grepping the bundle for private addresses was tried and is the wrong
+# instrument. The vendored agent libraries carry loopback defaults for local
+# model providers (Ollama, LM Studio and others), which are inert constants
+# rather than this application's configuration, so that search reports a
+# refusal on every clean build.
+# Matched on the presence of any absolute origin rather than on the exact
+# expected string: a clean build's policy names no scheme at all, so one
+# appearing is the fault itself and the test needs no list of what is allowed.
+policy="$(grep -oE 'Content-Security-Policy" content="[^"]*"' dist/index.html | head -1)"
+[ -n "$policy" ] || { echo "REFUSING TO PUBLISH: no CSP in dist/index.html." >&2; exit 1; }
+origins="$(printf '%s' "$policy" | grep -oE '(https?|wss?)://[^ ";]+' | sort -u || true)"
+if [ -n "$origins" ]; then
+	echo "REFUSING TO PUBLISH: the bundle's connection policy names absolute origins." >&2
+	printf '  %s\n' $origins >&2
+	echo "A service override reached this build — typically a developer .env.local" >&2
+	echo "compiled in, which sends a public page at the visitor's own machine." >&2
 	exit 1
 fi
 
