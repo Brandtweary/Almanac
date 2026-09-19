@@ -2,7 +2,7 @@
 
 *Local AI for self-reliance and homesteading.*
 
-This website is a free hosted demo of Almanac, so you can try the application before running it on your own hardware.
+This website is a free hosted demo of Almanac, so you can try the application before running it on your own hardware. The whole thing is open source, and the code is [on GitHub](https://github.com/Brandtweary/Almanac).
 
 Nearly everything you need to grow food, manage water, or fix a machine is already written down and freely available — just not in a form you can sift through with the problem in front of you and no expert to call. Almanac is an offline reference library with a local AI assistant on top, one that can talk you through a procedure by voice, the computer off to one side while your hands stay on the work. It is built for homesteads, preparedness, and off-grid communities.
 
