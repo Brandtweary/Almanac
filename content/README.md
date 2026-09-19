@@ -42,7 +42,18 @@ A native archive has no extracted text catalog, so lexical retrieval localizes e
 decoding, block-parsing and segmenting the whole article — interpreter-bound work that gains nothing
 from running searches at the same time. `CONTENT_LEXICAL_CONCURRENCY` (1) admits searches into that
 stage in arrival order, so the first is answered at one search's cost instead of every search
-returning at the cost of all of them.
+returning at the cost of all of them. A cancelled search does not release its admission: cancelling
+the coroutine awaiting a thread does not stop the thread, so the gate is released by the localization
+itself rather than by whoever was waiting on it.
+
+`tools/precompute_passages.py` moves that per-article work to a one-time pass over the archive,
+storing each article's extracted blocks, its segmentation spans and its semantic representative in
+`generations/<generation>/article-spans.sqlite`. Passage handles are unchanged: the build runs the
+same segmentation the query path runs, reconstructs passages from what it is about to store and
+refuses any article whose reconstruction is not identical field for field. The artifact is an
+optimization and never a definition — an article it does not cover, an interrupted build and an
+artifact bound to another generation all leave the original query-time path in place, and
+`coverage.native_archives[].precomputed_articles` reports how much of an archive it covers.
 Retrieval-stage failures record their stage and traceback to `failures.jsonl` under a fixed disk
 allotment: `CONTENT_FAILURE_LOG_MAX_BYTES` (64 MiB) covers the live file and one rotated predecessor
 together, so ordinary request traffic cannot grow the store without limit. A repeating identical

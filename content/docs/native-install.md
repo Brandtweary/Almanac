@@ -38,6 +38,33 @@ For Wikipedia use its exact acquired nopic SHA-256, `--pack-id wikipedia-en-nopi
 
 Run the same command to resume. A durable entry cursor advances only after successful vector upsert, so replay is idempotent. The active union retains unrelated archive/catalog packs; replacing one pack selects its new generation while historical handles remain readable. A partial replacement of a catalog containing several packs is refused rather than silently dropping its remaining packs.
 
+## Precompute article spans
+
+A prepared generation answers correctly before this step and slowly: the first search to touch an
+article decodes, block-parses and segments it. One pass over the archive stores that result beside
+the generation.
+
+```sh
+PYTHONPATH=. python tools/precompute_passages.py \
+  --data /srv/almanac/content-state --workers 16
+```
+
+Without `--generation` it covers every active native generation. Measured over uniformly sampled
+English Wikipedia articles, a build costs about 44 ms of one core per article — decode 3 ms, HTML
+parsing 32 ms, segmentation 9 ms — and stores about 2.8 KB, so an eight-million-article archive is
+roughly 24 GB and a few hours across sixteen workers. `--min-free-bytes` (8 GiB) stops the build and
+publishes what it reached rather than filling the filesystem.
+
+Run the same command to resume. The artifact is written under a building name and moved into place
+when the run ends, whether by completing, by the disk floor, by an error or by a signal; a resume
+moves a published artifact back under the building name first, so the live service never reads a file
+being written and loses the precompute for the duration of that resume. `article-spans.status.json`
+beside the artifact carries the run's own account of itself — cursor, stored articles, failures,
+rate, remaining estimate and terminal state — so a build that died is legible without the console it
+was started from. Partial coverage is safe by construction: an article the build never reached is
+segmented at query time the way every article was before. The service reads the artifact at startup,
+so a completed build is picked up by restarting it.
+
 ## Coverage and serving
 
 The data root contains `active.json`, immutable `originals/<sha256>` and `generations/<generation>/manifest.json`. Native generations keep a pinned tokenizer but no duplicate full-text catalog or extraction cache. Complete source reading and the native full-text branch become available before semantic indexing completes; every response discloses `dense_stage`, indexed count, entry cursor/population, source selection and the title/lead representation. Incomplete dense indexing is explicit degradation and cannot satisfy required qualified retrieval. Extraction v4 preserves superscript/subscript and supported mathematical notation and flags omitted unsupported math; explicit v3 dispatch retains historical native text, while unknown revisions fail instead of silently reinterpreting handles. Article vectors do not claim to semantically encode every later paragraph; full-body lexical discovery and original reading are independent capabilities.

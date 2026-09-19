@@ -107,8 +107,14 @@ export function inspectCorpusCitations(text: string, ledger: EvidenceLedger, ori
  *  corpus it reads as a broken deployment and is never retried or narrowed. */
 function corpusFailure(kind: string, status: number, body: string): string {
 	const code = /"code"\s*:\s*"([a-z_]+)"/.exec(body)?.[1] ?? "";
-	if (code === "corpus_timeout" || status === 504)
-		return `Corpus ${kind} exceeded its deadline. The library is installed and reachable; this query was too expensive to complete in time. Retry it, narrow it to fewer or more specific terms, or scope it to one document.`;
+	if (code === "corpus_timeout" || status === 504) {
+		// A read carries a document and at most a passage handle, so advice to
+		// use fewer or more specific terms names nothing it could act on.
+		const recovery = kind === "search"
+			? "Retry it, narrow it to fewer or more specific terms, or scope it to one document."
+			: "Retry it, or start from a specific passage handle instead of the whole document.";
+		return `Corpus ${kind} exceeded its deadline. The library is installed and reachable; this request was too expensive to complete in time. ${recovery}`;
+	}
 	if (code === "rate_limited") return `Corpus ${kind} was rate limited. Wait before searching again and make the next query count.`;
 	return `Corpus ${kind} failed (HTTP ${status}): ${body}`;
 }

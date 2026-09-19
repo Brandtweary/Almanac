@@ -23,6 +23,7 @@ from bs4 import BeautifulSoup
 
 from .extract import TokenCounter, html_blocks, segment, decode_zim_html, inline_content
 from .models import ContentError, Document, Passage, Profile, digest
+from .precompute import ArticleSpans, binding as spans_binding, rebuild as rebuild_passages
 from .store import atomic_json, HANDLE
 
 KIND = "native-zim-article-v1"
@@ -207,6 +208,9 @@ class NativeReader:
         self.document_cache = OrderedDict()
         self.cache_bytes = 0
         self.cache_lock = threading.RLock()
+        # Article spans computed once at ingest time. Absent, partial or bound to
+        # another generation, every path below falls back to computing them.
+        self.spans = ArticleSpans.open(store.directory(generation), spans_binding(self))
 
     def verify_original(self):
         stat = self.path.stat()
@@ -243,10 +247,18 @@ class NativeReader:
             raise ContentError("source_excluded", "Article has an unresolved contrary source-rights notice", 404)
         license = self.template.license
         if self.policy != "canonical-html":
-            allowed, _, explicit = selection(decode_zim_html(entry.get_item()), self.policy)
-            if not allowed:
-                raise ContentError("source_excluded", "Article is outside the declared source selection", 404)
-            license = explicit
+            # A selection policy reads the article's own page-data, which means
+            # parsing its whole DOM. An article present in the precomputed spans
+            # was admitted by this same policy under this same binding when they
+            # were built, and carries the license that admission resolved.
+            stored = self.spans.raw(index) if self.spans is not None else None
+            if stored is not None and stored[3] is not None:
+                license = stored[3]
+            else:
+                allowed, _, explicit = selection(decode_zim_html(entry.get_item()), self.policy)
+                if not allowed:
+                    raise ContentError("source_excluded", "Article is outside the declared source selection", 404)
+                license = explicit
         base = self.template.source_url.rstrip("/")
         host = urlsplit(base).netloc
         source_url = (urlsplit(base).scheme + "://" + quote(entry.path, safe="/()_'")) if host and entry.path.startswith(host + "/") else base + "/" + quote(entry.path, safe="/()_'")
@@ -264,6 +276,17 @@ class NativeReader:
         with self.cache_lock:
             return self._passages(document_id)
 
+    def segment_article(self, document, index, blocks=None):
+        """Segment one article and give its passages their span-addressed handles."""
+        rows = segment(document, self.blocks(index) if blocks is None else blocks,
+                       self.profile, self.tokenizer, self.generation)
+        for row in rows:
+            row.passage_id = span_handle(self.generation, index, row)
+        for ordinal, row in enumerate(rows):
+            row.previous = rows[ordinal - 1].passage_id if ordinal else None
+            row.next = rows[ordinal + 1].passage_id if ordinal + 1 < len(rows) else None
+        return rows
+
     def _passages(self, document_id):
         self.verify_original()
         if document_id in self.cache:
@@ -271,12 +294,12 @@ class NativeReader:
             return self.cache[document_id][0]
         document = self.document(document_id)
         index = int(document_id.rsplit("_", 1)[1])
-        rows = segment(document, self.blocks(index), self.profile, self.tokenizer, self.generation)
-        for row in rows:
-            row.passage_id = span_handle(self.generation, index, row)
-        for ordinal, row in enumerate(rows):
-            row.previous = rows[ordinal - 1].passage_id if ordinal else None
-            row.next = rows[ordinal + 1].passage_id if ordinal + 1 < len(rows) else None
+        stored = self.spans.raw(index) if self.spans is not None else None
+        if stored is None:
+            rows = self.segment_article(document, index)
+        else:
+            rows = rebuild_passages(document, self.generation, index, stored[0], stored[1],
+                                    self.profile, self.tokenizer)
         size = sum(len(row.model_dump_json().encode()) for row in rows)
         if size <= PASSAGE_CACHE_ENTRY_BYTES:
             while self.cache and (len(self.cache) >= PASSAGE_CACHE_DOCUMENTS
@@ -303,10 +326,22 @@ class NativeReader:
                 return row
         raise ContentError("unknown_passage", "Native passage identity or content does not match", 404)
 
-    def representative(self, index):
+    def representative(self, index, *, html=None, blocks=None, stored=True):
+        """The article's one indexed vector row, and what a dense-only hit resolves to.
+
+        A search resolves every dense candidate through here, so leaving it out
+        of the precompute would keep a whole-article decode and parse on the
+        query path for each one. `html` and `blocks` let the builder reuse work
+        it has already done; `stored=False` makes it recompute, which is how the
+        builder verifies what it is about to store.
+        """
+        if stored and self.spans is not None:
+            precomputed = self.spans.raw(index)
+            if precomputed is not None:
+                return precomputed[2]
         document = self.document(self.document_id(index))
         if self.representation == "title-lead-v1":
-            blocks = self.blocks(index)
+            blocks = self.blocks(index) if blocks is None else blocks
             if not blocks:
                 raise ValueError("Canonical article has no extracted text")
             lead = []
@@ -327,8 +362,9 @@ class NativeReader:
             row.passage_id = span_handle(self.generation, index, row)
             row.embedding_text = text[:width]
             return row
-        entry = self.entry(index)
-        lead, lead_flags = article_lead(decode_zim_html(entry.get_item()), self.profile.encoder_max_tokens * 16,
+        if html is None:
+            html = decode_zim_html(self.entry(index).get_item())
+        lead, lead_flags = article_lead(html, self.profile.encoder_max_tokens * 16,
             self.template.extraction_revision, with_flags=True)
         text = self.profile.document_prefix + document.title + "\n" + lead
         width = min(len(text), self.profile.encoder_max_tokens * 4)

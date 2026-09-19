@@ -196,7 +196,14 @@ class Store:
         for value in generations:
             manifest = self.manifest(value)
             if manifest.get("kind") == "native-zim-article-v1":
+                # Precompute coverage comes from the already-open reader, never a
+                # fresh artifact read: coverage is reported on every response.
+                try:
+                    spans = self.native(value).spans
+                except (ContentError, OSError, RuntimeError):
+                    spans = None
                 native.append({"generation": value, "pack_id": manifest["source"]["pack_id"],
+                    "precomputed_articles": None if spans is None else spans.articles,
                     "lexical": "native full text within declared source selection", "reader": "complete articles",
                     "dense_representation": manifest["dense_representation"], "dense_stage": manifest["dense_stage"],
                     "indexed_articles": manifest["indexed_articles"], "entry_cursor": manifest["entry_cursor"],

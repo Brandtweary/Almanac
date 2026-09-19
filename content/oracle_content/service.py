@@ -211,8 +211,29 @@ class Service:
         return gate
 
     async def lexical(self, generation, query, document_id):
-        async with self.lexical_gate():
-            return await self._lexical(generation, query, document_id)
+        # Localization runs in a thread, and cancelling the coroutine awaiting a
+        # thread does not stop the thread. Releasing the gate when this
+        # coroutine is cancelled — at the request deadline, or when a visitor
+        # closes the tab mid-search — would admit the next search alongside an
+        # orphan that still holds the interpreter and the reader's locks, which
+        # is exactly the interleaving the gate exists to prevent. So the gate is
+        # released by the work's own completion rather than by whoever waits on
+        # it, and a cancelled caller returns immediately while its orphan keeps
+        # its place in the queue.
+        gate = self.lexical_gate()
+        await gate.acquire()
+        work = asyncio.ensure_future(self._lexical(generation, query, document_id))
+
+        def completed(finished):
+            gate.release()
+            if not finished.cancelled():
+                # Retrieve it so an abandoned orphan's failure is not reported
+                # as an unhandled exception when it is garbage collected; the
+                # caller that is still waiting receives it through the shield.
+                finished.exception()
+
+        work.add_done_callback(completed)
+        return await asyncio.shield(work)
 
     async def _lexical(self, generation, query, document_id):
         native = self.store.native(generation)

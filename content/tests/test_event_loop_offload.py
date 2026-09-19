@@ -1,5 +1,6 @@
 """The service has one event loop, so its CPU/disk work must not sit on it."""
 import asyncio
+import contextlib
 import threading
 import time
 from contextlib import contextmanager
@@ -111,3 +112,43 @@ def test_concurrent_lexical_requests_queue_instead_of_interleaving():
 
     asyncio.run(exercise())
     assert peak == 1, f"{peak} localizations ran at once; concurrent searches share the interpreter"
+
+
+def test_a_cancelled_search_does_not_admit_the_next_one_beside_its_orphan():
+    """Cancelling the coroutine awaiting a thread does not stop the thread.
+
+    A search abandoned at its deadline, or by a visitor closing the tab, leaves
+    its localization running. If the gate is released by the waiter rather than
+    by the work, the next search is admitted alongside that orphan and the two
+    share the interpreter — the very interleaving the gate exists to prevent,
+    arriving exactly when the service is already behind.
+    """
+    service = Service.__new__(Service)
+    service.store = _Store()
+    service.zim = _Zim()
+    service.profile = SimpleNamespace(lexical_depth=5, rrf_k=60)
+
+    live, peak = 0, 0
+
+    def slow_localize(generation, path, hits, query, document_id):
+        nonlocal live, peak
+        live += 1
+        peak = max(peak, live)
+        time.sleep(0.3)
+        live -= 1
+        return []
+
+    service._localize_native_hits = slow_localize
+
+    async def exercise():
+        abandoned = asyncio.ensure_future(service.lexical("generation", "one", None))
+        await asyncio.sleep(0.1)
+        abandoned.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await abandoned
+        await service.lexical("generation", "two", None)
+
+    asyncio.run(exercise())
+    assert peak == 1, (
+        f"{peak} localizations ran at once; the gate was released by the cancelled "
+        "waiter rather than by the localization it was holding admission for")

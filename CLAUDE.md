@@ -20,7 +20,7 @@ Browser-local voice/text agent with optional personal memory and a mandatory bac
 - `speech/` provides the CPU Pocket TTS backend with public stock Alba, verified offline assets and cancellation-safe MessagePack streaming; its source recipe and attribution are in `speech/README.md`.
 - `src/pi-web-ui/` is the vendored Lit/Tailwind interface; the pinned Pi agent libraries provide the agent loop. `src/pi-ai-slim-compat.ts` limits browser provider imports.
 - `proxy/` contains the Bun/Hono gateway, one-active-completion queue and bounded speech forwarding; `proxy/README.md` describes routes and configuration. The About page's email sign-up writes to a SQLite file the gateway only ever appends to; no mail is sent and no route reads it back.
-- `content/` contains the Python corpus service, staged ingestion, immutable SQLite catalog, native ZIM lexical integration and persistent dense-index adapters.
+- `content/` contains the Python corpus service, staged ingestion, immutable SQLite catalog, native ZIM lexical integration and persistent dense-index adapters. A native generation's article blocks, segmentation spans and semantic representatives are precomputed once beside it rather than rebuilt per search; the artifact never defines a passage, so absent or partial coverage falls back to segmenting at query time.
 - `deploy/` contains the single setup entry, acquisition manifests and offline packaging; `docs/install.md` is the installation contract.
 - `evaluation/` separates retrieval, source reading, tool research and retained-role evaluation; hosted screening belongs only to developer evaluation.
 
