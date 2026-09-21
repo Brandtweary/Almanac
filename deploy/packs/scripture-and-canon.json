@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "id": "scripture-and-canon-source-v1",
-  "scope": "acquisition-only; indexing, component-rights and redistribution admission pending",
-  "index_workspace_bytes": 0,
+  "scope": "acquisition and dense-index floor; passage-span workspace, indexing, component-rights and redistribution admission pending",
+  "index_workspace_bytes": 6978270720,
   "runtime_workspace_bytes": 0,
   "image_store_bytes": 0,
   "artifacts": [
