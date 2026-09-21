@@ -54,9 +54,108 @@ def relative(value):
     return path
 
 
+RESERVATION_KEYS = ('index_workspace_bytes', 'runtime_workspace_bytes', 'image_store_bytes')
+
+# A footprint component is recomputed from its own declared inputs, so a hand-edited
+# byte count cannot drift away from the arithmetic the manifest claims produced it.
+FORMULAS = {
+    'entries-x-width': lambda i, _: i['entries'] * i['dimensions'] * i['bytes_per_dimension'],
+    'entries-x-bytes-each': lambda i, _: i['entries'] * i['bytes_each'],
+    'qdrant-hnsw-graph': lambda i, _: -(-i['entries'] * i['links_per_node'] * 2 * 4 * 12 // 10),
+    'qdrant-payload-disk': lambda i, _: -(-i['entries'] * i['payload_bytes'] * 15 // 10),
+    'fraction-of-components': lambda i, sized: -(-sum(sized[n] for n in i['components'])
+                                                 * i['numerator'] // i['denominator']),
+    # For state an install provably does not create, whose absence the basis explains
+    # rather than leaving as a bare zero nobody can interrogate.
+    'no-derived-state': lambda i, _: 0,
+}
+FORMULA_INPUTS = {
+    'entries-x-width': ('entries', 'dimensions', 'bytes_per_dimension'),
+    'entries-x-bytes-each': ('entries', 'bytes_each'),
+    'qdrant-hnsw-graph': ('entries', 'links_per_node'),
+    'qdrant-payload-disk': ('entries', 'payload_bytes'),
+    'fraction-of-components': ('components', 'numerator', 'denominator'),
+    'no-derived-state': (),
+}
+DERIVATIONS = ('exact', 'upstream-formula', 'measured-mean', 'unmeasured')
+
+
+def footprint_components(release, omitted=()):
+    """Size every quantified component, recomputing derived fractions over what remains.
+
+    A component named in `omitted` is one the operator has chosen not to install, so
+    it contributes nothing and is also absent from the sums a fraction is taken over.
+    """
+    sized, unquantified = {}, []
+    for component in release['footprint']['components']:
+        name = component['name']
+        if name in omitted:
+            continue
+        if component['derivation'] == 'unmeasured':
+            unquantified.append(name)
+            continue
+        inputs = component['inputs']
+        if component['formula'] == 'fraction-of-components':
+            inputs = {**inputs, 'components': [n for n in inputs['components'] if n not in omitted]}
+        sized[name] = FORMULAS[component['formula']](inputs, sized)
+    return sized, unquantified
+
+
+def reservations_by_target(release, omitted=()):
+    sized, unquantified = footprint_components(release, omitted)
+    totals = {key: 0 for key in RESERVATION_KEYS}
+    for component in release['footprint']['components']:
+        if component['name'] in sized:
+            totals[component['target']] += sized[component['name']]
+    return totals, sized, unquantified
+
+
+def validate_footprint(release):
+    """Every declared byte count is reproduced from its stated basis, or labelled unmeasured."""
+    footprint = release.get('footprint')
+    components = footprint.get('components') if isinstance(footprint, dict) else None
+    if not isinstance(components, list) or not components:
+        raise SetupError('Release must itemize the installed footprint its reservations stand for')
+    names = set()
+    for component in components:
+        name = component.get('name')
+        if not isinstance(name, str) or not re.fullmatch('[a-z][a-z0-9-]*', name) or name in names:
+            raise SetupError('Footprint components need distinct lowercase names')
+        names.add(name)
+        if component.get('target') not in RESERVATION_KEYS:
+            raise SetupError(f'Footprint component {name} must name the reservation it belongs to')
+        if component.get('derivation') not in DERIVATIONS:
+            raise SetupError(f'Footprint component {name} must state how its number was derived')
+        if not isinstance(component.get('basis'), str) or not component['basis'].strip():
+            raise SetupError(f'Footprint component {name} must state the evidence behind its number')
+        if component['derivation'] == 'unmeasured':
+            if component.get('bytes') is not None or 'formula' in component:
+                raise SetupError(f'Unmeasured footprint component {name} cannot declare a byte count')
+            continue
+        if type(component.get('bytes')) is not int or component['bytes'] < 0:
+            raise SetupError(f'Footprint component {name} must declare a nonnegative byte count')
+        if component.get('formula') not in FORMULAS:
+            raise SetupError(f'Footprint component {name} must name a known derivation formula')
+        inputs = component.get('inputs')
+        if not isinstance(inputs, dict) or any(key not in inputs for key in FORMULA_INPUTS[component['formula']]):
+            raise SetupError(f'Footprint component {name} is missing the inputs its formula consumes')
+        if component['formula'] == 'fraction-of-components':
+            quantified = {c['name'] for c in components[:components.index(component)] if c['derivation'] != 'unmeasured'}
+            if not inputs['components'] or not set(inputs['components']) <= quantified:
+                raise SetupError(f'Footprint component {name} takes a fraction of components it does not follow')
+    _sized, _unquantified = footprint_components(release)
+    for component in components:
+        if component['derivation'] != 'unmeasured' and _sized[component['name']] != component['bytes']:
+            raise SetupError(f'Footprint component {component["name"]} contradicts its own derivation')
+    totals, _sized, _unquantified = reservations_by_target(release)
+    for key in RESERVATION_KEYS:
+        if release[key] != totals[key]:
+            raise SetupError(f'{key} must equal the components itemized against it')
+
+
 def validate(release):
-    if release.get('schema_version') != 1:
-        raise SetupError('Unsupported release schema')
+    if release.get('schema_version') != 2:
+        raise SetupError('Unsupported release schema; version 2 itemizes the installed footprint its reservations stand for')
     if not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9._-]*', release.get('id', '')):
         raise SetupError('Invalid release identity')
     artifacts = release.get('artifacts', [])
@@ -91,9 +190,10 @@ def validate(release):
         for url in artifact.get('urls', []):
             if not url.startswith('https://'):
                 raise SetupError('Downloads require HTTPS; offline copies use --offline-bundle')
-    for key in ('index_workspace_bytes', 'runtime_workspace_bytes', 'image_store_bytes'):
+    for key in RESERVATION_KEYS:
         if type(release.get(key)) is not int or release[key] < 0:
             raise SetupError(f'Release must specify measured {key}')
+    validate_footprint(release)
     return artifacts
 
 
@@ -314,25 +414,39 @@ def check_space(reservations):
         group['purposes'].append(label)
     for group in groups.values():
         if group['free_bytes'] < group['required_bytes']:
-            raise SetupError(f"Insufficient disk for {', '.join(group['purposes'])}: need {group['required_bytes']} additional bytes, have {group['free_bytes']}; no packs omitted")
+            raise SetupError(f"Insufficient disk for {', '.join(group['purposes'])}: need {group['required_bytes']} additional bytes, have {group['free_bytes']}; nothing was silently substituted or trimmed to fit")
     return list(groups.values())
 
 
-def preflight(root, release, artifacts, include_image_store=True, export_destination=None):
+def preflight(root, release, artifacts, include_image_store=True, export_destination=None, omitted=()):
+    """Reserve what installing this release actually costs, not merely what it downloads."""
+    unknown = set(omitted) - {c['name'] for c in release['footprint']['components']}
+    if unknown:
+        raise SetupError('Omitted footprint components are not declared by this release: ' + ', '.join(sorted(unknown)))
+    totals, sized, unquantified = reservations_by_target(release, omitted)
     unique = {a['sha256']: a for a in artifacts}
     missing = sum(a['bytes'] for a in unique.values() if not verify(root / 'objects' / a['sha256'], a))
-    reserve = release['index_workspace_bytes'] + release['runtime_workspace_bytes']
+    reserve = totals['index_workspace_bytes'] + totals['runtime_workspace_bytes']
     reservations = [(root, missing + reserve, 'data artifacts and workspace')]
-    if include_image_store and release['image_store_bytes']:
+    if include_image_store and totals['image_store_bytes']:
         _, image_root = docker_store()
-        reservations.append((image_root, release['image_store_bytes'], 'expanded container images'))
+        reservations.append((image_root, totals['image_store_bytes'], 'expanded container images'))
     if export_destination:
         export_destination.parent.mkdir(parents=True, exist_ok=True)
         if export_destination.exists() or export_destination.with_name(export_destination.name + '.partial').exists():
             raise SetupError('Export destination or partial already exists')
         reservations.append((export_destination.parent, sum(a['bytes'] for a in unique.values()) + 1024 * 1024, 'portable bundle copy and metadata'))
-    disks = check_space(reservations)
-    return {'download_bytes_upper_bound': missing, 'filesystems': disks}
+    footprint = {'components': sized, 'omitted': sorted(omitted), 'unquantified': unquantified,
+                 'installed_bytes': sum(a['bytes'] for a in unique.values()) + reserve}
+    try:
+        disks = check_space(reservations)
+    except SetupError as error:
+        itemized = ', '.join(f'{name}={value}' for name, value in sorted(sized.items()))
+        advice = f'. Installed footprint beyond the pinned artifacts: {itemized}. Free that space, or install part of it with --without <component>'
+        if unquantified:
+            advice += f'. Not reserved because nothing measures them yet: {", ".join(unquantified)}'
+        raise SetupError(str(error) + advice) from error
+    return {'download_bytes_upper_bound': missing, 'footprint': footprint, 'filesystems': disks}
 
 
 def capture_assets(root, recipe):
@@ -435,14 +549,14 @@ def materialize_images(root, recipe, reserve_bytes=0):
     print(f'Image artifacts measured and saved in {receipt_path}; no services started')
 
 
-def prepare(root, release, bundle=None, include_image_store=True, export_destination=None, connections=1):
+def prepare(root, release, bundle=None, include_image_store=True, export_destination=None, connections=1, omitted=()):
     artifacts = validate(release)
     if bundle and bundle.name.endswith('.partial'):
         raise SetupError('Incomplete export cannot be imported')
     root.mkdir(parents=True, exist_ok=True)
     for folder in ('objects', 'staging', 'releases'):
         (root / folder).mkdir(exist_ok=True)
-    print(json.dumps(preflight(root, release, artifacts, include_image_store, export_destination), indent=2))
+    print(json.dumps(preflight(root, release, artifacts, include_image_store, export_destination, omitted), indent=2))
     inventory_path = root / 'inventory.json'
     inventory = json.loads(inventory_path.read_text()) if inventory_path.exists() else {'schema_version': 1, 'releases': {}}
     generation = root / 'releases' / release['id']
@@ -511,7 +625,7 @@ def export_bundle(root, release, destination):
         raise
 
 
-def start(root, release, generation, qualification=False):
+def start(root, release, generation, qualification=False, omitted=()):
     required = {'application', 'image', 'model', 'tokenizer', 'speech', 'extraction', 'corpus', 'index', 'license'}
     missing = required - {a['kind'] for a in release['artifacts']}
     if not qualification and (missing or not release.get('qualification', {}).get('offline_smoke_passed')):
@@ -549,8 +663,9 @@ def start(root, release, generation, qualification=False):
     if not compose.get('services'):
         raise SetupError('Release contains no services')
     engine, image_root = docker_store()
-    check_space([(root, release['index_workspace_bytes'] + release['runtime_workspace_bytes'], 'runtime workspace'),
-                 (image_root, release['image_store_bytes'], 'expanded container images')])
+    totals, _sized, _unquantified = reservations_by_target(release, omitted)
+    check_space([(root, totals['index_workspace_bytes'] + totals['runtime_workspace_bytes'], 'runtime workspace'),
+                 (image_root, totals['image_store_bytes'], 'expanded container images')])
     for artifact in release['artifacts']:
         if artifact['kind'] == 'image':
             subprocess.run([engine, 'load', '--input', str(generation / artifact['path'])], check=True)
@@ -605,6 +720,8 @@ def main(argv=None):
     parser.add_argument('--export-bundle', type=Path, help='Prepare a portable verified bundle directory')
     parser.add_argument('--qualification', action='store_true', help='Start an explicitly labelled candidate on loopback for local evaluation; never mark production active')
     parser.add_argument('--prepare-only', action='store_true', help='Acquire assets without starting services')
+    parser.add_argument('--without', action='append', default=[], metavar='COMPONENT',
+                        help='Install without a declared footprint component, dropping its reservation; repeatable')
     args = parser.parse_args(argv)
     if not 1 <= args.connections <= 16:
         parser.error('--connections must be between 1 and 16')
@@ -613,6 +730,8 @@ def main(argv=None):
     path = args.release or (args.offline_bundle / 'release.json' if args.offline_bundle else None)
     if args.reserve_bytes and not args.materialize_images:
         parser.error('--reserve-bytes applies to --materialize-images only')
+    if args.without and not (args.release or args.offline_bundle):
+        parser.error('--without names a footprint component of a release manifest')
     if (args.materialize_images or args.capture_assets) and (args.export_bundle or args.qualification):
         parser.error('--materialize-images only prepares image artifacts; it cannot export or start services')
     if args.offline_bundle:
@@ -632,11 +751,11 @@ def main(argv=None):
         if args.materialize_images:
             materialize_images(args.data, json.loads(args.materialize_images.read_text()), args.reserve_bytes)
             return
-        generation = prepare(args.data, release, args.offline_bundle, include_image_store=not (args.prepare_only or args.export_bundle), export_destination=args.export_bundle, connections=args.connections)
+        generation = prepare(args.data, release, args.offline_bundle, include_image_store=not (args.prepare_only or args.export_bundle), export_destination=args.export_bundle, connections=args.connections, omitted=tuple(args.without))
         if args.export_bundle:
             export_bundle(args.data, release, args.export_bundle)
         if not args.prepare_only and not args.export_bundle:
-            start(args.data, release, generation, qualification=args.qualification)
+            start(args.data, release, generation, qualification=args.qualification, omitted=tuple(args.without))
 
 
 if __name__ == '__main__':

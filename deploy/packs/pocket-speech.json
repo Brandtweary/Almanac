@@ -1,7 +1,20 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "id": "pocket-speech-assets-v1",
   "scope": "selected stock speech assets; runtime image and full redistribution notices are separate",
+  "footprint": {
+    "components": [
+      {
+        "name": "speech-derived-state",
+        "target": "runtime_workspace_bytes",
+        "bytes": 0,
+        "derivation": "exact",
+        "formula": "no-derived-state",
+        "inputs": {},
+        "basis": "the pinned weights, tokenizer and voice preset are the whole installed footprint: the speech backend indexes nothing, derives no persistent artifact from them and holds its working state in memory"
+      }
+    ]
+  },
   "index_workspace_bytes": 0,
   "runtime_workspace_bytes": 0,
   "image_store_bytes": 0,

@@ -31,8 +31,13 @@ class SetupTests(unittest.TestCase):
                          'urls': ['https://example.org/pinned.txt'],
                          'rights': {'acquisition': 'permitted', 'redistribution': 'permitted',
                                     'evidence': ['https://example.org/license'], 'notice': 'licenses/source.txt'}}
-        self.release = {'schema_version': 1, 'id': 'fixture-v1', 'artifacts': [self.artifact],
-                        'index_workspace_bytes': 0, 'runtime_workspace_bytes': 0, 'image_store_bytes': 0}
+        self.vectors = {'name': 'dense-vectors', 'target': 'index_workspace_bytes', 'bytes': 0,
+                        'derivation': 'exact', 'formula': 'entries-x-width',
+                        'inputs': {'entries': 0, 'dimensions': 384, 'bytes_per_dimension': 4},
+                        'basis': 'fixture archive with no indexed entries'}
+        self.release = {'schema_version': 2, 'id': 'fixture-v1', 'artifacts': [self.artifact],
+                        'index_workspace_bytes': 0, 'runtime_workspace_bytes': 0, 'image_store_bytes': 0,
+                        'footprint': {'components': [self.vectors]}}
         self.bundle = self.base / 'bundle'
         (self.bundle / 'objects').mkdir(parents=True)
         (self.bundle / 'objects' / self.artifact['sha256']).write_bytes(self.content)
@@ -114,7 +119,8 @@ class SetupTests(unittest.TestCase):
     def test_release_id_immutable(self):
         root = self.base / 'data'
         setup.prepare(root, self.release, self.bundle)
-        self.release['index_workspace_bytes'] = 1
+        self.vectors['inputs']['entries'] = 1
+        self.vectors['bytes'] = self.release['index_workspace_bytes'] = 1536
         with self.assertRaisesRegex(setup.SetupError, 'rebound'):
             setup.prepare(root, self.release, self.bundle)
 
@@ -151,6 +157,10 @@ class SetupTests(unittest.TestCase):
         run.assert_not_called()
 
     def test_shared_filesystem_adds_image_and_data_reservations(self):
+        self.release['footprint']['components'].append(
+            {'name': 'images', 'target': 'image_store_bytes', 'bytes': 80, 'derivation': 'exact',
+             'formula': 'entries-x-bytes-each', 'inputs': {'entries': 8, 'bytes_each': 10},
+             'basis': 'fixture expanded image layers'})
         self.release['image_store_bytes'] = 80
         with patch.object(setup, 'docker_store', return_value=('docker', self.base)), \
              patch.object(setup.shutil, 'disk_usage') as disk:
@@ -305,6 +315,89 @@ class SetupTests(unittest.TestCase):
     def test_unqualified_release_cannot_launch(self):
         with self.assertRaisesRegex(setup.SetupError, 'not qualified'):
             setup.start(self.base, self.release, self.base)
+
+
+class FootprintTests(unittest.TestCase):
+    """A reservation is only worth trusting if its number is reproduced from a stated basis."""
+
+    def setUp(self):
+        SetupTests.setUp(self)
+        self.vectors['inputs']['entries'] = 1000
+        self.vectors['bytes'] = 1536000
+        self.spans = {'name': 'passage-spans', 'target': 'index_workspace_bytes', 'bytes': 3190000,
+                      'derivation': 'measured-mean', 'formula': 'entries-x-bytes-each',
+                      'inputs': {'entries': 1000, 'bytes_each': 3190},
+                      'basis': 'the measured mean stored size per article'}
+        self.headroom = {'name': 'headroom', 'target': 'index_workspace_bytes', 'bytes': 307200,
+                         'derivation': 'upstream-formula', 'formula': 'fraction-of-components',
+                         'inputs': {'components': ['dense-vectors'], 'numerator': 1, 'denominator': 5},
+                         'basis': 'the storage headroom the vector store asks for'}
+        self.release['footprint']['components'] = [self.vectors, self.spans, self.headroom]
+        self.release['index_workspace_bytes'] = 1536000 + 3190000 + 307200
+
+    def test_declared_scalar_cannot_exceed_its_itemization(self):
+        self.release['index_workspace_bytes'] += 1
+        with self.assertRaisesRegex(setup.SetupError, 'index_workspace_bytes must equal'):
+            setup.validate(self.release)
+
+    def test_component_cannot_contradict_its_own_derivation(self):
+        self.spans['bytes'] = self.release['index_workspace_bytes'] = 1
+        with self.assertRaisesRegex(setup.SetupError, 'contradicts its own derivation'):
+            setup.validate(self.release)
+
+    def test_unmeasured_component_may_not_smuggle_in_a_number(self):
+        self.spans['derivation'] = 'unmeasured'
+        with self.assertRaisesRegex(setup.SetupError, 'cannot declare a byte count'):
+            setup.validate(self.release)
+
+    def test_component_without_a_basis_is_refused(self):
+        self.spans['basis'] = '   '
+        with self.assertRaisesRegex(setup.SetupError, 'must state the evidence'):
+            setup.validate(self.release)
+
+    def test_fraction_cannot_precede_what_it_is_a_fraction_of(self):
+        self.release['footprint']['components'] = [self.headroom, self.vectors, self.spans]
+        with self.assertRaisesRegex(setup.SetupError, 'does not follow'):
+            setup.validate(self.release)
+
+    def test_predecessor_schema_is_refused_rather_than_read_as_zero_cost(self):
+        self.release['schema_version'] = 1
+        with self.assertRaisesRegex(setup.SetupError, 'Unsupported release schema'):
+            setup.validate(self.release)
+
+    def test_indexing_cost_is_reserved_before_any_download(self):
+        with patch.object(setup.shutil, 'disk_usage') as disk:
+            disk.return_value.free = len(self.content) + self.release['index_workspace_bytes'] - 1
+            with self.assertRaisesRegex(setup.SetupError, 'Insufficient'):
+                setup.preflight(self.base, self.release, [self.artifact])
+            disk.return_value.free = len(self.content) + self.release['index_workspace_bytes']
+            report = setup.preflight(self.base, self.release, [self.artifact])
+        self.assertEqual(report['footprint']['components']['passage-spans'], 3190000)
+
+    def test_a_refusal_names_the_itemization_and_the_way_out(self):
+        with patch.object(setup.shutil, 'disk_usage') as disk:
+            disk.return_value.free = 0
+            with self.assertRaisesRegex(setup.SetupError, r'passage-spans=3190000.*--without'):
+                setup.preflight(self.base, self.release, [self.artifact])
+
+    def test_omitting_a_component_drops_it_and_its_share_of_a_fraction(self):
+        with patch.object(setup.shutil, 'disk_usage') as disk:
+            disk.return_value.free = len(self.content) + 3190000
+            report = setup.preflight(self.base, self.release, [self.artifact],
+                                     omitted=('dense-vectors',))
+        self.assertEqual(report['footprint']['components'], {'passage-spans': 3190000, 'headroom': 0})
+
+    def test_omitting_an_undeclared_component_is_refused(self):
+        with self.assertRaisesRegex(setup.SetupError, 'not declared by this release'):
+            setup.preflight(self.base, self.release, [self.artifact], omitted=('dense-vecotrs',))
+
+    def test_every_shipped_pack_reproduces_its_own_numbers(self):
+        packs = [p for p in sorted((Path(__file__).parent / 'packs').glob('*.json'))
+                 if not p.name.endswith('.recipe.json')]
+        self.assertTrue(packs)
+        for release in [json.loads(p.read_text()) for p in packs]:
+            with self.subTest(release=release['id']):
+                setup.validate(release)
 
 
 if __name__ == '__main__':

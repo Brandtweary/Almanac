@@ -21,7 +21,7 @@ Browser-local voice/text agent with optional personal memory and a mandatory bac
 - `src/pi-web-ui/` is the vendored Lit/Tailwind interface; the pinned Pi agent libraries provide the agent loop. `src/pi-ai-slim-compat.ts` limits browser provider imports.
 - `proxy/` contains the Bun/Hono gateway, one-active-completion queue and bounded speech forwarding; `proxy/README.md` describes routes and configuration. The About page's email sign-up writes to a SQLite file the gateway only ever appends to; no mail is sent and no route reads it back.
 - `content/` contains the Python corpus service, staged ingestion, immutable SQLite catalog, native ZIM lexical integration and persistent dense-index adapters. A native generation's article blocks, segmentation spans and semantic representatives are precomputed once beside it rather than rebuilt per search; the artifact never defines a passage, so absent or partial coverage falls back to segmenting at query time.
-- `deploy/` contains the single setup entry, acquisition manifests and offline packaging; `docs/install.md` is the installation contract.
+- `deploy/` contains the single setup entry, acquisition manifests and offline packaging; `docs/install.md` is the installation contract. A pack manifest itemizes the installed footprint its disk reservations stand for, covering indexing and not only download, and setup refuses a component whose declared bytes its own stated derivation does not reproduce.
 - `evaluation/` separates retrieval, source reading, tool research and retained-role evaluation; hosted screening belongs only to developer evaluation.
 
 ## Ownership and persistence

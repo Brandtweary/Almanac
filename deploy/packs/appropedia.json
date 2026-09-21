@@ -1,8 +1,91 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "id": "appropedia-source-v1",
-  "scope": "acquisition-only; indexing, component-rights and offline-reader admission pending",
-  "index_workspace_bytes": 0,
+  "scope": "acquisition and the installed index footprint; component-rights and offline-reader admission pending",
+  "footprint": {
+    "components": [
+      {
+        "name": "appropedia-dense-vectors",
+        "target": "index_workspace_bytes",
+        "bytes": 34308096,
+        "derivation": "exact",
+        "formula": "entries-x-width",
+        "inputs": {
+          "entries": 22336,
+          "dimensions": 384,
+          "bytes_per_dimension": 4
+        },
+        "basis": "22336 indexed HTML entries, the counter recorded in the checked inspection receipt content/inspections/appropedia-2026-02-html-v4.json, one vector each at the encoder's 384 dimensions and the profile schema's default float32 vector datatype. Rights exclusions and a non-canonical selection policy can only lower the count, and a float16 profile halves the width"
+      },
+      {
+        "name": "appropedia-dense-graph",
+        "target": "index_workspace_bytes",
+        "bytes": 3430810,
+        "derivation": "upstream-formula",
+        "formula": "qdrant-hnsw-graph",
+        "inputs": {
+          "entries": 22336,
+          "links_per_node": 16
+        },
+        "basis": "Qdrant's published capacity formula hnsw_size = points x m x 2 x 4 bytes x 1.2 at its default m of 16 (https://qdrant.tech/documentation/capacity-planning/); the collection adapters.Qdrant.create builds keeps the graph on disk and overrides no HNSW parameter"
+      },
+      {
+        "name": "appropedia-dense-payload",
+        "target": "index_workspace_bytes",
+        "bytes": 13200576,
+        "derivation": "upstream-formula",
+        "formula": "qdrant-payload-disk",
+        "inputs": {
+          "entries": 22336,
+          "payload_bytes": 394
+        },
+        "basis": "Qdrant's published disk_size = points x avg_payload_size x 1.5, whose 1.5 covers backend storage overhead. Every point carries the same four-field record adapters.Qdrant.put builds, 394 bytes compactly encoded at this archive's widest entry index of 65155"
+      },
+      {
+        "name": "appropedia-passage-spans",
+        "target": "index_workspace_bytes",
+        "bytes": null,
+        "derivation": "unmeasured",
+        "basis": "the article-spans artifact stores each article's extracted blocks, spans and representative compressed at zlib level 6. The only measured constant, 3190 bytes per article in oracle_content.precompute, was sampled from English Wikipedia and does not transfer to this archive's entries; sampling this archive is what would quantify it. The builder publishes whatever it reaches and stops at its own --min-free-bytes floor, so an unreserved shortfall costs coverage rather than the install"
+      },
+      {
+        "name": "dense-index-headroom",
+        "target": "index_workspace_bytes",
+        "bytes": 10187897,
+        "derivation": "upstream-formula",
+        "formula": "fraction-of-components",
+        "inputs": {
+          "components": [
+            "appropedia-dense-vectors",
+            "appropedia-dense-graph",
+            "appropedia-dense-payload"
+          ],
+          "numerator": 1,
+          "denominator": 5
+        },
+        "basis": "the ~20% disk headroom the same Qdrant capacity page recommends, taken over the vector, graph and payload components it covers: the write-ahead log, snapshots and the optimizer's temporary segments. The article-spans artifact is a SQLite file outside the vector store and is deliberately not in this sum"
+      },
+      {
+        "name": "shared-service-runtime",
+        "target": "runtime_workspace_bytes",
+        "bytes": 0,
+        "derivation": "exact",
+        "formula": "no-derived-state",
+        "inputs": {},
+        "basis": "indexing writes into the shared content state and the shared Qdrant store, and adds no per-pack runtime working set; the service's own bounded stores (CONTENT_SNAPSHOT_MAX_BYTES, CONTENT_FAILURE_LOG_MAX_BYTES) belong to the installation rather than to any one pack and are not multiplied by it"
+      },
+      {
+        "name": "archive-second-copy",
+        "target": "index_workspace_bytes",
+        "bytes": 0,
+        "derivation": "exact",
+        "formula": "no-derived-state",
+        "inputs": {},
+        "basis": "prepare_native hardlinks the verified archive into the content state, so the original occupies its pinned artifact bytes once; a content state on another filesystem cannot hardlink and needs that many bytes again, which is a layout choice this manifest cannot see"
+      }
+    ]
+  },
+  "index_workspace_bytes": 61127379,
   "runtime_workspace_bytes": 0,
   "image_store_bytes": 0,
   "artifacts": [

@@ -11,7 +11,7 @@ dependencies = [
   "pydantic==2.13.5", "beautifulsoup4==4.15.0", "tokenizers==0.23.2",
 ]
 [project.optional-dependencies]
-extraction = ["docling==2.128.0", "libzim==3.13.0"]
+extraction = ["docling==2.128.0", "libzim==3.13.0", "zstandard==0.25.0"]
 test = ["pytest==9.1.1"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
