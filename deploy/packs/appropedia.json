@@ -7,6 +7,7 @@
       {
         "name": "appropedia-dense-vectors",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 34308096,
         "derivation": "exact",
         "formula": "entries-x-width",
@@ -20,6 +21,7 @@
       {
         "name": "appropedia-dense-graph",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 3430810,
         "derivation": "upstream-formula",
         "formula": "qdrant-hnsw-graph",
@@ -32,6 +34,7 @@
       {
         "name": "appropedia-dense-payload",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 13200576,
         "derivation": "upstream-formula",
         "formula": "qdrant-payload-disk",
@@ -44,6 +47,7 @@
       {
         "name": "appropedia-passage-spans",
         "target": "index_workspace_bytes",
+        "location": "content-state",
         "bytes": null,
         "derivation": "unmeasured",
         "basis": "the article-spans artifact stores each article's extracted blocks, spans and representative compressed at zlib level 6. The only measured constant, 3190 bytes per article in oracle_content.precompute, was sampled from English Wikipedia and does not transfer to this archive's entries; sampling this archive is what would quantify it. The builder publishes whatever it reaches and stops at its own --min-free-bytes floor, so an unreserved shortfall costs coverage rather than the install"
@@ -51,6 +55,7 @@
       {
         "name": "dense-index-headroom",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 10187897,
         "derivation": "upstream-formula",
         "formula": "fraction-of-components",
@@ -68,6 +73,7 @@
       {
         "name": "shared-service-runtime",
         "target": "runtime_workspace_bytes",
+        "location": "content-state",
         "bytes": 0,
         "derivation": "exact",
         "formula": "no-derived-state",
@@ -77,6 +83,7 @@
       {
         "name": "archive-second-copy",
         "target": "index_workspace_bytes",
+        "location": "content-state",
         "bytes": 0,
         "derivation": "exact",
         "formula": "no-derived-state",

@@ -31,7 +31,8 @@ hands are busy.
 
 The searchable installation is English Wikipedia (full articles without images), Appropedia's
 practical-reference archive, CD3WD's development and trades manuals, and a scripture and
-canon collection drawn from English Wikisource and Project Gutenberg. The
+canon collection drawn from English Wikisource, Project Gutenberg and SuttaCentral's
+English translations of the Pali canon. The
 [collection guide](./docs/library.md) lists sources, editions, and publisher links, along with
 further reference originals — food preservation, crop water needs, seed production, drinking
 water, wood properties, electrical work, machining, and emergency care — which you download

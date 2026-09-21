@@ -1,13 +1,14 @@
 # Reference tools
 
 This internal service is independent of personal memory. The gateway forwards the same-origin
-routes below and the browser registers them as `corpus_search` and `corpus_read`. No installation
+routes below and the browser registers them as `corpus_search`, `corpus_collections` and `corpus_read`. No installation
 or filesystem-management endpoint is public. FastAPI `/openapi.json` exposes request schemas.
 
 | Route | Input | Output |
 |---|---|---|
 | `GET /health`, `GET /capabilities` | None | `ready`, `generation`, `profile_id`, `qualified`, `coverage` |
 | `POST /v1/corpus/search` | `query`, optional `document_id`, `cursor`, `require_qualified` | Common envelope, `hits`, `cursor` |
+| `GET /v1/corpus/collections` | None | Common envelope, `collections` |
 | `POST /v1/corpus/read` | `document_id`, optional `passage_id`, `cursor` | Common envelope, `document`, `overview`, `passages`, `cursor` |
 | `GET /v1/corpus/source/{handle}` | URL-encoded returned passage handle | Immutable original bytes; ZIM article text |
 
@@ -17,6 +18,13 @@ Common envelope: `generation`, `profile_id`, `status` (`ok`, `unqualified`, `deg
 Native archive lexical discovery combines exact-title navigation with full-text search through the shared ZIM adapter for both compact and passage-catalog generations; semantic retrieval remains independent.
 Qualification describes measured retrieval quality separately from mechanical readiness.
 `require_qualified` rejects unqualified profiles and any failed required retrieval stage.
+
+A listing entry describes one installed collection: `title` (a native archive's prepared title,
+otherwise the pack identifier), `category` (the part of the library it is listed under, empty when
+it was prepared without one), `publisher`, `origin`, `language`, `articles`, `indexing_complete`,
+`packs`, and for a staged pack the `works` it carries with the `additional_works` it only counts.
+A category groups archives for display and is recorded outside the generation identity, so naming
+or renaming one re-lists an archive without rebuilding its index.
 
 Each hit or read passage contains:
 

@@ -22,6 +22,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import posixpath
 import struct
 import subprocess
 import sys
@@ -53,6 +54,13 @@ COLLECTION_TITLES = {
     "vinaya": "Vinaya Piṭaka — Monastic Law",
 }
 COLLECTION_ORDER = list(COLLECTION_TITLES)
+
+# Every text keeps its own article under its translator; this decides only which one the
+# bare `suttacentral.net/<uid>` path reaches. Ordered after SuttaCentral's own presentation:
+# its `suttaplex` listing puts Sujato's translation first for every text two translators
+# share. A text contested by translators this does not rank keeps a stable order but is
+# decided by neither the source nor this list, so the receipt names it.
+PRIMARY_TRANSLATORS = ("sujato",)
 
 DOCUMENT = """<!DOCTYPE html>
 <html lang="{language}"><head><meta charset="utf-8">
@@ -105,9 +113,16 @@ def collection_key(collection: str) -> tuple[int, str]:
             else len(COLLECTION_ORDER), collection)
 
 
-def index_html(title: str, intro: str, links: list[tuple[str, str]]) -> str:
-    items = "".join(f"<li><a href='/{path}'>{escape_attribute(label)}</a></li>"
-                    for path, label in links)
+def index_html(page: str, title: str, intro: str, links: list[tuple[str, str]]) -> str:
+    """Render a listing page, linking relative to the page's own path.
+
+    A reader serves a ZIM under whatever prefix it chooses, so a root-absolute link leaves
+    the archive and resolves against the host instead of the book.
+    """
+    here = posixpath.dirname(page)
+    items = "".join(
+        f"<li><a href='{escape_attribute(posixpath.relpath(path, here))}'>"
+        f"{escape_attribute(label)}</a></li>" for path, label in links)
     return DOCUMENT.format(language="en", title=escape_attribute(title),
                            body=f"<main><h1>{escape_attribute(title)}</h1>{intro}<ul>{items}</ul></main>")
 
@@ -160,7 +175,7 @@ def build(source: Path, output: Path, *, language: str, root_language: str,
     written: list[tuple[Text, str]] = []
     failures: list[dict] = []
     segments = 0
-    preferred: dict[str, Text] = {}
+    carried: dict[str, list[Text]] = {}
 
     output.parent.mkdir(parents=True, exist_ok=True)
     creator = Creator(str(output)).config_indexing(True, "eng")
@@ -195,9 +210,7 @@ def build(source: Path, output: Path, *, language: str, root_language: str,
                                      article_html(text, title, rendered, name_of)))
             written.append((text, title))
             segments += len(translation)
-            # The first translator to carry a uid owns its bare path; survey order is
-            # stable, so which one that is does not vary between builds.
-            preferred.setdefault(text.uid, text)
+            carried.setdefault(text.uid, []).append(text)
 
         by_collection: dict[str, list[tuple[Text, str]]] = {}
         for text, title in written:
@@ -207,18 +220,26 @@ def build(source: Path, output: Path, *, language: str, root_language: str,
             path = f"suttacentral.net/collection/{collection}"
             label = COLLECTION_TITLES.get(collection, collection)
             archive.add_item(Article(path, label, index_html(
-                label, f"<p>{len(entries)} texts.</p>",
+                path, label, f"<p>{len(entries)} texts.</p>",
                 [(text.entry_path, title) for text, title in entries]), front=False))
 
         archive.add_item(Article(MAIN_PATH, "Pali Canon", index_html(
-            "Pali Canon — SuttaCentral English translations",
+            MAIN_PATH, "Pali Canon — SuttaCentral English translations",
             f"<p>{len(written)} texts. {LICENSE_TEXT}</p>",
             [(f"suttacentral.net/collection/{collection}",
               COLLECTION_TITLES.get(collection, collection))
              for collection in sorted(by_collection, key=collection_key)]), front=False))
 
-        for uid, text in preferred.items():
-            archive.add_redirection(f"suttacentral.net/{uid}", uid, text.entry_path,
+        def rank(text: Text) -> int:
+            return (PRIMARY_TRANSLATORS.index(text.author) if text.author in PRIMARY_TRANSLATORS
+                    else len(PRIMARY_TRANSLATORS))
+
+        preferred, unranked = {}, []
+        for uid, texts in carried.items():
+            preferred[uid] = min(texts, key=rank)
+            if len(texts) > 1 and not any(text.author in PRIMARY_TRANSLATORS for text in texts):
+                unranked.append(uid)
+            archive.add_redirection(f"suttacentral.net/{uid}", uid, preferred[uid].entry_path,
                                     {Hint.FRONT_ARTICLE: False})
         archive.set_mainpath(MAIN_PATH)
 
@@ -240,6 +261,9 @@ def build(source: Path, output: Path, *, language: str, root_language: str,
             "segments_rendered": segments,
             "unique_uids": len(preferred),
             "redirections": len(preferred),
+            "primary_translators": list(PRIMARY_TRANSLATORS),
+            "contested_uids": sorted(uid for uid, texts in carried.items() if len(texts) > 1),
+            "primary_unranked_uids": sorted(unranked),
             "index_pages": len(by_collection) + 1,
             "by_collection_declared": declared.by_collection(),
             "by_collection_written": {key: len(value) for key, value in by_collection.items()},

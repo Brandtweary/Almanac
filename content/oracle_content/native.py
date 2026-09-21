@@ -26,6 +26,22 @@ from .models import ContentError, Document, Passage, Profile, digest
 from .precompute import ArticleSpans, binding as spans_binding, rebuild as rebuild_passages
 from .store import atomic_json, HANDLE
 
+# An archive's own `M/Counter` names each mimetype it holds and how many entries carry
+# it. MIME parameters contain semicolons, so the count boundaries are matched rather
+# than split on. One definition serves both the ingest, which counts what it is about
+# to index, and the remote inspector, which counts it before the archive is acquired:
+# two spellings of this would let a declared footprint disagree with the index built
+# from it without either side noticing.
+INDEXED_MIME_COUNTS = re.compile(r"(?:^|;)(text/html(?:;[^=;]+=[^;]+)*|application/xhtml\+xml)=(\d+)(?=;|$)")
+
+
+def counted_html_entries(counter: str | None):
+    """How many entries a compact native generation indexes, or None without a counter."""
+    if not counter:
+        return None
+    return sum(int(number) for _mimetype, number in INDEXED_MIME_COUNTS.findall(counter))
+
+
 KIND = "native-zim-article-v1"
 POLICIES = {"canonical-html", "appropedia-explicit-open-english-v1", "appropedia-open-english-v2"}
 
@@ -440,8 +456,13 @@ class NativeReader:
 
 async def build_native(store, template: Document, profile: Profile, dense, tokenizer_path: Path, *,
                        selection_policy: str, inspection: str, reserve_bytes: int, activate=True,
-                       index_storage: Path | None = None, workers: int = 1):
-    """Prepare source-native access and resume one-vector-per-article indexing."""
+                       index_storage: Path | None = None, workers: int = 1, category: str = ""):
+    """Prepare source-native access and resume one-vector-per-article indexing.
+
+    `category` names the part of the library this archive is listed under. It describes the
+    installation rather than the indexed bytes, so it stays out of the generation identity:
+    naming or renaming one re-lists an archive without rebuilding it.
+    """
     from .ingest import publish_original
     if selection_policy not in POLICIES or not inspection or reserve_bytes < 1 or not 1 <= workers <= 64:
         raise ValueError("Native source policy, inspection and positive disk reservation are required")
@@ -479,6 +500,9 @@ async def build_native(store, template: Document, profile: Profile, dense, token
                 "exclusion_reasons": {}, "point_checksum": "0", "reserve_bytes": reserve_bytes,
                 "failures": [], "dense_representation": "title/lead only; not full article bodies"}
             atomic_json(manifest_path, manifest)
+        if manifest.get("category", "") != category:
+            manifest["category"] = category
+            atomic_json(manifest_path, manifest)
         reader = NativeReader(store, generation)
         reader.verify_original()
         if not reader.archive.has_fulltext_index:
@@ -487,9 +511,7 @@ async def build_native(store, template: Document, profile: Profile, dense, token
         manifest["archive_article_count_including_redirects"] = reader.archive.article_count
         try:
             counter = bytes(reader.archive.get_metadata("Counter")).decode("utf-8") if "Counter" in reader.archive.metadata_keys else ""
-            # MIME parameters contain semicolons; match count boundaries, not a naive split.
-            manifest["canonical_html_articles"] = sum(int(number) for mime, number in
-                re.findall(r"(?:^|;)(text/html(?:;[^=;]+=[^;]+)*|application/xhtml\+xml)=(\d+)(?=;|$)", counter)) if counter else None
+            manifest["canonical_html_articles"] = counted_html_entries(counter)
         except (KeyError, UnicodeError):
             manifest["canonical_html_articles"] = None
         atomic_json(manifest_path, manifest)

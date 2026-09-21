@@ -1,7 +1,10 @@
 """The remote inspector reads a published archive's counts without acquiring it."""
+import json
 import struct
 import sys
+import urllib.error
 from pathlib import Path
+from unittest import mock
 
 import pytest
 
@@ -50,13 +53,19 @@ def archive(counter: str = COUNTER, entries=(("M", "Counter"),)) -> bytes:
 class Served:
     """A range-serving origin that records exactly which bytes were asked for."""
 
-    def __init__(self, content, status=206):
+    def __init__(self, content, status=206, offset_by=0, truncate_to=None):
         self.content, self.status, self.ranges = content, status, []
+        self.offset_by, self.truncate_to = offset_by, truncate_to
+        self.headers = {}
 
     def __call__(self, request, timeout=None):
-        start, stop = request.headers["Range"].removeprefix("bytes=").split("-")
-        start, stop = int(start), int(stop)
+        start, stop = (int(value) for value in
+                       request.headers["Range"].removeprefix("bytes=").split("-"))
         self.ranges.append((start, stop))
+        # Headers precede the body on a real origin, so they are set before read().
+        served = len(self.body())
+        self.headers["Content-Range"] = (f"bytes {start + self.offset_by}-"
+                                         f"{start + self.offset_by + served - 1}/{len(self.content)}")
         return self
 
     def __enter__(self):
@@ -65,9 +74,13 @@ class Served:
     def __exit__(self, *unused):
         return False
 
-    def read(self):
+    def body(self):
         start, stop = self.ranges[-1]
-        return self.content[start:stop + 1]
+        served = self.content[start:stop + 1]
+        return served if self.truncate_to is None else served[:self.truncate_to]
+
+    def read(self):
+        return self.body()
 
 
 def test_counter_is_read_from_a_fraction_of_the_archive():
@@ -106,3 +119,47 @@ def test_an_archive_without_a_counter_reports_no_count():
     served = Served(archive(entries=(("M", "Title"),)))
     report = remote.inspect("https://example.org/a.zim", served)
     assert report["counter"] is None and report["indexed_html_entries"] is None
+
+
+def test_bytes_from_the_wrong_offset_are_refused_before_anything_parses_them():
+    served = Served(archive(), offset_by=64)
+    with pytest.raises(ValueError, match="answered a request for byte"):
+        remote.inspect("https://example.org/a.zim", served)
+
+
+def test_a_short_fixed_width_read_is_refused_rather_than_misparsed():
+    served = Served(archive(), truncate_to=16)
+    with pytest.raises(ValueError, match="the archive is truncated"):
+        remote.inspect("https://example.org/a.zim", served)
+
+
+def test_a_counter_past_the_read_bound_raises_instead_of_reporting_a_short_one():
+    served = Served(archive())
+    with mock.patch.object(remote, "CLUSTER_READ", 12):
+        with pytest.raises(ValueError, match="rather than reporting a truncated value"):
+            remote.inspect("https://example.org/a.zim", served)
+
+
+def test_an_entry_longer_than_the_first_read_still_parses():
+    served = Served(archive(entries=(("M", "Counter"),)))
+    with mock.patch.object(remote, "ENTRY_READ", 4):
+        report = remote.inspect("https://example.org/a.zim", served)
+    assert report["indexed_html_entries"] == 13220 + 15 + 1
+
+
+def test_an_entry_that_never_terminates_is_bounded_rather_than_read_whole():
+    served = Served(archive(entries=(("M", "Counter"),)))
+    with mock.patch.object(remote, "ENTRY_READ", 4), mock.patch.object(remote, "ENTRY_READ_LIMIT", 4):
+        with pytest.raises(ValueError, match="not terminated within"):
+            remote.inspect("https://example.org/a.zim", served)
+
+
+def test_a_failing_url_is_reported_and_exits_nonzero(capsys):
+    def refused(request, timeout=None):
+        raise urllib.error.HTTPError(request.full_url, 403, "Forbidden", {}, None)
+    with mock.patch.object(remote.urllib.request, "urlopen", refused):
+        status = remote.main(["https://example.org/a.zim"])
+    captured = capsys.readouterr()
+    assert status == 1
+    assert "403" in captured.err
+    assert json.loads(captured.out)[0]["error"].startswith("HTTPError")

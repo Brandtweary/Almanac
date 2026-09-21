@@ -84,13 +84,16 @@ def publish_original(store, source, sha256, managed):
 
 async def build(store: Store, documents, profile: Profile, dense, tokenizer,
                 validation: dict, *, assets_path: str | None = None, activate: bool = True,
-                managed_originals: bool = False):
+                managed_originals: bool = False, category: str = ""):
     """Stream manifests, resume durable stages, atomically activate validated indexes.
 
     `validation.adapters` keys are `<media_type>:<extraction_revision>`, with checked/receipt
     identifying representative layout fixtures. Optional document overrides additionally bind
     sha256/extraction_revision. All documents still undergo automated integrity/parse checks.
     `managed_originals` allows hardlinks only from an installer's immutable verified objects.
+    `category` names the part of the library these works are listed under; it describes the
+    installation rather than the index, so it stays out of the generation identity and can be
+    renamed without rebuilding anything.
     """
     # Spooling permits millions of archive articles without an in-memory document manifest.
     with tempfile.TemporaryDirectory(prefix="ingestion-", dir=store.root) as scratch:
@@ -124,6 +127,11 @@ async def build(store: Store, documents, profile: Profile, dense, tokenizer,
                 "vector_datatype": profile.vector_datatype,
                 "profile_id": profile.profile_id, "packs": [], "document_count": count,
                 "passage_count": 0, "embedded_passages": 0, "extraction_failures": 0}
+            # The category mirrors this invocation, including its absence, and is persisted
+            # before the activated-generation shortcut so a renamed one survives it.
+            if manifest.get("category", "") != category:
+                manifest["category"] = category
+                atomic_json(manifest_path, manifest)
             if manifest["stage"] == "active":
                 if activate:
                     store.activate(generation)

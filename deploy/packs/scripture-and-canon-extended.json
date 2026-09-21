@@ -7,6 +7,7 @@
       {
         "name": "gutenberg-pn-dense-vectors",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 3506688,
         "derivation": "exact",
         "formula": "entries-x-width",
@@ -20,6 +21,7 @@
       {
         "name": "gutenberg-pn-dense-graph",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 350669,
         "derivation": "upstream-formula",
         "formula": "qdrant-hnsw-graph",
@@ -32,6 +34,7 @@
       {
         "name": "gutenberg-pn-dense-payload",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 1349253,
         "derivation": "upstream-formula",
         "formula": "qdrant-payload-disk",
@@ -44,6 +47,7 @@
       {
         "name": "gutenberg-pn-passage-spans",
         "target": "index_workspace_bytes",
+        "location": "content-state",
         "bytes": null,
         "derivation": "unmeasured",
         "basis": "the article-spans artifact stores each article's extracted blocks, spans and representative compressed at zlib level 6. The only measured constant, 3190 bytes per article in oracle_content.precompute, was sampled from English Wikipedia and does not transfer to this archive's entries; sampling this archive is what would quantify it. The builder publishes whatever it reaches and stops at its own --min-free-bytes floor, so an unreserved shortfall costs coverage rather than the install"
@@ -51,6 +55,7 @@
       {
         "name": "gutenberg-pq-dense-vectors",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 4829184,
         "derivation": "exact",
         "formula": "entries-x-width",
@@ -64,6 +69,7 @@
       {
         "name": "gutenberg-pq-dense-graph",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 482919,
         "derivation": "upstream-formula",
         "formula": "qdrant-hnsw-graph",
@@ -76,6 +82,7 @@
       {
         "name": "gutenberg-pq-dense-payload",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 1858104,
         "derivation": "upstream-formula",
         "formula": "qdrant-payload-disk",
@@ -88,6 +95,7 @@
       {
         "name": "gutenberg-pq-passage-spans",
         "target": "index_workspace_bytes",
+        "location": "content-state",
         "bytes": null,
         "derivation": "unmeasured",
         "basis": "the article-spans artifact stores each article's extracted blocks, spans and representative compressed at zlib level 6. The only measured constant, 3190 bytes per article in oracle_content.precompute, was sampled from English Wikipedia and does not transfer to this archive's entries; sampling this archive is what would quantify it. The builder publishes whatever it reaches and stops at its own --min-free-bytes floor, so an unreserved shortfall costs coverage rather than the install"
@@ -95,6 +103,7 @@
       {
         "name": "gutenberg-pr-dense-vectors",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 33082368,
         "derivation": "exact",
         "formula": "entries-x-width",
@@ -108,6 +117,7 @@
       {
         "name": "gutenberg-pr-dense-graph",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 3308237,
         "derivation": "upstream-formula",
         "formula": "qdrant-hnsw-graph",
@@ -120,6 +130,7 @@
       {
         "name": "gutenberg-pr-dense-payload",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 12761265,
         "derivation": "upstream-formula",
         "formula": "qdrant-payload-disk",
@@ -132,6 +143,7 @@
       {
         "name": "gutenberg-pr-passage-spans",
         "target": "index_workspace_bytes",
+        "location": "content-state",
         "bytes": null,
         "derivation": "unmeasured",
         "basis": "the article-spans artifact stores each article's extracted blocks, spans and representative compressed at zlib level 6. The only measured constant, 3190 bytes per article in oracle_content.precompute, was sampled from English Wikipedia and does not transfer to this archive's entries; sampling this archive is what would quantify it. The builder publishes whatever it reaches and stops at its own --min-free-bytes floor, so an unreserved shortfall costs coverage rather than the install"
@@ -139,6 +151,7 @@
       {
         "name": "gutenberg-ps-dense-vectors",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 39783936,
         "derivation": "exact",
         "formula": "entries-x-width",
@@ -152,6 +165,7 @@
       {
         "name": "gutenberg-ps-dense-graph",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 3978394,
         "derivation": "upstream-formula",
         "formula": "qdrant-hnsw-graph",
@@ -164,6 +178,7 @@
       {
         "name": "gutenberg-ps-dense-payload",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 15346343,
         "derivation": "upstream-formula",
         "formula": "qdrant-payload-disk",
@@ -176,6 +191,7 @@
       {
         "name": "gutenberg-ps-passage-spans",
         "target": "index_workspace_bytes",
+        "location": "content-state",
         "bytes": null,
         "derivation": "unmeasured",
         "basis": "the article-spans artifact stores each article's extracted blocks, spans and representative compressed at zlib level 6. The only measured constant, 3190 bytes per article in oracle_content.precompute, was sampled from English Wikipedia and does not transfer to this archive's entries; sampling this archive is what would quantify it. The builder publishes whatever it reaches and stops at its own --min-free-bytes floor, so an unreserved shortfall costs coverage rather than the install"
@@ -183,6 +199,7 @@
       {
         "name": "dense-index-headroom",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 24127472,
         "derivation": "upstream-formula",
         "formula": "fraction-of-components",
@@ -209,6 +226,7 @@
       {
         "name": "shared-service-runtime",
         "target": "runtime_workspace_bytes",
+        "location": "content-state",
         "bytes": 0,
         "derivation": "exact",
         "formula": "no-derived-state",
@@ -218,6 +236,7 @@
       {
         "name": "archive-second-copy",
         "target": "index_workspace_bytes",
+        "location": "content-state",
         "bytes": 0,
         "derivation": "exact",
         "formula": "no-derived-state",

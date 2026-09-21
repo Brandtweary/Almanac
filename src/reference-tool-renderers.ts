@@ -1,6 +1,6 @@
 import { html } from "lit";
 import { createRef, ref } from "lit/directives/ref.js";
-import { BookOpen, History, Search } from "lucide";
+import { BookOpen, History, Library, Search } from "lucide";
 import { registerToolRenderer, renderCollapsibleHeader } from "./pi-web-ui/tools/renderer-registry.js";
 import type { ToolRenderer } from "./pi-web-ui/tools/types.js";
 
@@ -30,6 +30,7 @@ function referenceRenderer(icon: unknown, pending: string, complete: string, fai
 
 export function registerReferenceToolRenderers(): void {
 	registerToolRenderer("corpus_search", referenceRenderer(Search, "Searching library…", "Searched library", "Library search failed", "hits"));
+	registerToolRenderer("corpus_collections", referenceRenderer(Library, "Listing library…", "Listed library", "Library listing failed"));
 	registerToolRenderer("corpus_read", referenceRenderer(BookOpen, "Reading source…", "Read source", "Source read failed", "passages"));
 	registerToolRenderer("conversation_history", referenceRenderer(History, "Reading conversation history…", "Read conversation history", "Conversation history read failed"));
 }

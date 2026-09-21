@@ -13,7 +13,7 @@ import weakref
 from contextvars import ContextVar
 from pathlib import Path
 from urllib.parse import quote
-from .models import ContentError, Profile, SearchRequest, ReadRequest, Passage, digest
+from .models import ContentError, Document, Profile, SearchRequest, ReadRequest, Passage, digest
 from .store import HANDLE, Store, atomic_json
 
 
@@ -88,6 +88,10 @@ FAILURE_FINGERPRINTS_MAX = 512
 # request is answered at a single search's cost rather than the batch's.
 LEXICAL_CONCURRENCY = 1
 
+# A listing names the works a staged pack carries. Past this many the remainder is counted
+# instead, so a pack acquired as thousands of separate documents stays a readable entry.
+COLLECTION_WORKS_LIMIT = 64
+
 
 class Service:
     lexical_concurrency = LEXICAL_CONCURRENCY
@@ -159,6 +163,46 @@ class Service:
             generation, ready, dense_complete = None, False, False
         return {"ready": ready, "generation": generation, "profile_id": self.profile.profile_id,
                 "qualified": self.profile.qualified and dense_complete, "coverage": self.store.coverage(generation)}
+
+    def collections(self):
+        """List the installed library itself: what it holds, rather than what a query found.
+
+        A native archive is one collection, named by the title it was prepared under. A staged
+        generation holds separately acquired works, so it contributes one collection per pack,
+        naming the works it carries up to `COLLECTION_WORKS_LIMIT` and counting the remainder.
+        Both read the recorded manifest and catalog; neither opens an archive, because a listing
+        is answered far more often than it changes.
+        """
+        from .native import KIND as NATIVE_KIND
+        entries = []
+        for generation in self.store.active_generations():
+            manifest = self.store.manifest(generation)
+            category = manifest.get("category", "")
+            if manifest.get("kind") == NATIVE_KIND:
+                doc = Document.model_validate(manifest["source"])
+                articles = manifest.get("canonical_html_articles") or manifest.get("indexed_articles")
+                entries.append({"category": category, "title": doc.title, "publisher": doc.publisher,
+                                "origin": doc.source_url, "language": doc.language, "articles": articles,
+                                "works": [], "additional_works": 0,
+                                "indexing_complete": manifest.get("dense_stage") == "complete",
+                                "packs": sorted(manifest.get("packs", []))})
+                continue
+            packs = {}
+            with self.store.connect(generation) as db:
+                for row in db.execute("SELECT data FROM documents ORDER BY rowid"):
+                    doc = Document.model_validate_json(row[0])
+                    pack = packs.setdefault(doc.pack_id, {"category": category, "title": doc.pack_id,
+                        "publisher": doc.publisher, "origin": doc.source_url, "language": doc.language,
+                        "articles": None, "works": [], "additional_works": 0,
+                        "indexing_complete": True, "packs": [doc.pack_id]})
+                    if pack["publisher"] != doc.publisher:
+                        pack["publisher"] = ""
+                    if len(pack["works"]) < COLLECTION_WORKS_LIMIT:
+                        pack["works"].append(doc.title)
+                    else:
+                        pack["additional_works"] += 1
+            entries.extend(packs[pack_id] for pack_id in sorted(packs))
+        return {**self.base(self.store.active()), "collections": entries}
 
     def base(self, generation, degradation=None):
         degradation = degradation or []

@@ -78,6 +78,11 @@ FORMULA_INPUTS = {
     'no-derived-state': (),
 }
 DERIVATIONS = ('exact', 'upstream-formula', 'measured-mean', 'unmeasured')
+# Where a component's bytes actually land. The scalar a component sums into says what
+# kind of cost it is; this says which filesystem has to hold it, and the two are
+# independent: a pack's index workspace is split between the vector store and the
+# content state, neither of which need share a device with the acquired originals.
+LOCATIONS = ('data-root', 'content-state', 'index-storage', 'image-store')
 
 
 def footprint_components(release, omitted=()):
@@ -110,6 +115,16 @@ def reservations_by_target(release, omitted=()):
     return totals, sized, unquantified
 
 
+def reservations_by_location(release, omitted=()):
+    """Group the same components by the filesystem that has to hold them."""
+    sized, _unquantified = footprint_components(release, omitted)
+    totals = {key: 0 for key in LOCATIONS}
+    for component in release['footprint']['components']:
+        if component['name'] in sized:
+            totals[component['location']] += sized[component['name']]
+    return totals
+
+
 def validate_footprint(release):
     """Every declared byte count is reproduced from its stated basis, or labelled unmeasured."""
     footprint = release.get('footprint')
@@ -124,6 +139,8 @@ def validate_footprint(release):
         names.add(name)
         if component.get('target') not in RESERVATION_KEYS:
             raise SetupError(f'Footprint component {name} must name the reservation it belongs to')
+        if component.get('location') not in LOCATIONS:
+            raise SetupError(f'Footprint component {name} must name the filesystem its bytes land on')
         if component.get('derivation') not in DERIVATIONS:
             raise SetupError(f'Footprint component {name} must state how its number was derived')
         if not isinstance(component.get('basis'), str) or not component['basis'].strip():
@@ -139,10 +156,30 @@ def validate_footprint(release):
         inputs = component.get('inputs')
         if not isinstance(inputs, dict) or any(key not in inputs for key in FORMULA_INPUTS[component['formula']]):
             raise SetupError(f'Footprint component {name} is missing the inputs its formula consumes')
+        # A formula is arithmetic on values a manifest author typed, so every one of them
+        # is checked for type and range here: a string or a float reaches the arithmetic
+        # otherwise and surfaces as a traceback rather than as a rejected manifest.
+        for key, value in inputs.items():
+            if key == 'components':
+                continue
+            if type(value) is not int or value < 0:
+                raise SetupError(f'Footprint component {name} needs a nonnegative whole number for {key}')
         if component['formula'] == 'fraction-of-components':
-            quantified = {c['name'] for c in components[:components.index(component)] if c['derivation'] != 'unmeasured'}
-            if not inputs['components'] or not set(inputs['components']) <= quantified:
+            if inputs['denominator'] <= 0:
+                raise SetupError(f'Footprint component {name} needs a positive denominator')
+            if not isinstance(inputs['components'], list) or not inputs['components'] or \
+                    any(not isinstance(value, str) for value in inputs['components']):
+                raise SetupError(f'Footprint component {name} must name the components it is a fraction of')
+            preceding = {c['name']: c for c in components[:components.index(component)]
+                         if c.get('derivation') != 'unmeasured'}
+            if not set(inputs['components']) <= set(preceding):
                 raise SetupError(f'Footprint component {name} takes a fraction of components it does not follow')
+            incoherent = [operand for operand in inputs['components']
+                          if preceding[operand]['target'] != component['target']
+                          or preceding[operand]['location'] != component['location']]
+            if incoherent:
+                raise SetupError(f'Footprint component {name} takes a fraction of components reserved '
+                                 f'elsewhere: {", ".join(sorted(incoherent))}')
     _sized, _unquantified = footprint_components(release)
     for component in components:
         if component['derivation'] != 'unmeasured' and _sized[component['name']] != component['bytes']:
@@ -402,6 +439,19 @@ def docker_store():
     return engine, image_root
 
 
+def hosting_device(path):
+    """The nearest existing ancestor, whose filesystem is the one a new directory lands on.
+
+    A target that setup has not created yet still has a device; resolving it this way
+    reads that device without creating a directory a mistyped path would strand.
+    """
+    path = Path(path).resolve()
+    for candidate in (path, *path.parents):
+        if candidate.is_dir():
+            return candidate
+    raise SetupError(f'No existing filesystem holds {path}')
+
+
 def check_space(reservations):
     """Add reservations sharing a filesystem before comparing with available bytes."""
     groups = {}
@@ -418,31 +468,48 @@ def check_space(reservations):
     return list(groups.values())
 
 
-def preflight(root, release, artifacts, include_image_store=True, export_destination=None, omitted=()):
-    """Reserve what installing this release actually costs, not merely what it downloads."""
+def preflight(root, release, artifacts, include_image_store=True, export_destination=None, omitted=(),
+              content_state=None, index_storage=None):
+    """Reserve what installing this release actually costs, against the disks that hold it.
+
+    Each location is checked once, on its own device. `check_space` sums whatever shares
+    a filesystem, so the ordinary single-disk layout still compares one total against one
+    free figure rather than demanding the same bytes twice. A location whose path was not
+    supplied is assumed to sit under the data root — the documented layout — and the
+    assumption is named in the report instead of being made silently.
+    """
     unknown = set(omitted) - {c['name'] for c in release['footprint']['components']}
     if unknown:
         raise SetupError('Omitted footprint components are not declared by this release: ' + ', '.join(sorted(unknown)))
     totals, sized, unquantified = reservations_by_target(release, omitted)
+    placed = reservations_by_location(release, omitted)
     unique = {a['sha256']: a for a in artifacts}
     missing = sum(a['bytes'] for a in unique.values() if not verify(root / 'objects' / a['sha256'], a))
-    reserve = totals['index_workspace_bytes'] + totals['runtime_workspace_bytes']
-    reservations = [(root, missing + reserve, 'data artifacts and workspace')]
-    if include_image_store and totals['image_store_bytes']:
+    paths = {'data-root': root, 'content-state': content_state, 'index-storage': index_storage}
+    assumed = sorted(name for name, path in paths.items() if path is None and placed[name])
+    reservations = [(root, missing + placed['data-root'], 'acquired artifacts')]
+    for name in ('content-state', 'index-storage'):
+        if placed[name]:
+            reservations.append((hosting_device(paths[name] or root), placed[name], name.replace('-', ' ')))
+    if include_image_store and placed['image-store']:
         _, image_root = docker_store()
-        reservations.append((image_root, totals['image_store_bytes'], 'expanded container images'))
+        reservations.append((image_root, placed['image-store'], 'expanded container images'))
     if export_destination:
         export_destination.parent.mkdir(parents=True, exist_ok=True)
         if export_destination.exists() or export_destination.with_name(export_destination.name + '.partial').exists():
             raise SetupError('Export destination or partial already exists')
         reservations.append((export_destination.parent, sum(a['bytes'] for a in unique.values()) + 1024 * 1024, 'portable bundle copy and metadata'))
-    footprint = {'components': sized, 'omitted': sorted(omitted), 'unquantified': unquantified,
-                 'installed_bytes': sum(a['bytes'] for a in unique.values()) + reserve}
+    footprint ={'components': sized, 'omitted': sorted(omitted), 'unquantified': unquantified,
+                 'by_location': placed, 'assumed_under_data_root': assumed,
+                 'installed_bytes': sum(a['bytes'] for a in unique.values()) + sum(placed.values())}
     try:
         disks = check_space(reservations)
     except SetupError as error:
         itemized = ', '.join(f'{name}={value}' for name, value in sorted(sized.items()))
         advice = f'. Installed footprint beyond the pinned artifacts: {itemized}. Free that space, or install part of it with --without <component>'
+        if assumed:
+            advice += (f'. Checked against the data root because no path was given for: {", ".join(assumed)}'
+                       ' — pass --content-state/--index-storage when they are on other filesystems')
         if unquantified:
             advice += f'. Not reserved because nothing measures them yet: {", ".join(unquantified)}'
         raise SetupError(str(error) + advice) from error
@@ -549,14 +616,16 @@ def materialize_images(root, recipe, reserve_bytes=0):
     print(f'Image artifacts measured and saved in {receipt_path}; no services started')
 
 
-def prepare(root, release, bundle=None, include_image_store=True, export_destination=None, connections=1, omitted=()):
+def prepare(root, release, bundle=None, include_image_store=True, export_destination=None, connections=1,
+            omitted=(), content_state=None, index_storage=None):
     artifacts = validate(release)
     if bundle and bundle.name.endswith('.partial'):
         raise SetupError('Incomplete export cannot be imported')
     root.mkdir(parents=True, exist_ok=True)
     for folder in ('objects', 'staging', 'releases'):
         (root / folder).mkdir(exist_ok=True)
-    print(json.dumps(preflight(root, release, artifacts, include_image_store, export_destination, omitted), indent=2))
+    print(json.dumps(preflight(root, release, artifacts, include_image_store, export_destination, omitted,
+                               content_state, index_storage), indent=2))
     inventory_path = root / 'inventory.json'
     inventory = json.loads(inventory_path.read_text()) if inventory_path.exists() else {'schema_version': 1, 'releases': {}}
     generation = root / 'releases' / release['id']
@@ -625,7 +694,7 @@ def export_bundle(root, release, destination):
         raise
 
 
-def start(root, release, generation, qualification=False, omitted=()):
+def start(root, release, generation, qualification=False, omitted=(), content_state=None, index_storage=None):
     required = {'application', 'image', 'model', 'tokenizer', 'speech', 'extraction', 'corpus', 'index', 'license'}
     missing = required - {a['kind'] for a in release['artifacts']}
     if not qualification and (missing or not release.get('qualification', {}).get('offline_smoke_passed')):
@@ -663,9 +732,11 @@ def start(root, release, generation, qualification=False, omitted=()):
     if not compose.get('services'):
         raise SetupError('Release contains no services')
     engine, image_root = docker_store()
-    totals, _sized, _unquantified = reservations_by_target(release, omitted)
-    check_space([(root, totals['index_workspace_bytes'] + totals['runtime_workspace_bytes'], 'runtime workspace'),
-                 (image_root, totals['image_store_bytes'], 'expanded container images')])
+    placed = reservations_by_location(release, omitted)
+    check_space([(root, placed['data-root'], 'runtime workspace'),
+                 (hosting_device(content_state or root), placed['content-state'], 'content state'),
+                 (hosting_device(index_storage or root), placed['index-storage'], 'vector store'),
+                 (image_root, placed['image-store'], 'expanded container images')])
     for artifact in release['artifacts']:
         if artifact['kind'] == 'image':
             subprocess.run([engine, 'load', '--input', str(generation / artifact['path'])], check=True)
@@ -722,6 +793,8 @@ def main(argv=None):
     parser.add_argument('--prepare-only', action='store_true', help='Acquire assets without starting services')
     parser.add_argument('--without', action='append', default=[], metavar='COMPONENT',
                         help='Install without a declared footprint component, dropping its reservation; repeatable')
+    parser.add_argument('--content-state', type=Path, help='Reference-library state directory, when it is not under --data')
+    parser.add_argument('--index-storage', type=Path, help='Persistent vector-store directory, when it is not under --data')
     args = parser.parse_args(argv)
     if not 1 <= args.connections <= 16:
         parser.error('--connections must be between 1 and 16')
@@ -751,11 +824,11 @@ def main(argv=None):
         if args.materialize_images:
             materialize_images(args.data, json.loads(args.materialize_images.read_text()), args.reserve_bytes)
             return
-        generation = prepare(args.data, release, args.offline_bundle, include_image_store=not (args.prepare_only or args.export_bundle), export_destination=args.export_bundle, connections=args.connections, omitted=tuple(args.without))
+        generation = prepare(args.data, release, args.offline_bundle, include_image_store=not (args.prepare_only or args.export_bundle), export_destination=args.export_bundle, connections=args.connections, omitted=tuple(args.without), content_state=args.content_state, index_storage=args.index_storage)
         if args.export_bundle:
             export_bundle(args.data, release, args.export_bundle)
         if not args.prepare_only and not args.export_bundle:
-            start(args.data, release, generation, qualification=args.qualification, omitted=tuple(args.without))
+            start(args.data, release, generation, qualification=args.qualification, omitted=tuple(args.without), content_state=args.content_state, index_storage=args.index_storage)
 
 
 if __name__ == '__main__':

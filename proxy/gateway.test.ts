@@ -103,6 +103,22 @@ test("pinned model sampling applies before counting and generation",async()=>{
  const bad=createGateway(cfg,mock(),{...profile,model:{...profile.model,sampling:{temperature:1,top_p:.95,top_k:0}}});expect(bad.profile).toBeNull();
 });
 
+test("the library listing is forwarded, and its failures read like the other corpus routes",async()=>{
+ const calls:string[]=[];
+ const fetcher=(async(url:any,init:any)=>{const path=String(url);calls.push(path);
+  if(path.endsWith("/v1/corpus/collections")){expect(init.method).toBeUndefined();return Response.json({generation:"a".repeat(64),collections:[{category:"Scripture and canon",title:"Fixture archive"}]});}
+  return mock()(url,init);}) as unknown as typeof fetch;
+ const {app}=createGateway(cfg,fetcher,profile);
+ const listed=await app.request("/v1/corpus/collections");
+ expect(listed.status).toBe(200);
+ expect((await listed.json()).collections[0].category).toBe("Scripture and canon");
+ expect(calls).toContain("http://127.0.0.1:8791/v1/corpus/collections");
+ const down=(async()=>{throw new TypeError("connection refused");}) as unknown as typeof fetch;
+ const absent=await createGateway(cfg,down,profile).app.request("/v1/corpus/collections");
+ expect(absent.status).toBe(502);
+ expect(await absent.json()).toEqual({error:{code:"corpus_unavailable"}});
+});
+
 test("a corpus that is slow is reported as slow, and an absent one as absent",async()=>{
  const slow=(async(_url:any,init:any)=>new Promise<Response>((_resolve,reject)=>{
   init.signal.addEventListener("abort",()=>reject(init.signal.reason));

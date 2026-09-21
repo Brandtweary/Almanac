@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "id": "pali-canon-en-v1",
-  "scope": "Built locally and pinned by digest; `urls` stays empty until the archive is published, and an install attempted before then fails on acquisition rather than on verification.",
+  "scope": "Published as a GitHub release asset and pinned by digest; the release URL is durable but not immutable, so the pinned sha256 is what makes the download trustworthy rather than the address it came from.",
   "built_from": {
     "tool": "content/tools/build_pali_canon_zim.py",
     "repository": "https://github.com/suttacentral/bilara-data",
@@ -45,6 +45,7 @@
       {
         "name": "pali-canon-dense-vectors",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 7375872,
         "derivation": "exact",
         "formula": "entries-x-width",
@@ -58,6 +59,7 @@
       {
         "name": "pali-canon-dense-graph",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 737588,
         "derivation": "upstream-formula",
         "formula": "qdrant-hnsw-graph",
@@ -70,6 +72,7 @@
       {
         "name": "pali-canon-dense-payload",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 2830779,
         "derivation": "upstream-formula",
         "formula": "qdrant-payload-disk",
@@ -82,6 +85,7 @@
       {
         "name": "pali-canon-passage-spans",
         "target": "index_workspace_bytes",
+        "location": "content-state",
         "bytes": null,
         "derivation": "unmeasured",
         "basis": "the article-spans artifact stores each article's extracted blocks, spans and representative compressed at zlib level 6. The only measured constant, 3190 bytes per article in oracle_content.precompute, was sampled from English Wikipedia and does not transfer to this archive's entries; sampling this archive is what would quantify it. The builder publishes whatever it reaches and stops at its own --min-free-bytes floor, so an unreserved shortfall costs coverage rather than the install"
@@ -89,6 +93,7 @@
       {
         "name": "dense-index-headroom",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 2188848,
         "derivation": "upstream-formula",
         "formula": "fraction-of-components",
@@ -106,6 +111,7 @@
       {
         "name": "shared-service-runtime",
         "target": "runtime_workspace_bytes",
+        "location": "content-state",
         "bytes": 0,
         "derivation": "exact",
         "formula": "no-derived-state",
@@ -115,6 +121,7 @@
       {
         "name": "archive-second-copy",
         "target": "index_workspace_bytes",
+        "location": "content-state",
         "bytes": 0,
         "derivation": "exact",
         "formula": "no-derived-state",
@@ -130,9 +137,9 @@
     {
       "path": "notices/pali-canon-en.txt",
       "kind": "license",
-      "bytes": 1676,
-      "sha256": "806e9e9f306abb1ed2568d6cb2a3a989f232e7f855a4b7c34fab06358afadcd9",
-      "embedded_text": "Source pack: Pali Canon, English translations from SuttaCentral\nArchive: pali-canon_en_all_2026-09.zim\nBuilt by: Almanac, from SuttaCentral's segmented translation data\nOriginal library: https://suttacentral.net/\nSource data: https://github.com/suttacentral/bilara-data (branch `published`,\ncommit ff7eff006bee584c88cc185b3a1e0da4713a72e0)\n\nSuttaCentral dedicates the translations in this archive to the public domain under\nCreative Commons Zero 1.0. CC0 asks for nothing in return, so the attribution below is\ngiven rather than owed: a dedication of this size is a gift, and its authorship should\nstay legible to anyone who reads from it.\n\n  Bhikkhu Sujato    the four nikayas and much of the Khuddaka collection\n  Bhikkhu Brahmali  the Vinaya Pitaka\n  John Kelly, Ayya Soma, Bhante Suddhaso, Kovilo Bhikkhu\n                    further texts of the Khuddaka collection\n  Jessica Walton    co-translator of the Theragatha\n\nThe Pali root texts are those of the Mahasangiti edition. Each article names its\ntranslator and links to the passage it was rendered from, and every article carries\nthis same dedication in its own footer.\n\nOne English translation in the source data, the Patna Dharmapada, is published under\nCC BY-SA 3.0 rather than CC0 and is excluded from this archive; so are translations\nwhose root text is not Pali. The build receipt records both exclusions by count.\n\nPublic-domain dedication: https://creativecommons.org/publicdomain/zero/1.0/\nSuttaCentral licensing: https://suttacentral.net/licensing\n\nThis archive is built from public-domain-dedicated data and may be redistributed\nfreely. It is a rendering of the source data, not a SuttaCentral publication.\n",
+      "bytes": 1822,
+      "sha256": "a37740eefd013dc5472aa00bf74dca3e86929008d896be89cabb47077719f88c",
+      "embedded_text": "Source pack: Pali Canon, English translations from SuttaCentral\nArchive: pali-canon_en_all_2026-09.zim\nBuilt by: Almanac, from SuttaCentral's segmented translation data\nOriginal library: https://suttacentral.net/\nSource data: https://github.com/suttacentral/bilara-data (branch `published`,\ncommit ff7eff006bee584c88cc185b3a1e0da4713a72e0)\n\nSuttaCentral dedicates the translations in this archive to the public domain under\nCreative Commons Zero 1.0. CC0 asks for nothing in return, so the attribution below is\ngiven rather than owed: a dedication of this size is a gift, and its authorship should\nstay legible to anyone who reads from it.\n\n  Bhikkhu Sujato    the four nikayas and much of the Khuddaka collection\n  Bhikkhu Brahmali  the Vinaya Pitaka\n  John Kelly, Ayya Soma, Bhante Suddhaso, Kovilo Bhikkhu\n                    further texts of the Khuddaka collection\n  Jessica Walton    co-translator of the Theragatha\n\nThis archive carries the English translations only. Their segmentation and markup are\nkeyed to the Mahasangiti edition of the Pali, which the translators worked from; that\nPali text is not included here. Each article names its translator and links to the\npassage it was rendered from, and every article carries this same dedication in its\nown footer.\n\nOne English translation in the source data, the Patna Dharmapada, is published under\nCC BY-SA 3.0 rather than CC0 and is excluded from this archive; so are translations\nwhose root text is not Pali. The build receipt records both exclusions by count.\n\nPublic-domain dedication: https://creativecommons.org/publicdomain/zero/1.0/\nSuttaCentral licensing: https://suttacentral.net/licensing\n\nThis archive is built from public-domain-dedicated data and may be redistributed\nfreely. It is a rendering of the source data, not a SuttaCentral publication.\n",
       "urls": [],
       "rights": {
         "acquisition": "permitted",
@@ -150,7 +157,9 @@
       "kind": "corpus",
       "bytes": 5749297,
       "sha256": "416bc5ae5d5462c176a22dcb52d915a371771279e0cc33420f6de490748d1ace",
-      "urls": [],
+      "urls": [
+        "https://github.com/Brandtweary/Almanac/releases/download/pali-canon-2026-09/pali-canon_en_all_2026-09.zim"
+      ],
       "rights": {
         "acquisition": "permitted",
         "redistribution": "permitted",

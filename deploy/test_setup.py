@@ -31,7 +31,8 @@ class SetupTests(unittest.TestCase):
                          'urls': ['https://example.org/pinned.txt'],
                          'rights': {'acquisition': 'permitted', 'redistribution': 'permitted',
                                     'evidence': ['https://example.org/license'], 'notice': 'licenses/source.txt'}}
-        self.vectors = {'name': 'dense-vectors', 'target': 'index_workspace_bytes', 'bytes': 0,
+        self.vectors = {'name': 'dense-vectors', 'target': 'index_workspace_bytes',
+                        'location': 'index-storage', 'bytes': 0,
                         'derivation': 'exact', 'formula': 'entries-x-width',
                         'inputs': {'entries': 0, 'dimensions': 384, 'bytes_per_dimension': 4},
                         'basis': 'fixture archive with no indexed entries'}
@@ -158,7 +159,7 @@ class SetupTests(unittest.TestCase):
 
     def test_shared_filesystem_adds_image_and_data_reservations(self):
         self.release['footprint']['components'].append(
-            {'name': 'images', 'target': 'image_store_bytes', 'bytes': 80, 'derivation': 'exact',
+            {'name': 'images', 'target': 'image_store_bytes', 'location': 'image-store', 'bytes': 80, 'derivation': 'exact',
              'formula': 'entries-x-bytes-each', 'inputs': {'entries': 8, 'bytes_each': 10},
              'basis': 'fixture expanded image layers'})
         self.release['image_store_bytes'] = 80
@@ -324,11 +325,13 @@ class FootprintTests(unittest.TestCase):
         SetupTests.setUp(self)
         self.vectors['inputs']['entries'] = 1000
         self.vectors['bytes'] = 1536000
-        self.spans = {'name': 'passage-spans', 'target': 'index_workspace_bytes', 'bytes': 3190000,
+        self.spans = {'name': 'passage-spans', 'target': 'index_workspace_bytes',
+                      'location': 'index-storage', 'bytes': 3190000,
                       'derivation': 'measured-mean', 'formula': 'entries-x-bytes-each',
                       'inputs': {'entries': 1000, 'bytes_each': 3190},
                       'basis': 'the measured mean stored size per article'}
-        self.headroom = {'name': 'headroom', 'target': 'index_workspace_bytes', 'bytes': 307200,
+        self.headroom = {'name': 'headroom', 'target': 'index_workspace_bytes',
+                         'location': 'index-storage', 'bytes': 307200,
                          'derivation': 'upstream-formula', 'formula': 'fraction-of-components',
                          'inputs': {'components': ['dense-vectors'], 'numerator': 1, 'denominator': 5},
                          'basis': 'the storage headroom the vector store asks for'}
@@ -390,6 +393,72 @@ class FootprintTests(unittest.TestCase):
     def test_omitting_an_undeclared_component_is_refused(self):
         with self.assertRaisesRegex(setup.SetupError, 'not declared by this release'):
             setup.preflight(self.base, self.release, [self.artifact], omitted=('dense-vecotrs',))
+
+    def test_a_component_must_say_which_filesystem_holds_it(self):
+        del self.spans['location']
+        with self.assertRaisesRegex(setup.SetupError, 'must name the filesystem'):
+            setup.validate(self.release)
+
+    def test_a_fraction_cannot_span_reservations_or_filesystems(self):
+        self.spans['location'] = 'content-state'
+        self.headroom['inputs']['components'] = ['dense-vectors', 'passage-spans']
+        self.headroom['bytes'] = (1536000 + 3190000) // 5
+        self.release['index_workspace_bytes'] = 1536000 + 3190000 + self.headroom['bytes']
+        with self.assertRaisesRegex(setup.SetupError, 'reserved elsewhere: passage-spans'):
+            setup.validate(self.release)
+
+    def test_a_malformed_input_is_refused_rather_than_raised_through(self):
+        for value, complaint in (("1000", 'whole number'), (1000.0, 'whole number'), (-1, 'whole number')):
+            with self.subTest(value=value):
+                self.vectors['inputs']['entries'] = value
+                with self.assertRaisesRegex(setup.SetupError, complaint):
+                    setup.validate(self.release)
+        self.vectors['inputs']['entries'] = 1000
+        self.headroom['inputs']['denominator'] = 0
+        with self.assertRaisesRegex(setup.SetupError, 'positive denominator'):
+            setup.validate(self.release)
+        self.headroom['inputs']['denominator'] = 5
+        self.headroom['inputs']['components'] = 'dense-vectors'
+        with self.assertRaisesRegex(setup.SetupError, 'must name the components'):
+            setup.validate(self.release)
+
+    def test_index_bytes_are_charged_to_the_vector_store_and_not_to_the_data_root(self):
+        self.spans['location'] = 'content-state'
+        recorded = []
+        with patch.object(setup, 'check_space', side_effect=lambda r: recorded.extend(r) or []):
+            setup.preflight(self.base, self.release, [self.artifact],
+                            content_state=self.base / 'state', index_storage=self.base / 'qdrant')
+        charged = {label: (path, needed) for path, needed, label in recorded}
+        self.assertEqual(charged['acquired artifacts'][1], len(self.content))
+        # Neither directory exists yet, so each resolves to the filesystem that will hold it.
+        self.assertEqual(charged['index storage'], (self.base.resolve(), 1536000 + 307200))
+        self.assertEqual(charged['content state'], (self.base.resolve(), 3190000))
+
+    def test_one_filesystem_is_asked_for_the_total_once(self):
+        """The same bytes reserved under two labels must not be demanded twice."""
+        self.spans['location'] = 'content-state'
+        # Three distinct directories that happen to share one filesystem, which is the
+        # ordinary layout and the case a per-label reservation would double-charge.
+        state, qdrant = self.base / 'state', self.base / 'qdrant'
+        state.mkdir()
+        qdrant.mkdir()
+        total = len(self.content) + self.release['index_workspace_bytes']
+        with patch.object(setup.shutil, 'disk_usage') as disk:
+            disk.return_value.free = total
+            report = setup.preflight(self.base, self.release, [self.artifact],
+                                     content_state=state, index_storage=qdrant)
+        self.assertEqual([group['required_bytes'] for group in report['filesystems']], [total])
+
+    def test_an_unstated_location_is_named_rather_than_assumed_silently(self):
+        self.spans['location'] = 'content-state'
+        with patch.object(setup.shutil, 'disk_usage') as disk:
+            disk.return_value.free = 1 << 40
+            report = setup.preflight(self.base, self.release, [self.artifact])
+        self.assertEqual(report['footprint']['assumed_under_data_root'], ['content-state', 'index-storage'])
+        self.assertEqual(report['footprint']['by_location']['index-storage'], 1536000 + 307200)
+
+    def test_a_target_directory_that_does_not_exist_yet_resolves_to_its_filesystem(self):
+        self.assertEqual(setup.hosting_device(self.base / 'absent' / 'deeper'), self.base.resolve())
 
     def test_every_shipped_pack_reproduces_its_own_numbers(self):
         packs = [p for p in sorted((Path(__file__).parent / 'packs').glob('*.json'))

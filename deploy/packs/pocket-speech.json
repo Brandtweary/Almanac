@@ -7,6 +7,7 @@
       {
         "name": "speech-derived-state",
         "target": "runtime_workspace_bytes",
+        "location": "data-root",
         "bytes": 0,
         "derivation": "exact",
         "formula": "no-derived-state",

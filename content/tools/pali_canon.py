@@ -121,17 +121,33 @@ def restricted_paths(source: Path, dedication: str = "CC0") -> list[str]:
     publications may carry their own terms, and a record names the directory it governs.
     Refusing those directories by rule keeps a differently-licensed text out of the archive
     whether or not some other rule would have happened to exclude it.
+
+    A record that declares something other than the dedication but does not say which
+    directory it governs cannot be honoured, and is refused rather than skipped: the
+    alternative is a differently-licensed text entering the archive because the one rule
+    meant to stop it could not read its own input.
     """
     records = json.loads((source / "_publication.json").read_text(encoding="utf-8"))
-    restricted = []
-    for record in records.values():
+    restricted, unplaceable = [], []
+    for number, record in records.items():
         license = (record.get("license") or {}).get("license_abbreviation")
         if license == dedication:
             continue
         url = record.get("source_url") or ""
         _, separator, path = url.partition("/published/")
+        path = path.rstrip("/")
         if separator and path.startswith("translation/"):
-            restricted.append(path.rstrip("/"))
+            restricted.append(path)
+        elif separator and path.startswith("root/"):
+            # Root texts are never carried by this archive, so a record governing one
+            # restricts nothing and needs no directory of its own.
+            continue
+        else:
+            unplaceable.append(f"{number} ({license or 'no license'}): source_url {url!r}")
+    if unplaceable:
+        raise SourceError(
+            "publication records declare terms other than " + dedication
+            + " but name no translation directory to exclude: " + "; ".join(sorted(unplaceable)))
     return sorted(restricted)
 
 

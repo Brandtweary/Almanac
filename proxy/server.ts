@@ -91,18 +91,16 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
   app.get("/ready", async c => { const r = await readiness(c.req.raw.signal); return c.json(r, r.ready ? 200 : 503); });
   app.get("/v1/requests/:id", c => { const status = queue?.status(c.req.param("id")); return status ? c.json(status) : c.json({error: {code: "request_unknown"}}, 404); });
   app.delete("/v1/requests/:id", c => queue?.cancel(c.req.param("id")) ? c.json({state: "interrupted"}) : c.json({error: {code: "request_unknown"}}, 404));
-  for (const tool of ["search", "read"]) app.post(`/v1/corpus/${tool}`, limit("corpus"), async c => {
-    const body = await c.req.json().catch(() => null);
-    if (!body || typeof body !== "object" || Array.isArray(body)) return c.json({error: {code: "invalid_request"}}, 400);
-    // A deadline, a caller that left and an absent service are three different
-    // answers: reported as one, a slow search reaches the model as a library
-    // that is not installed, which is a fact about the deployment rather than
-    // about the query, and nothing in the message suggests narrowing or
-    // repeating it. The timeout signal is held separately because that is the
-    // only way to tell afterwards which of the two aborted the fetch.
+  // A deadline, a caller that left and an absent service are three different
+  // answers: reported as one, a slow search reaches the model as a library
+  // that is not installed, which is a fact about the deployment rather than
+  // about the query, and nothing in the message suggests narrowing or
+  // repeating it. The timeout signal is held separately because that is the
+  // only way to tell afterwards which of the two aborted the fetch.
+  async function forwardCorpus(c: Parameters<MiddlewareHandler>[0], tool: string, init: RequestInit = {}) {
     const deadline = AbortSignal.timeout(cfg.corpusTimeoutMs);
     try {
-      const upstream = await fetcher(`${cfg.contentBase}/v1/corpus/${tool}`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body), signal: AbortSignal.any([c.req.raw.signal, deadline])});
+      const upstream = await fetcher(`${cfg.contentBase}/v1/corpus/${tool}`, {...init, signal: AbortSignal.any([c.req.raw.signal, deadline])});
       const data = await upstream.json(); return c.json(data, upstream.status as 200);
     } catch (error) {
       if (c.req.raw.signal.aborted) { log({stage: `corpus_${tool}`, status: "cancelled"}); return c.json({error: {code: "cancelled"}}, 499 as 200); }
@@ -110,7 +108,14 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
       log({stage: `corpus_${tool}`, status: "failed", error: error instanceof Error ? error.name : "unknown"});
       return c.json({error: {code: "corpus_unavailable"}}, 502);
     }
+  }
+  for (const tool of ["search", "read"]) app.post(`/v1/corpus/${tool}`, limit("corpus"), async c => {
+    const body = await c.req.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) return c.json({error: {code: "invalid_request"}}, 400);
+    return forwardCorpus(c, tool, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
   });
+  app.get("/v1/corpus/collections", limit("corpus"), c => forwardCorpus(c, "collections"));
+
   app.post("/v1/phonemize", limit("phonemize"), async c => {
     const body = await c.req.text();
     if (new TextEncoder().encode(body).length > 131072) return c.json({error: {code: "body_too_large"}}, 413);

@@ -67,13 +67,7 @@ def verify(archive_path: Path, receipt: dict, source: Path, sample: int, seed: i
     if len(declared.texts) != receipt["coverage"]["declared_texts"]:
         problems.append(f"source now declares {len(declared.texts)} texts, receipt declares "
                         f"{receipt['coverage']['declared_texts']}")
-    for collection, expected in CANONICAL_TEXT_COUNTS.items():
-        # Counted over distinct uids: a text carried by two translators is two articles
-        # but one discourse, and it is the discourses the canon fixes a number for.
-        built = len({text.uid for text in declared.texts if text.collection == collection})
-        if built != expected:
-            problems.append(f"collection {collection} holds {built} discourses, canon has {expected}")
-
+    present: dict[str, set[str]] = {}
     for text in declared.texts:
         try:
             entry = archive.get_entry_by_path(text.entry_path)
@@ -95,6 +89,17 @@ def verify(archive_path: Path, receipt: dict, source: Path, sample: int, seed: i
         if missing:
             problems.append(f"{text.entry_path}: {len(missing)} of {len(segments)} segments "
                             f"absent from the article, first {missing[0]}")
+            continue
+        present.setdefault(text.collection, set()).add(text.uid)
+
+    for collection, expected in CANONICAL_TEXT_COUNTS.items():
+        # Counted over the articles this archive actually yielded, and over distinct uids:
+        # a text carried by two translators is two articles but one discourse, and it is
+        # the discourses the canon fixes a number for.
+        built = len(present.get(collection, ()))
+        if built != expected:
+            problems.append(f"archive holds {built} complete {collection} discourses, "
+                            f"canon has {expected}")
 
     # Extraction and retrieval are sampled: both are far slower per article than a
     # decode, and a fault in either is a property of the build rather than of one text.

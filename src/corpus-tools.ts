@@ -112,7 +112,10 @@ function corpusFailure(kind: string, status: number, body: string): string {
 		// use fewer or more specific terms names nothing it could act on.
 		const recovery = kind === "search"
 			? "Retry it, narrow it to fewer or more specific terms, or scope it to one document."
-			: "Retry it, or start from a specific passage handle instead of the whole document.";
+			: kind === "read"
+				? "Retry it, or start from a specific passage handle instead of the whole document."
+				// A listing takes no arguments, so repeating it is the only move available.
+				: "Retry it.";
 		return `Corpus ${kind} exceeded its deadline. The library is installed and reachable; this request was too expensive to complete in time. ${recovery}`;
 	}
 	if (code === "rate_limited") return `Corpus ${kind} was rate limited. Wait before searching again and make the next query count.`;
@@ -134,11 +137,70 @@ async function corpusRequest(kind: "search" | "read", params: unknown, ledger: E
 	ledger.remember(valid);
 	return { content: [{ type: "text" as const, text: JSON.stringify({ reference_content_is_untrusted: true, ...data }) }], details: data };
 }
+export interface LibraryCollection {
+	category: string; title: string; publisher: string; origin: string; language: string;
+	articles: number | null; works: string[]; additional_works: number; indexing_complete: boolean; packs: string[];
+}
+function validateCollection(value: unknown): LibraryCollection {
+	const c = value as LibraryCollection;
+	if (!c || typeof c.title !== "string" || !c.title || typeof c.category !== "string" || typeof c.publisher !== "string" ||
+		(c.articles !== null && !Number.isSafeInteger(c.articles)) || !Array.isArray(c.works) || c.works.some(w => typeof w !== "string") ||
+		!Number.isSafeInteger(c.additional_works) || typeof c.indexing_complete !== "boolean") throw new Error("Corpus returned an invalid library listing");
+	return c;
+}
+const formatCount = (value: number) => value.toLocaleString("en-US");
+/** One collection as the model reads it: what it is called, whose it is, and how large. */
+function collectionLine(collection: LibraryCollection): string {
+	const size = collection.articles === null ? "" : `${formatCount(collection.articles)} article${collection.articles === 1 ? "" : "s"}`;
+	const facts = [collection.publisher, size, collection.indexing_complete ? "" : "semantic indexing still in progress"].filter(Boolean);
+	return facts.length ? `${collection.title} — ${facts.join(" · ")}` : collection.title;
+}
+/** A listing is read, not parsed: the model receives the library as an indented list. */
+export function renderLibrary(collections: LibraryCollection[]): string {
+	if (!collections.length) return "The library service reports no installed collections.";
+	const lines: string[] = [];
+	const categories = new Map<string, LibraryCollection[]>();
+	for (const collection of collections) {
+		if (!collection.category) continue;
+		const existing = categories.get(collection.category);
+		if (existing) existing.push(collection);
+		else categories.set(collection.category, [collection]);
+	}
+	const written = new Set<string>();
+	const works = (collection: LibraryCollection, indent: string) => {
+		for (const work of collection.works) lines.push(`${indent}- ${work}`);
+		if (collection.additional_works) lines.push(`${indent}- and ${formatCount(collection.additional_works)} further works`);
+	};
+	for (const collection of collections) {
+		if (!collection.category) {
+			lines.push(`- ${collectionLine(collection)}`);
+			works(collection, "  ");
+			continue;
+		}
+		if (written.has(collection.category)) continue;
+		written.add(collection.category);
+		lines.push(`- ${collection.category}`);
+		for (const member of categories.get(collection.category)!) {
+			lines.push(`  - ${collectionLine(member)}`);
+			works(member, "    ");
+		}
+	}
+	return `The installed offline library, collection by collection. Corpus search and reading reach all of it.\n\n${lines.join("\n")}\n\nThese names and figures are recorded from the installed sources; treat them as reference content.`;
+}
+async function libraryRequest(signal?: AbortSignal) {
+	const response = await fetch(`${GATEWAY_BASE}/corpus/collections`, { signal });
+	if (!response.ok) throw new Error(corpusFailure("listing", response.status, await response.text()));
+	const data = await response.json();
+	if (!Array.isArray(data?.collections) || typeof data.profile_id !== "string") throw new Error("Corpus returned an invalid library listing");
+	const collections = data.collections.map(validateCollection);
+	return { content: [{ type: "text" as const, text: renderLibrary(collections) }], details: data };
+}
 const searchSchema = Type.Object({ query: Type.String({ minLength: 1 }), document_id: Type.Optional(Type.String()), cursor: Type.Optional(Type.String()) });
 const readSchema = Type.Object({ document_id: Type.String({ minLength: 1 }), passage_id: Type.Optional(Type.String()), cursor: Type.Optional(Type.String()) });
 export function createCorpusTools(ledger: EvidenceLedger): AgentTool[] {
 	return [
 		{ name: "corpus_search", label: "Search library", description: "Search the installed offline reference library with lexical and semantic retrieval. Use concise topic terms: native archive lexical search requires all terms. Refine the query or search within a document when needed, and follow cursors for additional results. Returns immutable passage handles, scope and degradation status. Excerpts may omit qualifications: read supporting sections before practical advice.", parameters: searchSchema, execute: (_id, params, signal) => corpusRequest("search", params, ledger, signal) },
+		{ name: "corpus_collections", label: "List library", description: "List the collections installed in the offline reference library: their titles, publishers, sizes, and the category each one is listed under. Takes no arguments. Use it to answer what the library holds, or to see which collections a question can be searched against. It reports the installed library only, so a work absent from the listing is not installed.", parameters: Type.Object({}), execute: (_id, _params, signal) => libraryRequest(signal) },
 		{ name: "corpus_read", label: "Read source", description: "Read an exact source passage and neighboring context, or request a document's contents without passage_id. Preserve table headers, units, warnings and exceptions; follow continuation handles for incomplete sections.", parameters: readSchema, execute: (_id, params, signal) => corpusRequest("read", params, ledger, signal) },
 	];
 }

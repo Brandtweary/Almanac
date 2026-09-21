@@ -179,13 +179,84 @@ def test_verification_fails_when_the_archive_bytes_do_not_match_the_receipt(arch
     assert any("sha256" in problem for problem in verify(output, receipt, source, sample=5, seed=1))
 
 
-def test_canonical_discourse_counts_are_checked(archive):
-    """A build that silently drops discourses is caught by the canon's own numbers."""
+def test_canonical_discourse_counts_are_checked_against_the_archive(archive, tmp_path):
+    """An archive one discourse short is caught by the canon's own numbers."""
+    from libzim.reader import Archive
+    from libzim.writer import Creator, Hint, Item, StringProvider
+
+    class Copy(Item):
+        def __init__(self, path, title, content):
+            super().__init__()
+            self._path, self._title, self._content = path, title, content
+
+        def get_path(self):
+            return self._path
+
+        def get_title(self):
+            return self._title
+
+        def get_mimetype(self):
+            return "text/html"
+
+        def get_contentprovider(self):
+            return StringProvider(self._content)
+
+        def get_hints(self):
+            return {Hint.FRONT_ARTICLE: True}
+
     source, output, receipt = archive
-    dropped = source / "translation" / "en" / AUTHOR / "sutta" / "mn" / f"mn152_translation-en-{AUTHOR}.json"
-    dropped.unlink()
-    problems = verify(output, receipt, source, sample=5, seed=1)
+    original = Archive(str(output))
+    short = tmp_path / "short.zim"
+    omitted = f"suttacentral.net/mn152/en/{AUTHOR}"
+    with Creator(str(short)).config_indexing(True, "eng") as creator:
+        for text in survey(source, "en", "pli").texts:
+            if text.entry_path == omitted:
+                continue
+            entry = original.get_entry_by_path(text.entry_path)
+            creator.add_item(Copy(text.entry_path, entry.title,
+                                  bytes(entry.get_item().content).decode("utf-8")))
+    receipt["archive"]["bytes"] = short.stat().st_size
+    receipt["archive"]["sha256"] = hashlib.sha256(short.read_bytes()).hexdigest()
+    problems = verify(short, receipt, source, sample=5, seed=1)
     assert any("canon has 152" in problem for problem in problems)
+    assert any(omitted in problem for problem in problems)
+
+
+def test_the_primary_translator_owns_the_bare_identifier_path(tmp_path):
+    """A text two translators carry redirects to the ranked one, not to whoever sorts first."""
+    from libzim.reader import Archive
+    from build_pali_canon_zim import PRIMARY_TRANSLATORS
+    source = write_source(tmp_path / "source")
+    rival = "asuddhaso"  # sorts before `sujato`, as the real contesting translators do
+    for collection in ("mn",):
+        base = source / "translation" / "en"
+        target = base / rival / "sutta" / collection
+        target.mkdir(parents=True, exist_ok=True)
+        original = (base / AUTHOR / "sutta" / collection / f"{collection}2_translation-en-{AUTHOR}.json")
+        segments = json.loads(original.read_text(encoding="utf-8"))
+        (target / f"{collection}2_translation-en-{rival}.json").write_text(
+            json.dumps(segments, ensure_ascii=False), encoding="utf-8")
+    assert rival < AUTHOR and PRIMARY_TRANSLATORS[0] == AUTHOR
+    output = tmp_path / "contested.zim"
+    receipt = build(source, output, language="en", root_language="pli",
+                    date="2026-01-01", name="contested")
+    assert receipt["coverage"]["contested_uids"] == ["mn2"]
+    assert receipt["coverage"]["primary_unranked_uids"] == []
+    entry = Archive(str(output)).get_entry_by_path("suttacentral.net/mn2")
+    assert entry.is_redirect
+    assert entry.get_item().path == f"suttacentral.net/mn2/en/{AUTHOR}"
+
+
+def test_listing_pages_link_relative_to_their_own_path(archive):
+    """A root-absolute link resolves against the host, not the book."""
+    from libzim.reader import Archive
+    source, output, receipt = archive
+    reader = Archive(str(output))
+    index = bytes(reader.get_entry_by_path("suttacentral.net/index").get_item().content).decode()
+    listing = bytes(reader.get_entry_by_path("suttacentral.net/collection/mn").get_item().content).decode()
+    assert "href='/" not in index and "href='/" not in listing
+    assert "href='collection/mn'" in index
+    assert f"href='../mn1/en/{AUTHOR}'" in listing
 
 
 def test_inline_markup_is_converted_and_stray_markup_escaped():
@@ -196,6 +267,41 @@ def test_inline_markup_is_converted_and_stray_markup_escaped():
     assert "5 &lt; 7 &amp;" in rendered
     assert "<em>kept</em>" in rendered
     assert "&lt;script&gt;" in rendered
+
+
+def test_a_restricted_publication_excludes_the_directory_it_names(tmp_path):
+    source = write_source(tmp_path / "source")
+    records = json.loads((source / "_publication.json").read_text(encoding="utf-8"))
+    records["scpub2"] = {
+        "text_uid": "dn",
+        "license": {"license_abbreviation": "CC BY-SA 3.0"},
+        "source_url": f"https://github.com/suttacentral/bilara-data/tree/published/translation/en/{AUTHOR}/sutta/dn",
+    }
+    (source / "_publication.json").write_text(json.dumps(records), encoding="utf-8")
+    result = survey(source, "en", "pli")
+    assert len(result.excluded["not_public_domain"]) == COLLECTIONS["dn"]
+    assert not any(text.collection == "dn" for text in result.texts)
+
+
+def test_a_restricted_publication_naming_no_directory_is_refused(tmp_path):
+    """The licence gate is the load-bearing rights claim; it may not fail open."""
+    source = write_source(tmp_path / "source")
+    records = json.loads((source / "_publication.json").read_text(encoding="utf-8"))
+    records["scpub3"] = {"text_uid": "mystery",
+                         "license": {"license_abbreviation": "CC BY-NC 4.0"}, "source_url": ""}
+    (source / "_publication.json").write_text(json.dumps(records), encoding="utf-8")
+    with pytest.raises(SourceError, match="name no translation directory"):
+        survey(source, "en", "pli")
+
+
+def test_a_publication_governing_only_root_texts_restricts_nothing(tmp_path):
+    """Root texts are not carried, so a record over them excludes no translation."""
+    source = write_source(tmp_path / "source")
+    records = json.loads((source / "_publication.json").read_text(encoding="utf-8"))
+    records["scpub4"] = {"text_uid": "ms", "license": {},
+                         "source_url": "https://github.com/suttacentral/bilara-data/tree/published/root/pli/ms"}
+    (source / "_publication.json").write_text(json.dumps(records), encoding="utf-8")
+    assert len(survey(source, "en", "pli").texts) == sum(COLLECTIONS.values())
 
 
 def test_a_segment_without_a_template_is_refused_rather_than_dropped():

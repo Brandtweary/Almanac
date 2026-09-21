@@ -4,10 +4,13 @@ Almanac’s chat searches the installed English Wikipedia, Appropedia, CD3WD and
 
 ## Searchable collections
 
+The chat lists the collections actually installed on the machine it runs on, with their sizes, through its own library listing; the entries below are what a complete installation acquires.
+
 - **English Wikipedia:** full articles without images, June 2026. The [source installation guide](install.md#source-based-local-setup) acquires and prepares the pinned archive.
 - **Appropedia:** English practical-reference archive, February 2026. The same installation guide covers acquisition and preparation.
 - **CD3WD:** practical-reference archive, November 2025, with 13,220 HTML articles searchable and readable through the same tools. The complete original archive also retains its 77 PDFs; no OCR pass is required for the HTML collection. Acquisition and HTML preparation use the [installation guide](install.md#source-based-local-setup).
 - **English Wikisource:** complete texts without images, August 2026. Carries Griffith’s *Hymns of the Rigveda*, seventeen volumes of Müller’s *Sacred Books of the East* including both Upanishad and both Qur’an volumes, and the King James and Jewish Publication Society 1917 Bibles.
+- **Pali canon:** SuttaCentral's English translations, September 2026 — 4,795 texts covering the four nikayas, the Khuddaka collection and the Vinaya, built from the source data's CC0 dedication and translated chiefly by Bhikkhu Sujato, with the Vinaya by Bhikkhu Brahmali. English only; the Pali the translations are keyed to is not included.
 - **Project Gutenberg:** March 2026, by Library of Congress class. The default selection is class B (philosophy, psychology and religion) with the classical, Celtic, Slavic, Uralic, Oriental, Indo-Iranian, East Asian, Indigenous American and Germanic literature classes; the larger English, American, Romance and general-literature classes are pinned as unselected candidates in `deploy/pack-catalog.json`.
 
 ## Reference originals

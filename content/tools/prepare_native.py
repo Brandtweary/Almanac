@@ -20,6 +20,7 @@ async def main():
     parser.add_argument("--sha256", required=True)
     parser.add_argument("--pack-id", required=True)
     parser.add_argument("--title", required=True)
+    parser.add_argument("--category", default="", help="Part of the library this archive is listed under, shared with the other archives of the same kind")
     parser.add_argument("--publisher", default="", help="Source attribution, distinct from the archive distributor")
     parser.add_argument("--source-base-url", required=True)
     parser.add_argument("--license", required=True)
@@ -53,7 +54,7 @@ async def main():
             dense = Qdrant(client, args.qdrant_url, encoder, profile)
             generation = await build_native(Store(args.data), document, profile, dense, token_path,
                 selection_policy=args.selection_policy, inspection=args.inspection.read_text().strip(), reserve_bytes=args.reserve_bytes,
-                index_storage=args.index_storage, workers=args.workers)
+                index_storage=args.index_storage, workers=args.workers, category=args.category)
             print(generation, flush=True)
         finally:
             if bulk is not None:

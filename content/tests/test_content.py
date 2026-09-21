@@ -613,3 +613,70 @@ def test_dense_hit_resolution_leaves_the_event_loop_free(tmp_path):
         assert ticks == 5
         return await searching
     assert asyncio.run(check())["hits"]
+
+
+def categorized(tmp_path, service, category):
+    """Stage two works of one pack under a named category of the active library."""
+    works = [document(tmp_path, name="psalms", text="A psalm of ascents.\n\nAnother paraphrase line.").model_copy(
+                 update={"pack_id": "canon", "title": "Psalms", "publisher": "Translators"}),
+             document(tmp_path, name="gita", text="A verse of the field.\n\nAnother paraphrase line.").model_copy(
+                 update={"pack_id": "canon", "title": "Bhagavad Gita", "publisher": "Translators"})]
+    evidence = {}
+    for work in works:
+        evidence.update(validation(work))
+    return asyncio.run(build(service.store, works, service.profile, service.dense, Tokens(), evidence, category=category))
+
+
+def test_library_listing_groups_installed_works_under_their_category(tmp_path):
+    service, _, generation = setup(tmp_path)
+    categorized(tmp_path, service, "Scripture and canon")
+
+    listing = service.collections()
+
+    assert listing["generation"] and listing["profile_id"] == service.profile.profile_id
+    by_title = {entry["title"]: entry for entry in listing["collections"]}
+    assert by_title["fixture"]["category"] == "", "a pack prepared without a category is listed on its own"
+    assert by_title["canon"]["category"] == "Scripture and canon"
+    assert by_title["canon"]["works"] == ["Psalms", "Bhagavad Gita"]
+    assert by_title["canon"]["additional_works"] == 0
+    assert by_title["canon"]["publisher"] == "Translators"
+
+
+def test_renaming_a_category_relists_the_same_generation(tmp_path):
+    service, _, _ = setup(tmp_path)
+    first = categorized(tmp_path, service, "Scripture and canon")
+
+    again = categorized(tmp_path, service, "Practical reference")
+
+    assert again == first, "a category describes the installation, so renaming one rebuilds nothing"
+    entry = next(e for e in service.collections()["collections"] if e["title"] == "canon")
+    assert entry["category"] == "Practical reference"
+
+
+def test_listing_counts_the_works_it_does_not_name(tmp_path):
+    service, _, _ = setup(tmp_path)
+    from oracle_content.service import COLLECTION_WORKS_LIMIT
+    works, evidence = [], {}
+    for index in range(COLLECTION_WORKS_LIMIT + 3):
+        work = document(tmp_path, name=f"tract{index}", text=f"Tract {index}.\n\nA paraphrase line.").model_copy(
+            update={"pack_id": "tracts", "title": f"Tract {index}"})
+        works.append(work)
+        evidence.update(validation(work))
+    asyncio.run(build(service.store, works, service.profile, service.dense, Tokens(), evidence, category="Scripture and canon"))
+
+    entry = next(e for e in service.collections()["collections"] if e["title"] == "tracts")
+
+    assert len(entry["works"]) == COLLECTION_WORKS_LIMIT
+    assert entry["additional_works"] == 3
+
+
+def test_http_listing_reports_the_installed_library(tmp_path):
+    service, _, _ = setup(tmp_path)
+    categorized(tmp_path, service, "Scripture and canon")
+    async def check():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=create_app(service)), base_url="http://test") as client:
+            response = await client.get("/v1/corpus/collections")
+            assert response.status_code == 200
+            categories = {entry["category"] for entry in response.json()["collections"]}
+            assert categories == {"", "Scripture and canon"}
+    asyncio.run(check())

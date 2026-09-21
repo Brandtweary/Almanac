@@ -164,6 +164,11 @@ def create_app(service=None, phonemizer=None):
     async def read(body: ReadRequest, request: Request):
         return await cancellable(request, request.app.state.service.read(body))
 
+    @app.get("/v1/corpus/collections")
+    async def collections(request: Request):
+        # Manifest and catalog reads under the same deadline and disconnect handling as retrieval.
+        return await cancellable(request, asyncio.to_thread(request.app.state.service.collections))
+
     @app.post("/v1/phonemize")
     async def phonemize(body: PhonemizeRequest, request: Request):
         return await cancellable(request, request.app.state.phonemizer.convert(body))

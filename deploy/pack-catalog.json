@@ -1,6 +1,12 @@
 {
   "schema_version": 1,
   "purpose": "Pinned acquisition candidates; not a distributable release or proof of coverage",
+  "category_titles_note": "The part of the library each category's packs are listed under once installed; passed to the preparation command as --category",
+  "category_titles": {
+    "encyclopedia": "Encyclopedia",
+    "practical-reference": "Practical reference",
+    "scripture-and-canon": "Scripture and canon"
+  },
   "packs": [
     {
       "id": "wikipedia-en-nopic",
@@ -194,6 +200,35 @@
         ],
         "text_license": "public-domain-or-CC-BY-SA-4.0",
         "exceptions": "Scanned works are public domain; contributor-authored translations, annotations and editorial apparatus are CC BY-SA 4.0 / GFDL. Preserve each page's own licensing template, author, translator and edition."
+      },
+      "readiness": "not-downloaded-or-indexed",
+      "selected": true
+    },
+    {
+      "id": "pali-canon-en-v1",
+      "category": "scripture-and-canon",
+      "language": "en",
+      "title": "Pali canon: SuttaCentral English translations",
+      "complete_articles": true,
+      "recommended": true,
+      "artifact": {
+        "path": "pali-canon_en_all_2026-09.zim",
+        "bytes": 5749297,
+        "sha256": "416bc5ae5d5462c176a22dcb52d915a371771279e0cc33420f6de490748d1ace",
+        "urls": [
+          "https://github.com/Brandtweary/Almanac/releases/download/pali-canon-2026-09/pali-canon_en_all_2026-09.zim"
+        ]
+      },
+      "release_manifest": "deploy/packs/pali-canon.json",
+      "rights": {
+        "status": "cleared",
+        "evidence": [
+          "https://suttacentral.net/licensing",
+          "https://github.com/suttacentral/bilara-data",
+          "https://creativecommons.org/publicdomain/zero/1.0/"
+        ],
+        "text_license": "CC0-1.0",
+        "exceptions": "Built by Almanac from bilara-data's CC0 dedication; the one CC BY-SA translation in the source data (Patna Dharmapada) and every non-Pali-root translation are excluded at build time. A GitHub release asset has no metalink, and can be replaced under its URL, so the pinned sha256 is the identity."
       },
       "readiness": "not-downloaded-or-indexed",
       "selected": true

@@ -57,7 +57,7 @@ test("provider serialization includes tool schema without issuing a completion",
  await loadReleaseProfile();
  const payload = await serializeModelRequest({ systemPrompt: "Read sources", messages: [{ role: "user", content: "Question", timestamp: 1 }], tools: createCorpusTools(new EvidenceLedger()) }) as any;
  assert.equal(payload.model, "local-test");
- assert.equal(payload.tools.length, 2);
+ assert.deepEqual(payload.tools.map((tool: any) => tool.function.name), ["corpus_search", "corpus_collections", "corpus_read"]);
  assert.equal(calls, 1);
 });
 

@@ -7,6 +7,7 @@
       {
         "name": "wikipedia-dense-vectors",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 13082099712,
         "derivation": "exact",
         "formula": "entries-x-width",
@@ -20,6 +21,7 @@
       {
         "name": "wikipedia-dense-graph",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 1308209972,
         "derivation": "upstream-formula",
         "formula": "qdrant-hnsw-graph",
@@ -32,6 +34,7 @@
       {
         "name": "wikipedia-dense-payload",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 5071868736,
         "derivation": "upstream-formula",
         "formula": "qdrant-payload-disk",
@@ -44,6 +47,7 @@
       {
         "name": "wikipedia-passage-spans",
         "target": "index_workspace_bytes",
+        "location": "content-state",
         "bytes": 27169204480,
         "derivation": "measured-mean",
         "formula": "entries-x-bytes-each",
@@ -56,6 +60,7 @@
       {
         "name": "dense-index-headroom",
         "target": "index_workspace_bytes",
+        "location": "index-storage",
         "bytes": 3892435684,
         "derivation": "upstream-formula",
         "formula": "fraction-of-components",
@@ -73,6 +78,7 @@
       {
         "name": "shared-service-runtime",
         "target": "runtime_workspace_bytes",
+        "location": "content-state",
         "bytes": 0,
         "derivation": "exact",
         "formula": "no-derived-state",
@@ -82,6 +88,7 @@
       {
         "name": "archive-second-copy",
         "target": "index_workspace_bytes",
+        "location": "content-state",
         "bytes": 0,
         "derivation": "exact",
         "formula": "no-derived-state",
