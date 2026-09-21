@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "id": "pali-canon-en-v1",
+  "scope": "Built locally and pinned by digest; `urls` stays empty until the archive is published, and an install attempted before then fails on acquisition rather than on verification.",
+  "built_from": {
+    "tool": "content/tools/build_pali_canon_zim.py",
+    "repository": "https://github.com/suttacentral/bilara-data",
+    "branch": "published",
+    "commit": "ff7eff006bee584c88cc185b3a1e0da4713a72e0"
+  },
+  "coverage": {
+    "declared_texts": 4795,
+    "written_texts": 4795,
+    "segments_rendered": 237006,
+    "unique_uids": 4691,
+    "redirections": 4691,
+    "index_pages": 7,
+    "by_collection_declared": {
+      "vinaya": 422,
+      "kn": 957,
+      "an": 1409,
+      "mn": 154,
+      "dn": 34,
+      "sn": 1819
+    },
+    "by_collection_written": {
+      "vinaya": 422,
+      "kn": 957,
+      "an": 1409,
+      "mn": 154,
+      "dn": 34,
+      "sn": 1819
+    },
+    "by_author_declared": {
+      "brahmali": 422,
+      "kelly": 100,
+      "kovilo": 2,
+      "soma": 73,
+      "suddhaso": 30,
+      "sujato": 4168
+    }
+  },
+  "index_workspace_bytes": 0,
+  "runtime_workspace_bytes": 0,
+  "image_store_bytes": 0,
+  "artifacts": [
+    {
+      "path": "notices/pali-canon-en.txt",
+      "kind": "license",
+      "bytes": 1676,
+      "sha256": "806e9e9f306abb1ed2568d6cb2a3a989f232e7f855a4b7c34fab06358afadcd9",
+      "embedded_text": "Source pack: Pali Canon, English translations from SuttaCentral\nArchive: pali-canon_en_all_2026-09.zim\nBuilt by: Almanac, from SuttaCentral's segmented translation data\nOriginal library: https://suttacentral.net/\nSource data: https://github.com/suttacentral/bilara-data (branch `published`,\ncommit ff7eff006bee584c88cc185b3a1e0da4713a72e0)\n\nSuttaCentral dedicates the translations in this archive to the public domain under\nCreative Commons Zero 1.0. CC0 asks for nothing in return, so the attribution below is\ngiven rather than owed: a dedication of this size is a gift, and its authorship should\nstay legible to anyone who reads from it.\n\n  Bhikkhu Sujato    the four nikayas and much of the Khuddaka collection\n  Bhikkhu Brahmali  the Vinaya Pitaka\n  John Kelly, Ayya Soma, Bhante Suddhaso, Kovilo Bhikkhu\n                    further texts of the Khuddaka collection\n  Jessica Walton    co-translator of the Theragatha\n\nThe Pali root texts are those of the Mahasangiti edition. Each article names its\ntranslator and links to the passage it was rendered from, and every article carries\nthis same dedication in its own footer.\n\nOne English translation in the source data, the Patna Dharmapada, is published under\nCC BY-SA 3.0 rather than CC0 and is excluded from this archive; so are translations\nwhose root text is not Pali. The build receipt records both exclusions by count.\n\nPublic-domain dedication: https://creativecommons.org/publicdomain/zero/1.0/\nSuttaCentral licensing: https://suttacentral.net/licensing\n\nThis archive is built from public-domain-dedicated data and may be redistributed\nfreely. It is a rendering of the source data, not a SuttaCentral publication.\n",
+      "urls": [],
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "permitted",
+        "evidence": [
+          "https://github.com/suttacentral/bilara-data/blob/published/LICENSE.md",
+          "https://suttacentral.net/licensing",
+          "https://creativecommons.org/publicdomain/zero/1.0/"
+        ],
+        "notice": "notices/pali-canon-en.txt"
+      }
+    },
+    {
+      "path": "sources/pali-canon_en_all_2026-09.zim",
+      "kind": "corpus",
+      "bytes": 5749297,
+      "sha256": "416bc5ae5d5462c176a22dcb52d915a371771279e0cc33420f6de490748d1ace",
+      "urls": [],
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "permitted",
+        "evidence": [
+          "https://github.com/suttacentral/bilara-data/blob/published/LICENSE.md",
+          "https://suttacentral.net/licensing"
+        ],
+        "text_license": "CC0-1.0",
+        "notice": "notices/pali-canon-en.txt"
+      }
+    }
+  ]
+}

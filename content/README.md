@@ -19,6 +19,8 @@ provide Docling and libzim; their dependency licenses accompany a distributed in
 `tools/configure_profile.py` creates an explicitly unqualified profile from installed tokenizer bytes and the pinned embedding backend; `tools/prepare_native.py` prepares a resumable compact ZIM generation in the active library union, with complete original reading/native full-text retrieval and explicitly title/lead-only dense discovery.
 The [native archive setup](docs/native-install.md) gives the complete invocation, source-inspection, coverage, storage-reservation and optional offline bulk-encoding contracts.
 
+`tools/build_pali_canon_zim.py` renders SuttaCentral's CC0 English translations of the Pali canon into a natively indexed ZIM, writing a receipt that counts what it produced against what the source declares; `tools/verify_pali_canon_zim.py` reads that archive back, resolving every declared text and comparing it segment by segment against the source, because an archive that is well formed and empty passes every cheaper check. Both require the `extraction` extra, and `tests_integration/test_pali_canon_zim.py` exercises them against archives broken on purpose.
+
 `oracle_content.models.Profile` is the strict release-profile schema. It requires explicit encoder
 identity/revision/dimensions/tokenizer digest/window, chat tokenizer digest, candidate depths, fusion
 weights/constant, token budgets, batching and timeouts. `qualified` remains false until evaluation
