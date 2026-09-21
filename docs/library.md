@@ -1,12 +1,14 @@
 # Reference collection
 
-Almanac’s chat searches the installed English Wikipedia, Appropedia and CD3WD snapshots. The additional reference originals below are a source collection: download them from their publishers for independent reading. They are not included in the standard searchable installation or served as a document download bundle by the demo.
+Almanac’s chat searches the installed English Wikipedia, Appropedia, CD3WD and scripture-and-canon snapshots. The additional reference originals below are a source collection: download them from their publishers for independent reading. They are not included in the standard searchable installation or served as a document download bundle by the demo.
 
 ## Searchable collections
 
 - **English Wikipedia:** full articles without images, June 2026. The [source installation guide](install.md#source-based-local-setup) acquires and prepares the pinned archive.
 - **Appropedia:** English practical-reference archive, February 2026. The same installation guide covers acquisition and preparation.
 - **CD3WD:** practical-reference archive, November 2025, with 13,220 HTML articles searchable and readable through the same tools. The complete original archive also retains its 77 PDFs; no OCR pass is required for the HTML collection. Acquisition and HTML preparation use the [installation guide](install.md#source-based-local-setup).
+- **English Wikisource:** complete texts without images, August 2026. Carries Griffith’s *Hymns of the Rigveda*, seventeen volumes of Müller’s *Sacred Books of the East* including both Upanishad and both Qur’an volumes, and the King James and Jewish Publication Society 1917 Bibles.
+- **Project Gutenberg:** March 2026, by Library of Congress class. The default selection is class B (philosophy, psychology and religion) with the classical, Celtic, Slavic, Uralic, Oriental, Indo-Iranian, East Asian, Indigenous American and Germanic literature classes; the larger English, American, Romance and general-literature classes are pinned as unselected candidates in `deploy/pack-catalog.json`.
 
 ## Reference originals
 
@@ -24,4 +26,4 @@ The collection also retains [Appropedia’s copyright policy](https://www.approp
 
 ## Editions and reuse
 
-Keep each original’s author, edition and license with the file. The application’s MIT license does not license these works. The FAO and WHO publications carry noncommercial share-alike terms; the older emergency-care workbook is written for trained first-contact professionals. Some manuals contain separately licensed figures, and the seed-production publication carries conflicting repository/PDF reuse statements. These are links to publisher originals, not permission to redistribute a combined pack.
+Keep each original’s author, edition and license with the file. The application’s MIT license does not license these works. Wikisource mixes public-domain scans with contributor-authored translations and annotations under CC BY-SA 4.0, and Project Gutenberg distributes a smaller copyrighted set alongside its public-domain texts under per-work permission terms, so each retrieved work’s own licensing statement governs it. The FAO and WHO publications carry noncommercial share-alike terms; the older emergency-care workbook is written for trained first-contact professionals. Some manuals contain separately licensed figures, and the seed-production publication carries conflicting repository/PDF reuse statements. These are links to publisher originals, not permission to redistribute a combined pack.

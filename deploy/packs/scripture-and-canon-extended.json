@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "id": "scripture-and-canon-extended-source-v1",
+  "scope": "acquisition-only; indexing, component-rights and redistribution admission pending",
+  "index_workspace_bytes": 0,
+  "runtime_workspace_bytes": 0,
+  "image_store_bytes": 0,
+  "artifacts": [
+    {
+      "path": "notices/gutenberg-lcc.txt",
+      "kind": "license",
+      "bytes": 1272,
+      "sha256": "5d17cc1efcad2361cd8d2bf66942d4d318cf9c3cc442a651e77299b6aa0bc344",
+      "embedded_text": "Source pack: Project Gutenberg, by Library of Congress classification\nPublisher of the archives: Kiwix, from Project Gutenberg\nOriginal library: https://www.gutenberg.org/\nArchive integrity metadata: https://download.kiwix.org/zim/gutenberg/\n\nProject Gutenberg distributes two distinct sets. The great majority of its texts are not\nrestricted under United States copyright law; a smaller set is copyrighted and carries its\nown permission terms inside each work. A whole-class archive may contain both, so each\nretrieved work's own front matter governs it. Project Gutenberg also asserts trademark\nterms on the \"Project Gutenberg\" name, separate from the status of the text itself.\n\nCopyright status outside the United States is determined by local law and is not\nestablished by this archive. Preserve each work's title, author, translator, edition and\nits included Project Gutenberg license header.\n\nLicense terms: https://www.gutenberg.org/policy/license.html\nPermission and trademark detail: https://www.gutenberg.org/policy/permission.html\n\nThis acquisition manifest permits locally evaluating the upstream archives. Redistribution\nadmission and per-work rights review remain separate; download completion establishes\nneither a redistribution grant nor index coverage.\n",
+      "urls": [],
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://www.gutenberg.org/policy/license.html",
+          "https://www.gutenberg.org/policy/permission.html"
+        ],
+        "notice": "notices/gutenberg-lcc.txt"
+      }
+    },
+    {
+      "path": "sources/gutenberg_en_lcc-pn_2026-03.zim",
+      "kind": "corpus",
+      "bytes": 3248473917,
+      "sha256": "1e1bd1fdf7464fb31f026e7a02e2bfbc77427802a2cbd7acb7402c09a046be19",
+      "urls": [
+        "https://wi.mirror.driftle.ss/kiwix/zim/gutenberg/gutenberg_en_lcc-pn_2026-03.zim",
+        "https://ny.mirror.driftle.ss/kiwix/zim/gutenberg/gutenberg_en_lcc-pn_2026-03.zim",
+        "https://ftp.nluug.nl/pub/kiwix/zim/gutenberg/gutenberg_en_lcc-pn_2026-03.zim",
+        "https://mirror.download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pn_2026-03.zim",
+        "https://mirror-sites-in.mblibrary.info/mirror-sites/download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pn_2026-03.zim"
+      ],
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://www.gutenberg.org/policy/license.html",
+          "https://www.gutenberg.org/policy/permission.html",
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pn_2026-03.zim.meta4"
+        ],
+        "notice": "notices/gutenberg-lcc.txt"
+      },
+      "metalink": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pn_2026-03.zim.meta4"
+    },
+    {
+      "path": "sources/gutenberg_en_lcc-pq_2026-03.zim",
+      "kind": "corpus",
+      "bytes": 4032702128,
+      "sha256": "1c7431f0e345d0fae7fa611b675edd7795360cb6d4af35a20dbea6f1aec9bbf9",
+      "urls": [
+        "https://wi.mirror.driftle.ss/kiwix/zim/gutenberg/gutenberg_en_lcc-pq_2026-03.zim",
+        "https://ny.mirror.driftle.ss/kiwix/zim/gutenberg/gutenberg_en_lcc-pq_2026-03.zim",
+        "https://ftp.nluug.nl/pub/kiwix/zim/gutenberg/gutenberg_en_lcc-pq_2026-03.zim",
+        "https://mirror.download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pq_2026-03.zim",
+        "https://mirror-sites-in.mblibrary.info/mirror-sites/download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pq_2026-03.zim"
+      ],
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://www.gutenberg.org/policy/license.html",
+          "https://www.gutenberg.org/policy/permission.html",
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pq_2026-03.zim.meta4"
+        ],
+        "notice": "notices/gutenberg-lcc.txt"
+      },
+      "metalink": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pq_2026-03.zim.meta4"
+    },
+    {
+      "path": "sources/gutenberg_en_lcc-pr_2026-03.zim",
+      "kind": "corpus",
+      "bytes": 16152121320,
+      "sha256": "439daa227e59e52c9f3b9b3d81a49c518583c799bd0bf15780e93e101a0a429d",
+      "urls": [
+        "https://wi.mirror.driftle.ss/kiwix/zim/gutenberg/gutenberg_en_lcc-pr_2026-03.zim",
+        "https://ny.mirror.driftle.ss/kiwix/zim/gutenberg/gutenberg_en_lcc-pr_2026-03.zim",
+        "https://ftp.nluug.nl/pub/kiwix/zim/gutenberg/gutenberg_en_lcc-pr_2026-03.zim",
+        "https://mirror.download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pr_2026-03.zim",
+        "https://mirror-sites-in.mblibrary.info/mirror-sites/download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pr_2026-03.zim"
+      ],
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://www.gutenberg.org/policy/license.html",
+          "https://www.gutenberg.org/policy/permission.html",
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pr_2026-03.zim.meta4"
+        ],
+        "notice": "notices/gutenberg-lcc.txt"
+      },
+      "metalink": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pr_2026-03.zim.meta4"
+    },
+    {
+      "path": "sources/gutenberg_en_lcc-ps_2026-03.zim",
+      "kind": "corpus",
+      "bytes": 16022294302,
+      "sha256": "a82d1fa3add5a126645cada4da34e4321c22284fd0fd61707841bcf2eec90124",
+      "urls": [
+        "https://wi.mirror.driftle.ss/kiwix/zim/gutenberg/gutenberg_en_lcc-ps_2026-03.zim",
+        "https://ny.mirror.driftle.ss/kiwix/zim/gutenberg/gutenberg_en_lcc-ps_2026-03.zim",
+        "https://ftp.nluug.nl/pub/kiwix/zim/gutenberg/gutenberg_en_lcc-ps_2026-03.zim",
+        "https://mirror.download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-ps_2026-03.zim",
+        "https://mirror-sites-in.mblibrary.info/mirror-sites/download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-ps_2026-03.zim"
+      ],
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://www.gutenberg.org/policy/license.html",
+          "https://www.gutenberg.org/policy/permission.html",
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-ps_2026-03.zim.meta4"
+        ],
+        "notice": "notices/gutenberg-lcc.txt"
+      },
+      "metalink": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-ps_2026-03.zim.meta4"
+    }
+  ]
+}

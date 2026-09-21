@@ -167,6 +167,428 @@
         "exceptions": "Catalog availability is not a redistribution grant. Review source-specific and third-party rights before release."
       },
       "readiness": "candidate-not-admitted"
+    },
+    {
+      "id": "wikisource-en-nopic",
+      "category": "scripture-and-canon",
+      "language": "en",
+      "title": "English Wikisource (nopic)",
+      "flavour": "nopic",
+      "complete_articles": true,
+      "recommended": true,
+      "artifact": {
+        "path": "wikisource_en_all_nopic_2026-08.zim",
+        "bytes": 12058109982,
+        "sha256": "b428beb6b7dad9cc96a9b719b9a518fd650a128bf3545b29ea19333c47b0fd5d",
+        "urls": [
+          "https://download.kiwix.org/zim/wikisource/wikisource_en_all_nopic_2026-08.zim"
+        ]
+      },
+      "upstream_manifest": "https://download.kiwix.org/zim/wikisource/wikisource_en_all_nopic_2026-08.zim.meta4",
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://en.wikisource.org/wiki/Wikisource:Copyright_policy",
+          "https://foundation.wikimedia.org/wiki/Policy:Terms_of_Use",
+          "https://download.kiwix.org/zim/wikisource/wikisource_en_all_nopic_2026-08.zim.meta4"
+        ],
+        "text_license": "public-domain-or-CC-BY-SA-4.0",
+        "exceptions": "Scanned works are public domain; contributor-authored translations, annotations and editorial apparatus are CC BY-SA 4.0 / GFDL. Preserve each page's own licensing template, author, translator and edition."
+      },
+      "readiness": "not-downloaded-or-indexed",
+      "selected": true
+    },
+    {
+      "id": "gutenberg-en-lcc-b",
+      "category": "scripture-and-canon",
+      "language": "en",
+      "title": "Project Gutenberg: Philosophy, Psychology, Religion (LC class B)",
+      "recommended": true,
+      "artifact": {
+        "path": "gutenberg_en_lcc-b_2026-03.zim",
+        "bytes": 6365165314,
+        "sha256": "62ae584ad7f178e313bc045c22aae58a7149515644eb7e8e70853a3ad6eb4a28",
+        "urls": [
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-b_2026-03.zim"
+        ]
+      },
+      "upstream_manifest": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-b_2026-03.zim.meta4",
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://www.gutenberg.org/policy/license.html",
+          "https://www.gutenberg.org/policy/permission.html",
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-b_2026-03.zim.meta4"
+        ],
+        "text_license": "public-domain-in-the-united-states",
+        "exceptions": "Project Gutenberg also distributes a smaller copyrighted set under per-work permission terms, and asserts trademark terms on its name. Status outside the United States is determined by local law. Preserve each work's own Project Gutenberg license header."
+      },
+      "readiness": "not-downloaded-or-indexed",
+      "selected": true
+    },
+    {
+      "id": "gutenberg-en-lcc-pa",
+      "category": "scripture-and-canon",
+      "language": "en",
+      "title": "Project Gutenberg: Classical Languages and Literature (LC class PA)",
+      "recommended": true,
+      "artifact": {
+        "path": "gutenberg_en_lcc-pa_2026-03.zim",
+        "bytes": 521989077,
+        "sha256": "8854203d1bcebebc41ed5f0c3b06a88f97de96e1775c617b6dcbe6ef19c338ef",
+        "urls": [
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pa_2026-03.zim"
+        ]
+      },
+      "upstream_manifest": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pa_2026-03.zim.meta4",
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://www.gutenberg.org/policy/license.html",
+          "https://www.gutenberg.org/policy/permission.html",
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pa_2026-03.zim.meta4"
+        ],
+        "text_license": "public-domain-in-the-united-states",
+        "exceptions": "Project Gutenberg also distributes a smaller copyrighted set under per-work permission terms, and asserts trademark terms on its name. Status outside the United States is determined by local law. Preserve each work's own Project Gutenberg license header."
+      },
+      "readiness": "not-downloaded-or-indexed",
+      "selected": true
+    },
+    {
+      "id": "gutenberg-en-lcc-pb",
+      "category": "scripture-and-canon",
+      "language": "en",
+      "title": "Project Gutenberg: Modern and Celtic Languages and Literature (LC class PB)",
+      "recommended": true,
+      "artifact": {
+        "path": "gutenberg_en_lcc-pb_2026-03.zim",
+        "bytes": 61479704,
+        "sha256": "ed4836fc260b32f95f44fe13ef4c8b74c95a412ffcd25611dafae878a3f92a43",
+        "urls": [
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pb_2026-03.zim"
+        ]
+      },
+      "upstream_manifest": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pb_2026-03.zim.meta4",
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://www.gutenberg.org/policy/license.html",
+          "https://www.gutenberg.org/policy/permission.html",
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pb_2026-03.zim.meta4"
+        ],
+        "text_license": "public-domain-in-the-united-states",
+        "exceptions": "Project Gutenberg also distributes a smaller copyrighted set under per-work permission terms, and asserts trademark terms on its name. Status outside the United States is determined by local law. Preserve each work's own Project Gutenberg license header."
+      },
+      "readiness": "not-downloaded-or-indexed",
+      "selected": true
+    },
+    {
+      "id": "gutenberg-en-lcc-pg",
+      "category": "scripture-and-canon",
+      "language": "en",
+      "title": "Project Gutenberg: Slavic Languages and Literature (LC class PG)",
+      "recommended": true,
+      "artifact": {
+        "path": "gutenberg_en_lcc-pg_2026-03.zim",
+        "bytes": 273910927,
+        "sha256": "6336e688356878f1f70c9f8715d78b19156eaf53baefeedf09413700833960b7",
+        "urls": [
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pg_2026-03.zim"
+        ]
+      },
+      "upstream_manifest": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pg_2026-03.zim.meta4",
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://www.gutenberg.org/policy/license.html",
+          "https://www.gutenberg.org/policy/permission.html",
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pg_2026-03.zim.meta4"
+        ],
+        "text_license": "public-domain-in-the-united-states",
+        "exceptions": "Project Gutenberg also distributes a smaller copyrighted set under per-work permission terms, and asserts trademark terms on its name. Status outside the United States is determined by local law. Preserve each work's own Project Gutenberg license header."
+      },
+      "readiness": "not-downloaded-or-indexed",
+      "selected": true
+    },
+    {
+      "id": "gutenberg-en-lcc-ph",
+      "category": "scripture-and-canon",
+      "language": "en",
+      "title": "Project Gutenberg: Uralic and Basque Languages and Literature (LC class PH)",
+      "recommended": true,
+      "artifact": {
+        "path": "gutenberg_en_lcc-ph_2026-03.zim",
+        "bytes": 48642945,
+        "sha256": "88940504f90c231112767cf81d16c9f2320a40cf9d5561d6553d70a663a96752",
+        "urls": [
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-ph_2026-03.zim"
+        ]
+      },
+      "upstream_manifest": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-ph_2026-03.zim.meta4",
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://www.gutenberg.org/policy/license.html",
+          "https://www.gutenberg.org/policy/permission.html",
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-ph_2026-03.zim.meta4"
+        ],
+        "text_license": "public-domain-in-the-united-states",
+        "exceptions": "Project Gutenberg also distributes a smaller copyrighted set under per-work permission terms, and asserts trademark terms on its name. Status outside the United States is determined by local law. Preserve each work's own Project Gutenberg license header."
+      },
+      "readiness": "not-downloaded-or-indexed",
+      "selected": true
+    },
+    {
+      "id": "gutenberg-en-lcc-pj",
+      "category": "scripture-and-canon",
+      "language": "en",
+      "title": "Project Gutenberg: Oriental Languages and Literature (LC class PJ)",
+      "recommended": true,
+      "artifact": {
+        "path": "gutenberg_en_lcc-pj_2026-03.zim",
+        "bytes": 265420358,
+        "sha256": "d51a8b5365ab376e46b0a8280985082f8a27c099bf968319b4ac0a559bece685",
+        "urls": [
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pj_2026-03.zim"
+        ]
+      },
+      "upstream_manifest": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pj_2026-03.zim.meta4",
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://www.gutenberg.org/policy/license.html",
+          "https://www.gutenberg.org/policy/permission.html",
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pj_2026-03.zim.meta4"
+        ],
+        "text_license": "public-domain-in-the-united-states",
+        "exceptions": "Project Gutenberg also distributes a smaller copyrighted set under per-work permission terms, and asserts trademark terms on its name. Status outside the United States is determined by local law. Preserve each work's own Project Gutenberg license header."
+      },
+      "readiness": "not-downloaded-or-indexed",
+      "selected": true
+    },
+    {
+      "id": "gutenberg-en-lcc-pk",
+      "category": "scripture-and-canon",
+      "language": "en",
+      "title": "Project Gutenberg: Indo-Iranian Languages and Literature (LC class PK)",
+      "recommended": true,
+      "artifact": {
+        "path": "gutenberg_en_lcc-pk_2026-03.zim",
+        "bytes": 83982058,
+        "sha256": "af55b90712b9ca0d01cc24763633a6fd5e0593ca56e91ea0753d29dabb24d8b7",
+        "urls": [
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pk_2026-03.zim"
+        ]
+      },
+      "upstream_manifest": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pk_2026-03.zim.meta4",
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://www.gutenberg.org/policy/license.html",
+          "https://www.gutenberg.org/policy/permission.html",
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pk_2026-03.zim.meta4"
+        ],
+        "text_license": "public-domain-in-the-united-states",
+        "exceptions": "Project Gutenberg also distributes a smaller copyrighted set under per-work permission terms, and asserts trademark terms on its name. Status outside the United States is determined by local law. Preserve each work's own Project Gutenberg license header."
+      },
+      "readiness": "not-downloaded-or-indexed",
+      "selected": true
+    },
+    {
+      "id": "gutenberg-en-lcc-pl",
+      "category": "scripture-and-canon",
+      "language": "en",
+      "title": "Project Gutenberg: Languages and Literature of Eastern Asia, Africa and Oceania (LC class PL)",
+      "recommended": true,
+      "artifact": {
+        "path": "gutenberg_en_lcc-pl_2026-03.zim",
+        "bytes": 107229022,
+        "sha256": "ac8eec2d35fa81ba55194aefb1ad6d04b9972500097758990e62c9c5a281a42f",
+        "urls": [
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pl_2026-03.zim"
+        ]
+      },
+      "upstream_manifest": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pl_2026-03.zim.meta4",
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://www.gutenberg.org/policy/license.html",
+          "https://www.gutenberg.org/policy/permission.html",
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pl_2026-03.zim.meta4"
+        ],
+        "text_license": "public-domain-in-the-united-states",
+        "exceptions": "Project Gutenberg also distributes a smaller copyrighted set under per-work permission terms, and asserts trademark terms on its name. Status outside the United States is determined by local law. Preserve each work's own Project Gutenberg license header."
+      },
+      "readiness": "not-downloaded-or-indexed",
+      "selected": true
+    },
+    {
+      "id": "gutenberg-en-lcc-pm",
+      "category": "scripture-and-canon",
+      "language": "en",
+      "title": "Project Gutenberg: Indigenous American Languages and Literature (LC class PM)",
+      "recommended": true,
+      "artifact": {
+        "path": "gutenberg_en_lcc-pm_2026-03.zim",
+        "bytes": 46746779,
+        "sha256": "ec4e65c533ce1a1924ed67d037edb53236e0bd7ae14cad1c0e2e494953b0a7b1",
+        "urls": [
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pm_2026-03.zim"
+        ]
+      },
+      "upstream_manifest": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pm_2026-03.zim.meta4",
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://www.gutenberg.org/policy/license.html",
+          "https://www.gutenberg.org/policy/permission.html",
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pm_2026-03.zim.meta4"
+        ],
+        "text_license": "public-domain-in-the-united-states",
+        "exceptions": "Project Gutenberg also distributes a smaller copyrighted set under per-work permission terms, and asserts trademark terms on its name. Status outside the United States is determined by local law. Preserve each work's own Project Gutenberg license header."
+      },
+      "readiness": "not-downloaded-or-indexed",
+      "selected": true
+    },
+    {
+      "id": "gutenberg-en-lcc-pt",
+      "category": "scripture-and-canon",
+      "language": "en",
+      "title": "Project Gutenberg: Germanic Literature (LC class PT)",
+      "recommended": true,
+      "artifact": {
+        "path": "gutenberg_en_lcc-pt_2026-03.zim",
+        "bytes": 759081192,
+        "sha256": "d581495dcbb8ee55fed1c2e56236d407f48b111d4e7a6b6d30b717c1c85115c5",
+        "urls": [
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pt_2026-03.zim"
+        ]
+      },
+      "upstream_manifest": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pt_2026-03.zim.meta4",
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://www.gutenberg.org/policy/license.html",
+          "https://www.gutenberg.org/policy/permission.html",
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pt_2026-03.zim.meta4"
+        ],
+        "text_license": "public-domain-in-the-united-states",
+        "exceptions": "Project Gutenberg also distributes a smaller copyrighted set under per-work permission terms, and asserts trademark terms on its name. Status outside the United States is determined by local law. Preserve each work's own Project Gutenberg license header."
+      },
+      "readiness": "not-downloaded-or-indexed",
+      "selected": true
+    },
+    {
+      "id": "gutenberg-en-lcc-pn",
+      "category": "scripture-and-canon",
+      "language": "en",
+      "title": "Project Gutenberg: Literature, Criticism and Drama (LC class PN)",
+      "recommended": false,
+      "artifact": {
+        "path": "gutenberg_en_lcc-pn_2026-03.zim",
+        "bytes": 3248473917,
+        "sha256": "1e1bd1fdf7464fb31f026e7a02e2bfbc77427802a2cbd7acb7402c09a046be19",
+        "urls": [
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pn_2026-03.zim"
+        ]
+      },
+      "upstream_manifest": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pn_2026-03.zim.meta4",
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://www.gutenberg.org/policy/license.html",
+          "https://www.gutenberg.org/policy/permission.html",
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pn_2026-03.zim.meta4"
+        ],
+        "text_license": "public-domain-in-the-united-states",
+        "exceptions": "Project Gutenberg also distributes a smaller copyrighted set under per-work permission terms, and asserts trademark terms on its name. Status outside the United States is determined by local law. Preserve each work's own Project Gutenberg license header."
+      },
+      "readiness": "not-downloaded-or-indexed",
+      "selected": false
+    },
+    {
+      "id": "gutenberg-en-lcc-pq",
+      "category": "scripture-and-canon",
+      "language": "en",
+      "title": "Project Gutenberg: Romance Literature (LC class PQ)",
+      "recommended": false,
+      "artifact": {
+        "path": "gutenberg_en_lcc-pq_2026-03.zim",
+        "bytes": 4032702128,
+        "sha256": "1c7431f0e345d0fae7fa611b675edd7795360cb6d4af35a20dbea6f1aec9bbf9",
+        "urls": [
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pq_2026-03.zim"
+        ]
+      },
+      "upstream_manifest": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pq_2026-03.zim.meta4",
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://www.gutenberg.org/policy/license.html",
+          "https://www.gutenberg.org/policy/permission.html",
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pq_2026-03.zim.meta4"
+        ],
+        "text_license": "public-domain-in-the-united-states",
+        "exceptions": "Project Gutenberg also distributes a smaller copyrighted set under per-work permission terms, and asserts trademark terms on its name. Status outside the United States is determined by local law. Preserve each work's own Project Gutenberg license header."
+      },
+      "readiness": "not-downloaded-or-indexed",
+      "selected": false
+    },
+    {
+      "id": "gutenberg-en-lcc-pr",
+      "category": "scripture-and-canon",
+      "language": "en",
+      "title": "Project Gutenberg: English Literature (LC class PR)",
+      "recommended": false,
+      "artifact": {
+        "path": "gutenberg_en_lcc-pr_2026-03.zim",
+        "bytes": 16152121320,
+        "sha256": "439daa227e59e52c9f3b9b3d81a49c518583c799bd0bf15780e93e101a0a429d",
+        "urls": [
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pr_2026-03.zim"
+        ]
+      },
+      "upstream_manifest": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pr_2026-03.zim.meta4",
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://www.gutenberg.org/policy/license.html",
+          "https://www.gutenberg.org/policy/permission.html",
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pr_2026-03.zim.meta4"
+        ],
+        "text_license": "public-domain-in-the-united-states",
+        "exceptions": "Project Gutenberg also distributes a smaller copyrighted set under per-work permission terms, and asserts trademark terms on its name. Status outside the United States is determined by local law. Preserve each work's own Project Gutenberg license header."
+      },
+      "readiness": "not-downloaded-or-indexed",
+      "selected": false
+    },
+    {
+      "id": "gutenberg-en-lcc-ps",
+      "category": "scripture-and-canon",
+      "language": "en",
+      "title": "Project Gutenberg: American Literature (LC class PS)",
+      "recommended": false,
+      "artifact": {
+        "path": "gutenberg_en_lcc-ps_2026-03.zim",
+        "bytes": 16022294302,
+        "sha256": "a82d1fa3add5a126645cada4da34e4321c22284fd0fd61707841bcf2eec90124",
+        "urls": [
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-ps_2026-03.zim"
+        ]
+      },
+      "upstream_manifest": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-ps_2026-03.zim.meta4",
+      "rights": {
+        "status": "component-review-required",
+        "evidence": [
+          "https://www.gutenberg.org/policy/license.html",
+          "https://www.gutenberg.org/policy/permission.html",
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-ps_2026-03.zim.meta4"
+        ],
+        "text_license": "public-domain-in-the-united-states",
+        "exceptions": "Project Gutenberg also distributes a smaller copyrighted set under per-work permission terms, and asserts trademark terms on its name. Status outside the United States is determined by local law. Preserve each work's own Project Gutenberg license header."
+      },
+      "readiness": "not-downloaded-or-indexed",
+      "selected": false
     }
   ],
   "selected_wikipedia_flavour": "nopic",
