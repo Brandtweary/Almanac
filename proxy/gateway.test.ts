@@ -132,3 +132,29 @@ test("a corpus that is slow is reported as slow, and an absent one as absent",as
  expect(absent.status).toBe(502);
  expect(await absent.json()).toEqual({error:{code:"corpus_unavailable"}});
 });
+
+test("health publishes a state and a progress stamp that only served work moves",async()=>{
+ const {app}=createGateway(cfg,mock(),profile);
+ const idle=await(await app.request("/health")).json();
+ expect(idle.state).toBe("idle");expect(idle.inflight).toBe(0);expect(typeof idle.last_progress_ts).toBe("number");
+ await Bun.sleep(5);
+ // Polling is not progress: a stamp the reader refreshes reports the reader.
+ expect((await(await app.request("/health")).json()).last_progress_ts).toBe(idle.last_progress_ts);
+ const served=await app.request("/v1/chat/completions",{method:"POST",headers:{"X-Request-Id":"progress-00000001"},body:JSON.stringify({model:"fixture",messages:[{role:"user",content:"hi"}]})});
+ expect(served.status).toBe(200);await served.text();
+ expect((await(await app.request("/health")).json()).last_progress_ts).toBeGreaterThan(idle.last_progress_ts);
+});
+
+test("health fails while the model behind the gateway cannot answer",async()=>{
+ const base=mock();let probes=0;
+ const fetcher=(async(url:any,init:any)=>{
+  if(String(url)===`${cfg.llmBase}/health`){probes++;return new Response("unavailable",{status:503});}
+  return base(url,init);}) as typeof fetch;
+ const {app}=createGateway(cfg,fetcher,profile);
+ const r=await app.request("/health");
+ expect(r.status).toBe(503);
+ expect(await r.json()).toMatchObject({ok:false,state:"model_unavailable"});
+ // Unauthenticated and unmetered, so repeated polling must not become load.
+ for(let i=0;i<5;i++) expect((await app.request("/health")).status).toBe(503);
+ expect(probes).toBe(1);
+});

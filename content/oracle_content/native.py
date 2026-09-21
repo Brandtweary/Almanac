@@ -455,17 +455,27 @@ class NativeReader:
 
 
 async def build_native(store, template: Document, profile: Profile, dense, tokenizer_path: Path, *,
-                       selection_policy: str, inspection: str, reserve_bytes: int, activate=True,
-                       index_storage: Path | None = None, workers: int = 1, category: str = ""):
+                       selection_policy: str, inspection: str, content_state_reserve_bytes: int, activate=True,
+                       index_storage: Path | None = None, index_storage_reserve_bytes: int = 0,
+                       workers: int = 1, category: str = ""):
     """Prepare source-native access and resume one-vector-per-article indexing.
+
+    The two reservations are separate quantities on separate filesystems and neither
+    substitutes for the other. `content_state_reserve_bytes` is a free-space floor on the
+    content state, which holds the published original and this generation's precomputed
+    article spans; the build refuses to start, and pauses in flight, rather than exhaust it.
+    `index_storage_reserve_bytes` is an allocation ceiling on `index_storage`, the vector
+    store's own directory: the build stops once the segments it has written reach it.
 
     `category` names the part of the library this archive is listed under. It describes the
     installation rather than the indexed bytes, so it stays out of the generation identity:
     naming or renaming one re-lists an archive without rebuilding it.
     """
     from .ingest import publish_original
-    if selection_policy not in POLICIES or not inspection or reserve_bytes < 1 or not 1 <= workers <= 64:
-        raise ValueError("Native source policy, inspection and positive disk reservation are required")
+    if selection_policy not in POLICIES or not inspection or content_state_reserve_bytes < 1 or not 1 <= workers <= 64:
+        raise ValueError("Native source policy, inspection and a positive content-state reservation are required")
+    if index_storage is not None and index_storage_reserve_bytes < 1:
+        raise ValueError("Declared index storage requires a positive index-storage allocation reservation")
     evidence = json.loads(inspection)
     if not isinstance(evidence, dict) or evidence.get("checked") is not True or evidence.get("source_sha256") != template.sha256 or evidence.get("extraction_revision") != template.extraction_revision or evidence.get("selection_policy") != selection_policy:
         raise ValueError("Native extraction inspection does not bind this source and selection")
@@ -485,8 +495,8 @@ async def build_native(store, template: Document, profile: Profile, dense, token
         if manifest_path.exists():
             manifest = store.manifest(generation)
         else:
-            if shutil.disk_usage(store.root).free < reserve_bytes:
-                raise ValueError("Native corpus indexing reservation does not fit available disk")
+            if shutil.disk_usage(store.root).free < content_state_reserve_bytes:
+                raise ValueError("Native corpus content-state reservation does not fit available disk")
             publish_original(store, Path(template.original_path), template.sha256, True)
             canonical = template.model_copy(update={"original_path": "originals/" + template.sha256})
             # Persist the exact tokenizer used to regenerate this generation's spans.
@@ -497,7 +507,9 @@ async def build_native(store, template: Document, profile: Profile, dense, token
                 "extraction_profile": profile.model_dump(), "inspection": evidence,
                 "packs": [template.pack_id], "document_count": 0, "passage_count": 0,
                 "entry_cursor": 0, "indexed_articles": 0, "excluded_entries": 0,
-                "exclusion_reasons": {}, "point_checksum": "0", "reserve_bytes": reserve_bytes,
+                "exclusion_reasons": {}, "point_checksum": "0",
+                "content_state_reserve_bytes": content_state_reserve_bytes,
+                "index_storage_reserve_bytes": index_storage_reserve_bytes,
                 "failures": [], "dense_representation": "title/lead only; not full article bodies"}
             atomic_json(manifest_path, manifest)
         if manifest.get("category", "") != category:
@@ -563,8 +575,8 @@ async def build_native(store, template: Document, profile: Profile, dense, token
             for index in range(manifest["entry_cursor"], reader.archive.entry_count):
                 if index % 1024 == 0:
                     reader.verify_original()
-                    if shutil.disk_usage(store.root).free < max(256 * 1024 * 1024, reserve_bytes // 20):
-                        raise ValueError("Native corpus indexing paused before exhausting its filesystem")
+                    if shutil.disk_usage(store.root).free < max(256 * 1024 * 1024, content_state_reserve_bytes // 20):
+                        raise ValueError("Native corpus indexing paused before exhausting the content-state filesystem")
                     if index_storage is not None:
                         if not index_storage.is_dir():
                             raise ValueError("Declared index storage directory is unavailable")
@@ -577,7 +589,7 @@ async def build_native(store, template: Document, profile: Profile, dense, token
                                 # Database optimization atomically retires old segment files.
                                 continue
                         manifest["observed_index_allocated_bytes"] = allocated
-                        if allocated >= reserve_bytes:
+                        if allocated >= index_storage_reserve_bytes:
                             raise ValueError("Native corpus indexing reached its declared index-storage reservation")
                 entry = reader.archive._get_entry_by_id(index)
                 reason = None

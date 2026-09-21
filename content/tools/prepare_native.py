@@ -26,13 +26,26 @@ async def main():
     parser.add_argument("--license", required=True)
     parser.add_argument("--selection-policy", choices=sorted(POLICIES), required=True)
     parser.add_argument("--inspection", type=Path, required=True, help="Representative source/structure inspection receipt")
-    parser.add_argument("--reserve-bytes", type=int, required=True)
-    parser.add_argument("--index-storage", type=Path, required=True, help="Local Qdrant storage directory; allocated bytes are checked against the reservation")
+    parser.add_argument("--content-state-reserve-bytes", type=int, required=True,
+        help="Free-space floor on --data, which holds the original and this generation's article spans")
+    parser.add_argument("--index-storage-reserve-bytes", type=int, required=True,
+        help="Allocation ceiling on --index-storage; indexing stops once the vector store reaches it")
+    # One number cannot stand for two quantities on two filesystems, and the figure
+    # this flag used to carry was the index-storage one, so accepting it would apply a
+    # vector-store ceiling as a content-state floor. Both replacements are reported
+    # separately by the preparation report, so a caller already has them.
+    parser.add_argument("--reserve-bytes", type=int, help=argparse.SUPPRESS)
+    parser.add_argument("--index-storage", type=Path, required=True, help="Local Qdrant storage directory; allocated bytes are checked against its own reservation")
     parser.add_argument("--embed-url", required=True)
     parser.add_argument("--qdrant-url", required=True)
     parser.add_argument("--workers", type=int, default=1, help="Bounded native article extraction workers")
     parser.add_argument("--bulk-encoder-command", type=Path, help="Optional argv JSON for an already qualified local JSONL encoder process")
     args = parser.parse_args()
+    if args.reserve_bytes is not None:
+        parser.error("--reserve-bytes named one number for two separate reservations on two "
+                     "filesystems; pass --content-state-reserve-bytes (the content-state free-space "
+                     "floor) and --index-storage-reserve-bytes (the vector-store allocation ceiling) "
+                     "instead, using the footprint figures reported for each location")
     profile = Profile.model_validate_json(args.profile.read_text())
     token_path = Path(profile.encoder_tokenizer)
     if not token_path.is_absolute():
@@ -53,8 +66,10 @@ async def main():
                 encoder = bulk
             dense = Qdrant(client, args.qdrant_url, encoder, profile)
             generation = await build_native(Store(args.data), document, profile, dense, token_path,
-                selection_policy=args.selection_policy, inspection=args.inspection.read_text().strip(), reserve_bytes=args.reserve_bytes,
-                index_storage=args.index_storage, workers=args.workers, category=args.category)
+                selection_policy=args.selection_policy, inspection=args.inspection.read_text().strip(),
+                content_state_reserve_bytes=args.content_state_reserve_bytes,
+                index_storage=args.index_storage, index_storage_reserve_bytes=args.index_storage_reserve_bytes,
+                workers=args.workers, category=args.category)
             print(generation, flush=True)
         finally:
             if bulk is not None:

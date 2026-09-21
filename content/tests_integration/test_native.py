@@ -46,10 +46,44 @@ def fixture(tmp_path, name="first", water_body=None):
     return doc, p, token_path
 
 
-def build(store, doc, p, dense, token_path):
+def build(store, doc, p, dense, token_path, **reservations):
+    reservations.setdefault("content_state_reserve_bytes", 1024 * 1024)
     return asyncio.run(build_native(store, doc, p, dense, token_path, selection_policy="canonical-html",
         inspection=json.dumps({"checked": True, "source_sha256": doc.sha256, "extraction_revision": doc.extraction_revision,
-                               "selection_policy": "canonical-html", "receipt": "local fixture headings and original paragraphs inspected"}), reserve_bytes=1024 * 1024))
+                               "selection_policy": "canonical-html", "receipt": "local fixture headings and original paragraphs inspected"}), **reservations))
+
+
+def test_each_reservation_measures_only_the_filesystem_it_names(tmp_path):
+    """The content-state floor and the index-storage ceiling are separate quantities.
+
+    The first build leaves the vector store already allocated well past the content-state
+    number and runs to completion against its own, larger ceiling; the second keeps that
+    ceiling below the same allocation and is stopped. One shared number cannot produce
+    both outcomes, so this is what tells the two checks apart.
+    """
+    doc, p, token_path = fixture(tmp_path)
+    index = tmp_path / "index"
+    index.mkdir()
+    (index / "segment").write_bytes(b"x" * (4 * 1024 * 1024))
+    dense = NativeDense()
+    generation = build(Store(tmp_path / "state"), doc, p, dense, token_path, index_storage=index,
+        content_state_reserve_bytes=1024 * 1024, index_storage_reserve_bytes=64 * 1024 * 1024)
+    manifest = Store(tmp_path / "state").manifest(generation)
+    assert manifest["dense_stage"] == "complete"
+    assert manifest["observed_index_allocated_bytes"] >= 4 * 1024 * 1024
+    assert manifest["content_state_reserve_bytes"] == 1024 * 1024
+    assert manifest["index_storage_reserve_bytes"] == 64 * 1024 * 1024
+    with pytest.raises(ValueError, match="index-storage reservation"):
+        build(Store(tmp_path / "capped"), doc, p, dense, token_path, index_storage=index,
+            content_state_reserve_bytes=1024 * 1024, index_storage_reserve_bytes=1024 * 1024)
+
+
+def test_a_declared_index_directory_without_its_own_reservation_is_refused(tmp_path):
+    doc, p, token_path = fixture(tmp_path)
+    index = tmp_path / "index"
+    index.mkdir()
+    with pytest.raises(ValueError, match="index-storage allocation reservation"):
+        build(Store(tmp_path / "state"), doc, p, NativeDense(), token_path, index_storage=index)
 
 
 def test_native_full_reader_and_independent_search_without_duplicate_catalog(tmp_path):

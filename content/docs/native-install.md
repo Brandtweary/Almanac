@@ -28,11 +28,13 @@ PYTHONPATH=. python tools/prepare_native.py \
   --source-base-url https://www.appropedia.org --license CC-BY-SA-per-page \
   --selection-policy appropedia-open-english-v2 \
   --inspection inspections/appropedia-2026-02-html-v4.json \
-  --reserve-bytes 27917287424 --index-storage /srv/almanac/index/qdrant \
+  --content-state-reserve-bytes <free-space floor for the content state> \
+  --index-storage-reserve-bytes 27917287424 \
+  --index-storage /srv/almanac/index/qdrant \
   --workers 4 --embed-url http://127.0.0.1:8899 --qdrant-url http://127.0.0.1:6333
 ```
 
-The archive is verified and hardlinked on the same filesystem into the content state; cross-filesystem publication requires a copy and its extra capacity. `--index-storage` identifies the local Qdrant storage directory: allocated bytes across that directory are checked against the explicit reservation, and low-free-space checks pause indexing. The example reservation is a conservative provisional peak allowance for a complete-article encyclopedia plus the practical archive; actual required space remains a deployment measurement, and filesystem growth checks are not a hard quota on an asynchronous database optimizer.
+The archive is verified and hardlinked on the same filesystem into the content state; cross-filesystem publication requires a copy and its extra capacity. `--index-storage` identifies the local Qdrant storage directory, and `--index-storage-reserve-bytes` caps allocation across it; `--content-state-reserve-bytes` is the separate free-space floor on `--data`, which the pre-flight and in-flight low-space checks measure against. A pack whose content-state components are declared unmeasured carries no computed figure for that floor, so it is the operator's own margin for the article-spans artifact rather than a number read off the report. The example index reservation is a conservative provisional peak allowance for a complete-article encyclopedia plus the practical archive; actual required space remains a deployment measurement, and filesystem growth checks are not a hard quota on an asynchronous database optimizer.
 
 For Wikipedia use its exact acquired nopic SHA-256, `--pack-id wikipedia-en-nopic-2026-06`, `--source-base-url https://en.wikipedia.org/wiki`, `--license CC-BY-SA-4.0`, `--selection-policy canonical-html` and the matching checked inspection receipt. Canonical HTML includes full articles; redirects resolve to their canonical targets, and non-HTML assets are not vector documents. The Appropedia policy requires an English article-body language declaration, applies the documented CC-BY-SA-4.0 default when page metadata selects that default, and respects explicit alternative licenses plus the inspection receipt’s source-bound exception map. Copyright discussion, bibliographic references and permission acknowledgements are not blanket exclusions; the four recorded unresolved contrary notices are source-serving choices, not legal verdicts, and this selected text scope does not clear every archive image or imported document.
 

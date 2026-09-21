@@ -20,7 +20,7 @@ The model and reference library use local artifacts. Web search remains availabl
 
 [`.env.example`](../.env.example) describes browser overrides; [`proxy/.env.example`](../proxy/.env.example) describes local service endpoints and the release-profile path. Default browser routes use the application's origin. Vite loads environment files for the selected mode, and the production connection policy permits that origin plus explicitly configured service origins. Check `.env.local` when building a production bundle because Vite loads it in every mode.
 
-`/health` confirms gateway liveness; `/ready` reports aggregate qualified readiness; `/v1/profile` describes capabilities, model and role limits. Candidate qualification is labelled separately and never makes `/ready` succeed. Missing corpus, missing model, invalid profile, full queue and failed inference remain distinct outcomes. See [gateway configuration](../proxy/README.md).
+`/health` reports gateway liveness as a supervisable document — a state, the timestamp of the last request a backend actually answered, and a 503 while the model does not answer — so an unattended installation can be watched without treating a served static page as a working service; `/ready` reports aggregate qualified readiness; `/v1/profile` describes capabilities, model and role limits. Candidate qualification is labelled separately and never makes `/ready` succeed. Missing corpus, missing model, invalid profile, full queue and failed inference remain distinct outcomes. See [gateway configuration](../proxy/README.md).
 
 ## Speech protocol
 

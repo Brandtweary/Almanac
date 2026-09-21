@@ -69,6 +69,9 @@ The example chooses compact float16 vector storage and candidate response budget
 After Appropedia acquisition finishes, prepare its permitted English-article selection using the repository's inspection receipt:
 
 ```sh
+# Both figures belong to the pack being indexed and are read from its preparation
+# report: footprint.by_location["content-state"] and footprint.by_location["index-storage"].
+export CONTENT_STATE_RESERVE_BYTES=<content-state bytes from the preparation report>
 export CONTENT_INDEX_RESERVE_BYTES=27917287424
 .venv/bin/python content/tools/prepare_native.py \
   --profile "$ALMANAC_DATA/content-profile.json" --data "$ALMANAC_DATA/content-state" \
@@ -78,12 +81,13 @@ export CONTENT_INDEX_RESERVE_BYTES=27917287424
   --source-base-url https://www.appropedia.org --license CC-BY-SA-per-page \
   --selection-policy appropedia-open-english-v2 \
   --inspection content/inspections/appropedia-2026-02-html-v4.json \
-  --reserve-bytes "$CONTENT_INDEX_RESERVE_BYTES" \
+  --content-state-reserve-bytes "$CONTENT_STATE_RESERVE_BYTES" \
+  --index-storage-reserve-bytes "$CONTENT_INDEX_RESERVE_BYTES" \
   --index-storage "$ALMANAC_DATA/index/qdrant" --workers 4 \
   --embed-url "$CONTENT_EMBED_URL" --qdrant-url "$CONTENT_QDRANT_URL"
 ```
 
-`--reserve-bytes` is this build's own cap on the `--index-storage` directory: indexing halts when allocation there reaches it. Set it to the figure setup already computed for that directory — the `footprint.by_location["index-storage"]` value in the preparation report for the pack being indexed — rather than to the pack's whole footprint, which also covers the article-spans artifact that lands in the content state instead. The 26 GiB literal above is a provisional value for the combined encyclopedia/library index and is not a corpus-size cap. Setup checks disk before downloading and this caps the build in flight; they are two different jobs and neither replaces the other. The index-storage path must identify the persistent Qdrant storage actually used by the local service. [Native corpus installation](../content/docs/native-install.md) documents the complete coverage and serving contract. The preparation command resumes interrupted work and adds a completed pack to the active library union; it does not replace other completed packs. It never treats missing inspection evidence or a partial index as successful preparation.
+The build takes two reservations on two filesystems, one flag each. `--index-storage-reserve-bytes` is this build's own cap on the `--index-storage` directory: indexing halts when allocation there reaches it. `--content-state-reserve-bytes` is a free-space floor on `--data`, where the published original and this generation's article-spans artifact land: the build refuses to start, and pauses in flight, rather than exhaust that filesystem. Set each to the figure setup already computed for that location — the `footprint.by_location["index-storage"]` and `footprint.by_location["content-state"]` values in the preparation report for the pack being indexed — rather than either to the pack's whole footprint, which spans both; where a pack declares its content-state components unmeasured the report reserves nothing there, and the floor is then an operator margin for the article-spans artifact rather than a computed figure. The superseded single `--reserve-bytes` flag is refused by name, because the number it carried was the index-storage one and reusing it as the content-state floor would under-reserve the spans artifact. The 26 GiB literal above is a provisional value for the combined encyclopedia/library index and is not a corpus-size cap. Setup checks disk before downloading and this caps the build in flight; they are two different jobs and neither replaces the other. The index-storage path must identify the persistent Qdrant storage actually used by the local service. [Native corpus installation](../content/docs/native-install.md) documents the complete coverage and serving contract. The preparation command resumes interrupted work and adds a completed pack to the active library union; it does not replace other completed packs. It never treats missing inspection evidence or a partial index as successful preparation.
 
 `--category` is optional and names the part of the library an archive is listed under, shared by the archives that belong together; the chat's library listing groups them by it. `category_titles` in `deploy/pack-catalog.json` gives the value for each catalog category. It is recorded outside the generation identity, so adding or changing one re-runs the preparation command without rebuilding the index.
 
@@ -100,7 +104,8 @@ Prepare the verified complete-article Wikipedia archive with its checked-in v4 i
   --source-base-url https://en.wikipedia.org/wiki --license CC-BY-SA-4.0 \
   --selection-policy canonical-html \
   --inspection content/inspections/wikipedia-2026-06-html-v4.json \
-  --reserve-bytes "$CONTENT_INDEX_RESERVE_BYTES" \
+  --content-state-reserve-bytes "$CONTENT_STATE_RESERVE_BYTES" \
+  --index-storage-reserve-bytes "$CONTENT_INDEX_RESERVE_BYTES" \
   --index-storage "$ALMANAC_DATA/index/qdrant" --workers 4 \
   --embed-url "$CONTENT_EMBED_URL" --qdrant-url "$CONTENT_QDRANT_URL"
 ```
@@ -118,12 +123,13 @@ Prepare CD3WD's HTML articles in the same searchable library; the complete origi
   --license "Source-specific notices retained in original archive" \
   --selection-policy canonical-html \
   --inspection content/inspections/cd3wd-2025-11-html-v4.json \
-  --reserve-bytes "$CONTENT_INDEX_RESERVE_BYTES" \
+  --content-state-reserve-bytes "$CONTENT_STATE_RESERVE_BYTES" \
+  --index-storage-reserve-bytes "$CONTENT_INDEX_RESERVE_BYTES" \
   --index-storage "$ALMANAC_DATA/index/qdrant" --workers 4 \
   --embed-url "$CONTENT_EMBED_URL" --qdrant-url "$CONTENT_QDRANT_URL"
 ```
 
-The receipts bind the exact source hashes, v4 extraction and source-selection policies. These operations can take substantially longer than downloading a small reference pack. Keep the measured free-space reserve and preparation receipts when resuming them; dense vectors represent article titles/leads, while native lexical search and original reading cover complete article bodies.
+The receipts bind the exact source hashes, v4 extraction and source-selection policies. These operations can take substantially longer than downloading a small reference pack. Keep both measured reserves and the preparation receipts when resuming them; dense vectors represent article titles/leads, while native lexical search and original reading cover complete article bodies.
 
 With `content-profile.json` and the activated content state in the data directory, start the content service in its own terminal or supervisor:
 

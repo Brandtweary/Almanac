@@ -67,6 +67,45 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
   app.use("*", cors({origin: cfg.allowedOrigins, allowMethods: ["GET", "POST", "DELETE", "OPTIONS"], exposeHeaders: ["X-Request-Id"]}));
   app.use("*", bodyLimit({maxSize: Math.max(131072, profile?.limits.maxRequestBytes ?? 65536, profile?.limits.speechMaxBytes ?? 65536), onError: c => c.json({error: {code: "body_too_large"}}, 413)}));
   app.onError((error, c) => { log({stage: "request", status: "failed", error: error.name}); return c.json({error: {code: "gateway_failure"}}, 500); });
+  // Liveness a process supervisor can act on. Three facts: a `state`, a
+  // progress timestamp that moves only when a backend answered work a caller
+  // asked for, and an HTTP status that fails while the model behind the
+  // gateway cannot answer. A document whose timestamp is refreshed by the act
+  // of reading it reports the poller's liveness rather than the gateway's, and
+  // a serving process is then indistinguishable from a wedged one — so the
+  // probes below route around `served` deliberately.
+  let lastProgressTs = Date.now() / 1000;
+  let servedInflight = 0;
+  const served = async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]): Promise<Response> => {
+    servedInflight++;
+    try {
+      // A backend answering at all is the progress being measured; its status
+      // code is the caller's problem, not evidence about this process.
+      const response = await fetcher(input, init);
+      lastProgressTs = Date.now() / 1000;
+      return response;
+    } finally { servedInflight--; }
+  };
+  // Unauthenticated and unmetered, so the probe behind it is cached and shared:
+  // one backend round trip per window however hard the route is polled.
+  const MODEL_PROBE_TTL_MS = 5000;
+  let modelProbe: {at: number; ok: boolean} | null = null;
+  let modelProbePending: Promise<boolean> | null = null;
+  async function modelAnswering(): Promise<boolean> {
+    if (!profile || !cfg.llmBase) return false;
+    if (modelProbe && Date.now() - modelProbe.at < MODEL_PROBE_TTL_MS) return modelProbe.ok;
+    if (!modelProbePending) {
+      modelProbePending = (async () => {
+        let ok = false;
+        try { ok = (await fetcher(`${cfg.llmBase}/health`, {signal: AbortSignal.timeout(5000)})).ok; }
+        catch { ok = false; }
+        modelProbe = {at: Date.now(), ok};
+        modelProbePending = null;
+        return ok;
+      })();
+    }
+    return modelProbePending;
+  }
   async function corpus(signal?: AbortSignal) {
     try {
       const r = await fetcher(`${cfg.contentBase}/capabilities`, {signal: AbortSignal.any([signal ?? new AbortController().signal, AbortSignal.timeout(5000)])});
@@ -78,15 +117,19 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
   }
   async function readiness(signal?: AbortSignal) {
     const content = await corpus(signal);
-    let modelReady = false;
-    if (profile && cfg.llmBase) {
-      try { const r = await fetcher(`${cfg.llmBase}/health`, {signal: AbortSignal.timeout(5000)}); modelReady = r.ok; }
-      catch { modelReady = false; }
-    }
+    const modelReady = await modelAnswering();
     return {ready: !!profile?.qualified && modelReady && content.ready === true && content.qualified === true, qualificationMode: cfg.qualificationMode, status: !profile ? profileError : !modelReady ? "model_unavailable" : !content.ready ? "corpus_unavailable" : !content.qualified && !cfg.qualificationMode ? "corpus_unqualified" : !profile.qualified ? "qualification_only" : "ready", profile,
       capabilities: {corpus: content.ready === true, personalMemory: true, speech: {stt: !!cfg.sttBase, tts: !!cfg.ttsBase}, webSearch: !!cfg.searxngBase}, corpus: content};
   }
-  app.get("/health", c => c.json({ok: true, state: "running", last_progress_ts: Date.now() / 1000}));
+  app.get("/health", async c => {
+    const modelReady = await modelAnswering();
+    // `idle` is a distinct state rather than stale progress: with nothing in
+    // flight there is no work to have stalled, and a supervisor suspends its
+    // staleness measurement on it. A request in flight puts the state back to
+    // `serving`, where an unmoving timestamp does mean something.
+    const state = !modelReady ? "model_unavailable" : servedInflight > 0 ? "serving" : "idle";
+    return c.json({ok: modelReady, state, inflight: servedInflight, last_progress_ts: lastProgressTs}, modelReady ? 200 : 503);
+  });
   app.get("/v1/profile", async c => c.json(await readiness(c.req.raw.signal)));
   app.get("/ready", async c => { const r = await readiness(c.req.raw.signal); return c.json(r, r.ready ? 200 : 503); });
   app.get("/v1/requests/:id", c => { const status = queue?.status(c.req.param("id")); return status ? c.json(status) : c.json({error: {code: "request_unknown"}}, 404); });
@@ -100,7 +143,7 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
   async function forwardCorpus(c: Parameters<MiddlewareHandler>[0], tool: string, init: RequestInit = {}) {
     const deadline = AbortSignal.timeout(cfg.corpusTimeoutMs);
     try {
-      const upstream = await fetcher(`${cfg.contentBase}/v1/corpus/${tool}`, {...init, signal: AbortSignal.any([c.req.raw.signal, deadline])});
+      const upstream = await served(`${cfg.contentBase}/v1/corpus/${tool}`, {...init, signal: AbortSignal.any([c.req.raw.signal, deadline])});
       const data = await upstream.json(); return c.json(data, upstream.status as 200);
     } catch (error) {
       if (c.req.raw.signal.aborted) { log({stage: `corpus_${tool}`, status: "cancelled"}); return c.json({error: {code: "cancelled"}}, 499 as 200); }
@@ -120,7 +163,7 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
     const body = await c.req.text();
     if (new TextEncoder().encode(body).length > 131072) return c.json({error: {code: "body_too_large"}}, 413);
     try {
-      const upstream = await fetcher(`${cfg.contentBase}/v1/phonemize`, {
+      const upstream = await served(`${cfg.contentBase}/v1/phonemize`, {
         method: "POST", headers: {"Content-Type": "application/json"}, body,
         signal: AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(15000)]),
       });
@@ -132,16 +175,16 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
   });
   async function countTokens(body: Record<string, unknown>, signal: AbortSignal) {
     if (profile?.model.parser === "vllm") {
-      const result = await fetcher(`${cfg.llmBase}/tokenize`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(vllmTokenizePayload(body, profile.model.excludeToolsWhenNone)), signal});
+      const result = await served(`${cfg.llmBase}/tokenize`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(vllmTokenizePayload(body, profile.model.excludeToolsWhenNone)), signal});
       const tokens = await result.json();
       if (!result.ok || !Array.isArray(tokens.tokens) || tokens.tokens.some((x: unknown) => !Number.isSafeInteger(x) || Number(x) < 0) || tokens.count !== tokens.tokens.length || !Number.isSafeInteger(tokens.max_model_len) || tokens.max_model_len < profile.model.contextWindow) throw new AdmissionError("tokenizer_failed", 502);
       return tokens.count;
     }
     if (!profile || profile.model.parser !== "llama.cpp") throw new AdmissionError("tokenizer_adapter_unavailable");
-    const template = await fetcher(`${cfg.llmBase}/apply-template`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body), signal});
+    const template = await served(`${cfg.llmBase}/apply-template`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body), signal});
     const formatted = await template.json();
     if (!template.ok || typeof formatted.prompt !== "string") throw new AdmissionError("template_failed", 502);
-    const result = await fetcher(`${cfg.llmBase}/tokenize`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({content: formatted.prompt, add_special: true, parse_special: true}), signal});
+    const result = await served(`${cfg.llmBase}/tokenize`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({content: formatted.prompt, add_special: true, parse_special: true}), signal});
     const tokens = await result.json();
     if (!result.ok || !Array.isArray(tokens.tokens) || tokens.tokens.some((x: unknown) => !Number.isSafeInteger(x))) throw new AdmissionError("tokenizer_failed", 502);
     return tokens.tokens.length;
@@ -183,7 +226,7 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
       lease = await queue.acquire(id, conversation, priority as "foreground" | "background", c.req.raw.signal);
       const tokens = await countTokens(body, lease.signal);
       if (tokens > budgets.maxInputTokens || tokens + Number(max) > profile.model.contextWindow) throw new AdmissionError("context_budget_exceeded", 413);
-      const upstream = await fetcher(`${cfg.llmBase}/v1/chat/completions`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body), signal: lease.signal});
+      const upstream = await served(`${cfg.llmBase}/v1/chat/completions`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body), signal: lease.signal});
       if (!upstream.ok || !upstream.body) { await upstream.body?.cancel(); throw new AdmissionError("inference_failed", 502); }
       if (!body.stream) {
         const data = await upstream.json();
@@ -246,7 +289,7 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
     const q = c.req.query("q")?.trim();
     if (!q || q.length > 4096) return c.json({error: {code: "invalid_query"}}, 400);
     try {
-      const r = await fetcher(`${cfg.searxngBase}/search?q=${encodeURIComponent(q)}&format=json`, {signal: AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(15000)])});
+      const r = await served(`${cfg.searxngBase}/search?q=${encodeURIComponent(q)}&format=json`, {signal: AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(15000)])});
       const data = await r.json();
       if (!r.ok || !Array.isArray(data.results) || data.results.some((x: any) => !x || typeof x.url !== "string")) throw new Error("invalid search response");
       const degraded = Array.isArray(data.unresponsive_engines) && data.unresponsive_engines.length > 0;
@@ -256,7 +299,7 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
   });
   const EMBED_MAX_INPUTS = 64, EMBED_MAX_INPUT_CHARS = 8192;
 async function embeddingIdentity(signal: AbortSignal): Promise<string> {
-	const response = await fetcher(`${cfg.embedBase}/info`, { signal });
+	const response = await served(`${cfg.embedBase}/info`, { signal });
 	if (!response.ok) throw new Error(`embedding metadata HTTP ${response.status}`);
 	const info = await response.json();
 	if (!info || typeof info.model_id !== "string" || !info.model_id ||
@@ -300,7 +343,7 @@ app.post("/v1/embed", limit("embed"), async (c) => {
 	const signal = AbortSignal.timeout(15000);
 	try {
 		encoder = await embeddingIdentity(signal);
-		res = await fetcher(`${cfg.embedBase}/embed`, {
+		res = await served(`${cfg.embedBase}/embed`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({ inputs, truncate: false, normalize: true }),
@@ -337,7 +380,7 @@ app.post("/v1/embed", limit("embed"), async (c) => {
     try {
       const bytes = await c.req.arrayBuffer();
       if (bytes.byteLength > profile.limits.speechMaxBytes) return c.json({error: {code: "speech_body_too_large"}}, 413);
-      const r = await fetcher(`${cfg.sttBase}/v1/audio/transcriptions`, {method: "POST", headers: {"Content-Type": c.req.header("Content-Type") ?? "application/octet-stream"}, body: bytes, signal: AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(profile.limits.speechTimeoutMs)])});
+      const r = await served(`${cfg.sttBase}/v1/audio/transcriptions`, {method: "POST", headers: {"Content-Type": c.req.header("Content-Type") ?? "application/octet-stream"}, body: bytes, signal: AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(profile.limits.speechTimeoutMs)])});
       const data = await r.json(); if (!r.ok || typeof data.text !== "string") throw new Error("invalid transcription response");
       return c.json(data);
     } catch (error) { log({stage: "speech", status: "failed", error: error instanceof Error ? error.name : "unknown"}); return c.json({error: {code: "speech_failed"}}, 502); }
@@ -347,7 +390,7 @@ app.post("/v1/embed", limit("embed"), async (c) => {
   else app.post("/voice/lease", c => c.json({error: {code: "speech_unavailable"}}, 503));
   app.get("/v1/corpus/source/:handle", limit("source"), async c => {
     try {
-      const upstream = await fetcher(`${cfg.contentBase}/v1/corpus/source/${encodeURIComponent(c.req.param("handle"))}`, {signal: c.req.raw.signal});
+      const upstream = await served(`${cfg.contentBase}/v1/corpus/source/${encodeURIComponent(c.req.param("handle"))}`, {signal: c.req.raw.signal});
       return new Response(upstream.body, {status: upstream.status, headers: {"Content-Type": upstream.headers.get("Content-Type") ?? "application/octet-stream", "Content-Disposition": upstream.headers.get("Content-Disposition") ?? "attachment", "Content-Security-Policy": "sandbox; default-src 'none'", "X-Content-Type-Options": "nosniff"}});
     } catch { return c.json({error: {code: "source_unavailable"}}, 502); }
   });
