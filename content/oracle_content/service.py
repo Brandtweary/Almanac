@@ -180,7 +180,12 @@ class Service:
             category = manifest.get("category", "")
             if manifest.get("kind") == NATIVE_KIND:
                 doc = Document.model_validate(manifest["source"])
-                articles = manifest.get("canonical_html_articles") or manifest.get("indexed_articles")
+                # The archive's own HTML-entry count stands for what a search can
+                # reach only while every entry is admitted. Under a selection policy
+                # the indexed count is the reachable one, and `indexing_complete`
+                # says whether it is final or still climbing.
+                articles = manifest.get("indexed_articles") if manifest["selection_policy"] != "canonical-html" \
+                    else (manifest.get("canonical_html_articles") or manifest.get("indexed_articles"))
                 entries.append({"category": category, "title": doc.title, "publisher": doc.publisher,
                                 "origin": doc.source_url, "language": doc.language, "articles": articles,
                                 "works": [], "additional_works": 0,

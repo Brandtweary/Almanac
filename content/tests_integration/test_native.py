@@ -46,11 +46,41 @@ def fixture(tmp_path, name="first", water_body=None):
     return doc, p, token_path
 
 
-def build(store, doc, p, dense, token_path, **reservations):
+WIKISOURCE_ENTRIES = {
+    "The Laws of Manu": "<p>The great sages approached Manu, seated with collected mind.</p>",
+    "Hymns of the Rigveda/Mandala 1": "<p>Agni I laud, the herald of the sacrifice.</p>",
+    "Page:Laws of Manu.djvu/12": "<p>12 THE LAWS OF MANU. The great sa- ges approached</p>",
+    "A/Page:Laws of Manu.djvu/13": "<p>13 THE LAWS OF MANU. Manu, seated with col- lected</p>",
+    "Page%3ARigveda.djvu/4": "<p>4 HYMNS OF THE RIGVEDA. Agni I laud, the her- ald</p>",
+    "Index:Laws of Manu.djvu": "<p>Index of the scanned volume.</p>",
+}
+MAINSPACE_ENTRIES = 2
+
+
+def wikisource_fixture(tmp_path, name="wikisource"):
+    """An archive shaped like a proofreading wiki: assembled works beside their scans.
+
+    The scan pages carry the same words as the works they were transcribed into, so an
+    archive indexed without a namespace policy answers a search twice from one work.
+    """
+    path = tmp_path / (name + ".zim")
+    with Creator(str(path)).config_indexing(True, "eng") as archive:
+        for entry, body in WIKISOURCE_ENTRIES.items():
+            archive.add_item(Article(entry, entry, body))
+        archive.set_mainpath("The Laws of Manu")
+    _doc, p, token_path = fixture(tmp_path, name + "-profile")
+    doc = Document(document_id="archive", work_id=name, pack_id=name, title="Wikisource", language="en",
+        source_url="https://en.wikisource.org/wiki", sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+        media_type="application/x-zim", license="public-domain-or-CC-BY-SA-4.0",
+        extraction_revision="html-structural-v4", original_path=str(path))
+    return doc, p, token_path
+
+
+def build(store, doc, p, dense, token_path, policy="canonical-html", **reservations):
     reservations.setdefault("content_state_reserve_bytes", 1024 * 1024)
-    return asyncio.run(build_native(store, doc, p, dense, token_path, selection_policy="canonical-html",
+    return asyncio.run(build_native(store, doc, p, dense, token_path, selection_policy=policy,
         inspection=json.dumps({"checked": True, "source_sha256": doc.sha256, "extraction_revision": doc.extraction_revision,
-                               "selection_policy": "canonical-html", "receipt": "local fixture headings and original paragraphs inspected"}), **reservations))
+                               "selection_policy": policy, "receipt": "local fixture headings and original paragraphs inspected"}), **reservations))
 
 
 def test_each_reservation_measures_only_the_filesystem_it_names(tmp_path):
@@ -228,3 +258,49 @@ def test_native_article_is_displayed_under_its_own_title_and_names_its_archive(t
             assert hit["passage_id"] not in header
             assert header.startswith('inline; filename="Valve.txt"')
     asyncio.run(check())
+
+
+def test_mainspace_policy_refuses_proofreading_namespaces_by_path_alone():
+    """Admission follows the entry path, in every spelling a ZIM writes it."""
+    def decoded():
+        raise AssertionError("a path-decided policy must not decode the article")
+    assert selection(decoded, "wikisource-mainspace-v1", "The Laws of Manu") == (True, None, None)
+    assert selection(decoded, "wikisource-mainspace-v1", "Hymns of the Rigveda/Mandala 1")[0]
+    for scan in ("Page:Laws of Manu.djvu/12", "A/Page:Laws of Manu.djvu/13",
+                 "Page%3ARigveda.djvu/4", "Index:Laws of Manu.djvu", "A/Index:Rigveda.djvu"):
+        assert selection(decoded, "wikisource-mainspace-v1", scan) == (False, "proofreading_scan_page", None)
+    with pytest.raises(ValueError):
+        selection(decoded, "wikisource-mainspace-v1")
+
+
+def test_mainspace_generation_indexes_assembled_works_and_not_their_scans(tmp_path):
+    """One work is indexed once: the assembled text, never the scanned pages beside it.
+
+    The count the pack's footprint declares is the archive's own HTML-entry count less
+    the entries this policy refuses, so it is asserted against what the build indexed.
+    """
+    doc, p, token_path = wikisource_fixture(tmp_path)
+    store, dense = Store(tmp_path / "state"), NativeDense()
+    generation = build(store, doc, p, dense, token_path, policy="wikisource-mainspace-v1")
+    manifest = store.manifest(generation)
+    scans = len(WIKISOURCE_ENTRIES) - MAINSPACE_ENTRIES
+    assert manifest["indexed_articles"] == MAINSPACE_ENTRIES
+    assert manifest["excluded_entries"] == scans
+    assert manifest["exclusion_reasons"] == {"proofreading_scan_page": scans}
+    assert manifest["canonical_html_articles"] - scans == manifest["indexed_articles"]
+    assert len(dense.points[generation]) == MAINSPACE_ENTRIES
+    reader = store.native(generation)
+    work = reader.document_id(reader.archive.get_entry_by_path("The Laws of Manu")._index)
+    # Wikisource licensing is per page; the policy resolves none, so the archive's
+    # own declaration stands rather than being erased by the admission.
+    assert reader.document(work).license == "public-domain-or-CC-BY-SA-4.0"
+    scan = reader.document_id(reader.archive.get_entry_by_path("Page:Laws of Manu.djvu/12")._index)
+    with pytest.raises(ContentError) as refused:
+        reader.document(scan)
+    assert refused.value.code == "source_excluded"
+    service = Service(store, p, dense, TokenCounter(str(token_path), p.encoder_tokenizer_sha256), ZimLexical())
+    hits = asyncio.run(service.search(SearchRequest(query="sages")))["hits"]
+    assert hits and all("Page:" not in hit["title"] for hit in hits)
+    # The listing counts what a search can reach, not the archive's whole entry table.
+    listing = next(row for row in service.collections()["collections"] if row["title"] == "Wikisource")
+    assert listing["articles"] == MAINSPACE_ENTRIES and listing["indexing_complete"]

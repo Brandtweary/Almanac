@@ -1,48 +1,54 @@
 {
   "schema_version": 2,
   "id": "scripture-and-canon-source-v1",
-  "scope": "acquisition and the installed index footprint; component-rights and redistribution admission pending",
+  "scope": "acquisition and the installed index footprint; component-rights and redistribution admission pending. The Wikisource archive is indexed under the wikisource-mainspace-v1 selection policy, which admits the assembled mainspace works and refuses the Page: and Index: proofreading scans, so its footprint stands for the mainspace entries alone and a handful of works transcribed but never assembled are acquired without being indexed",
   "footprint": {
     "components": [
       {
         "name": "wikisource-dense-vectors",
         "target": "index_workspace_bytes",
         "location": "index-storage",
-        "bytes": 6965116416,
+        "bytes": 1083597312,
         "derivation": "exact",
         "formula": "entries-x-width",
         "inputs": {
-          "entries": 4534581,
+          "entries": 705467,
           "dimensions": 384,
-          "bytes_per_dimension": 4
+          "bytes_per_dimension": 4,
+          "archive_html_entries": 4534581,
+          "refused_scan_pages": 3829114
         },
-        "basis": "4534581 indexed HTML entries, read from the archive's own M/Counter over HTTP range requests with content/tools/inspect_remote_zim.py, one vector each at the encoder's 384 dimensions and the profile schema's default float32 vector datatype. Rights exclusions and a non-canonical selection policy can only lower the count, and a float16 profile halves the width"
+        "basis": "the entries the wikisource-mainspace-v1 selection policy admits: 4534581 indexed HTML entries read from the archive's own M/Counter over HTTP range requests with content/tools/inspect_remote_zim.py, less the 3829114 Page: and Index: proofreading entries the policy refuses, counted by binary search over the same entry table. One vector each at the encoder's 384 dimensions and the profile schema's default float32 vector datatype. Rights exclusions can only lower the count further, and a float16 profile halves the width"
       },
       {
         "name": "wikisource-dense-graph",
         "target": "index_workspace_bytes",
         "location": "index-storage",
-        "bytes": 696511642,
+        "bytes": 108359732,
         "derivation": "upstream-formula",
         "formula": "qdrant-hnsw-graph",
         "inputs": {
-          "entries": 4534581,
-          "links_per_node": 16
+          "entries": 705467,
+          "links_per_node": 16,
+          "archive_html_entries": 4534581,
+          "refused_scan_pages": 3829114
         },
-        "basis": "Qdrant's published capacity formula hnsw_size = points x m x 2 x 4 bytes x 1.2 at its default m of 16 (https://qdrant.tech/documentation/capacity-planning/); the collection adapters.Qdrant.create builds keeps the graph on disk and overrides no HNSW parameter"
+        "basis": "Qdrant's published capacity formula hnsw_size = points x m x 2 x 4 bytes x 1.2 at its default m of 16 (https://qdrant.tech/documentation/capacity-planning/); the collection adapters.Qdrant.create builds keeps the graph on disk and overrides no HNSW parameter. The points are the mainspace entries wikisource-mainspace-v1 admits, the archive's 4534581 HTML entries less the 3829114 it refuses"
       },
       {
         "name": "wikisource-dense-payload",
         "target": "index_workspace_bytes",
         "location": "index-storage",
-        "bytes": 2693541114,
+        "bytes": 419047398,
         "derivation": "upstream-formula",
         "formula": "qdrant-payload-disk",
         "inputs": {
-          "entries": 4534581,
-          "payload_bytes": 396
+          "entries": 705467,
+          "payload_bytes": 396,
+          "archive_html_entries": 4534581,
+          "refused_scan_pages": 3829114
         },
-        "basis": "Qdrant's published disk_size = points x avg_payload_size x 1.5, whose 1.5 covers backend storage overhead. Every point carries the same four-field record adapters.Qdrant.put builds, 396 bytes compactly encoded at this archive's widest entry index of 4735817"
+        "basis": "Qdrant's published disk_size = points x avg_payload_size x 1.5, whose 1.5 covers backend storage overhead. Every point carries the same four-field record adapters.Qdrant.put builds, 396 bytes compactly encoded at this archive's widest entry index of 4735817. The points are the mainspace entries wikisource-mainspace-v1 admits, the archive's 4534581 HTML entries less the 3829114 it refuses; an admitted entry's index is still drawn from the whole table, so the width stands"
       },
       {
         "name": "wikisource-passage-spans",
@@ -50,7 +56,7 @@
         "location": "content-state",
         "bytes": null,
         "derivation": "unmeasured",
-        "basis": "the article-spans artifact stores each article's extracted blocks, spans and representative compressed at zlib level 6. The only measured constant, 3190 bytes per article in oracle_content.precompute, was sampled from English Wikipedia and does not transfer to this archive's entries; sampling this archive is what would quantify it. The builder publishes whatever it reaches and stops at its own --min-free-bytes floor, so an unreserved shortfall costs coverage rather than the install"
+        "basis": "the article-spans artifact stores each article's extracted blocks, spans and representative compressed at zlib level 6, for the 705467 mainspace entries wikisource-mainspace-v1 admits rather than for the whole entry table. The only measured constant, 3190 bytes per article in oracle_content.precompute, was sampled from English Wikipedia and does not transfer to this archive's entries; sampling this archive is what would quantify it. The builder publishes whatever it reaches and stops at its own --min-free-bytes floor, so an unreserved shortfall costs coverage rather than the install"
       },
       {
         "name": "gutenberg-b-dense-vectors",
@@ -536,7 +542,7 @@
         "name": "dense-index-headroom",
         "target": "index_workspace_bytes",
         "location": "index-storage",
-        "bytes": 2077631092,
+        "bytes": 328798146,
         "derivation": "upstream-formula",
         "formula": "fraction-of-components",
         "inputs": {
@@ -602,7 +608,7 @@
       }
     ]
   },
-  "index_workspace_bytes": 12465786549,
+  "index_workspace_bytes": 1972788873,
   "runtime_workspace_bytes": 0,
   "image_store_bytes": 0,
   "artifacts": [

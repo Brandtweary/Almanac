@@ -468,6 +468,24 @@ class FootprintTests(unittest.TestCase):
             with self.subTest(release=release['id']):
                 setup.validate(release)
 
+    def test_the_wikisource_footprint_counts_what_its_selection_policy_admits(self):
+        """The declared point count is the archive's entries less the scans it refuses.
+
+        The proofreading namespaces are most of that archive, and each work they
+        transcribe is also present assembled, so a footprint standing for the whole
+        entry table reserves an index of duplicates nobody reads.
+        """
+        release = json.loads((Path(__file__).parent / 'packs' / 'scripture-and-canon.json').read_text())
+        components = [c for c in release['footprint']['components'] if c['name'].startswith('wikisource-dense')]
+        self.assertEqual(len(components), 3)
+        for component in components:
+            with self.subTest(component=component['name']):
+                inputs = component['inputs']
+                self.assertEqual(inputs['entries'],
+                                 inputs['archive_html_entries'] - inputs['refused_scan_pages'])
+                self.assertLess(inputs['entries'], inputs['archive_html_entries'])
+                self.assertIn('wikisource-mainspace-v1', component['basis'])
+
 
 if __name__ == '__main__':
     unittest.main()

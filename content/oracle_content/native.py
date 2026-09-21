@@ -17,7 +17,7 @@ import time
 import traceback
 from html.parser import HTMLParser
 from html import escape
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, unquote, urlsplit
 
 from bs4 import BeautifulSoup
 
@@ -43,7 +43,12 @@ def counted_html_entries(counter: str | None):
 
 
 KIND = "native-zim-article-v1"
-POLICIES = {"canonical-html", "appropedia-explicit-open-english-v1", "appropedia-open-english-v2"}
+POLICIES = {"canonical-html", "appropedia-explicit-open-english-v1", "appropedia-open-english-v2",
+            "wikisource-mainspace-v1"}
+
+# MediaWiki proofreading namespaces, carrying one entry per scanned page and per
+# scanned volume. A selection policy naming them admits the assembled works alone.
+SCAN_WORKFLOW_NAMESPACES = ("Page:", "Index:")
 
 # One lexical search localizes up to `lexical_depth` articles from this archive,
 # and each localization decodes, block-parses and segments a whole article —
@@ -148,12 +153,43 @@ def html_type(value):
     return value.split(";", 1)[0].strip().lower() in {"text/html", "application/xhtml+xml"}
 
 
-def selection(html, policy):
+def scan_workflow_page(path):
+    """Whether an entry path names a MediaWiki proofreading page rather than a work.
+
+    `Page:` is one entry per scanned page image and `Index:` one per scanned volume;
+    both belong to the transcription workflow. A ZIM writes an article either at its
+    bare title or under a single-letter namespace directory, and percent-encodes the
+    title, so the prefix is tested after undoing both spellings.
+    """
+    if not isinstance(path, str):
+        raise ValueError("A namespace selection policy requires the entry path")
+    title = path[2:] if re.match("[A-Z]/", path) else path
+    return unquote(title).startswith(SCAN_WORKFLOW_NAMESPACES)
+
+
+def selection(html, policy, path=None):
+    """Admit or refuse one archive entry under a source selection policy.
+
+    `html` may be the entry's decoded HTML or a callable returning it, and a policy
+    deciding from the path alone never calls it: decoding an archive's every entry to
+    reach a verdict the path already carries costs the whole archive's decompression.
+    Returns admission, a refusal reason, and an explicit license when the policy
+    resolved one from the article itself — `None` leaves the archive's own in place.
+    """
     if policy == "canonical-html":
+        return True, None, None
+    if policy == "wikisource-mainspace-v1":
+        # Each transcribed work is also assembled in the mainspace under its own
+        # title, so admitting the proofreading namespaces indexes every work a
+        # second time as disconnected OCR pages. Licensing is per page on this
+        # source and stays with the archive's declaration rather than being read
+        # out of the article body.
+        if scan_workflow_page(path):
+            return False, "proofreading_scan_page", None
         return True, None, None
     if policy not in {"appropedia-explicit-open-english-v1", "appropedia-open-english-v2"}:
         raise ValueError("Unknown native source selection policy")
-    soup = BeautifulSoup(html, "html.parser")
+    soup = BeautifulSoup(html() if callable(html) else html, "html.parser")
     fields = {node.get("data-param"): node.get("data-value") for node in soup.select('[data-template="Page data"][data-param]')}
     body = soup.select_one(".mw-parser-output") or soup
     language = body.get("lang") or fields.get("language")
@@ -271,10 +307,13 @@ class NativeReader:
             if stored is not None and stored[3] is not None:
                 license = stored[3]
             else:
-                allowed, _, explicit = selection(decode_zim_html(entry.get_item()), self.policy)
+                allowed, _, explicit = selection(lambda: decode_zim_html(entry.get_item()), self.policy, entry.path)
                 if not allowed:
                     raise ContentError("source_excluded", "Article is outside the declared source selection", 404)
-                license = explicit
+                # A policy that resolves no license of its own leaves the archive's
+                # declaration standing; overwriting it with None would erase it.
+                if explicit is not None:
+                    license = explicit
         base = self.template.source_url.rstrip("/")
         host = urlsplit(base).netloc
         source_url = (urlsplit(base).scheme + "://" + quote(entry.path, safe="/()_'")) if host and entry.path.startswith(host + "/") else base + "/" + quote(entry.path, safe="/()_'")
@@ -600,7 +639,7 @@ async def build_native(store, template: Document, profile: Profile, dense, token
                 elif entry.path in reader.rights_exclusions:
                     reason = "unresolved_contrary_source_notice"
                 elif selection_policy != "canonical-html":
-                    allowed, reason, _ = selection(decode_zim_html(entry.get_item()), selection_policy)
+                    allowed, reason, _ = selection(lambda: decode_zim_html(entry.get_item()), selection_policy, entry.path)
                     if allowed:
                         reason = None
                 if reason:
