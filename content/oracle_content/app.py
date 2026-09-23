@@ -15,7 +15,7 @@ import uuid
 import httpx
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from .adapters import Embeddings, Qdrant, Reranker, ZimLexical
 from .extract import TokenCounter, html_blocks, decode_zim_html
 from .models import ContentError, Profile, SearchRequest, ReadRequest
@@ -47,6 +47,40 @@ def source_filename(doc, media_type):
     spaced = re.sub(r"[^\w.\- ]", " ", re.sub(r"['‘’ʼ`]", "", doc.title))
     stem = re.sub(r"\s+", " ", spaced).strip(" .-")[:96].strip(" .-")
     return (stem or doc.document_id) + (mimetypes.guess_extension(media_type) or "")
+
+
+SCAN_CHUNK_BYTES = 1024 * 1024
+
+
+def scan_item(root, archive, article_path):
+    """The scanned book a text archive's article was read from, or None.
+
+    A text archive built from a crawl of scanned books names that crawl by SHA-256 in its
+    `Scans` metadata and writes each book's article at the path its scan has in the crawl.
+    When the crawl is installed among the originals with an unchanged integrity receipt,
+    the scan is the source a reader is sent to; otherwise the article's text stands in.
+    """
+    if "Scans" not in archive.metadata_keys:
+        return None
+    sha256 = bytes(archive.get_metadata("Scans")).decode("ascii", "replace")
+    crawl = root / "originals" / sha256
+    if not re.fullmatch(r"[0-9a-f]{64}", sha256) or not crawl.is_file():
+        return None
+    receipt_path = crawl.with_suffix(".receipt.json")
+    receipt = json.loads(receipt_path.read_text()) if receipt_path.exists() else {}
+    stat = crawl.stat()
+    if receipt.get("sha256") != sha256 or receipt.get("size") != stat.st_size or receipt.get("mtime_ns") != stat.st_mtime_ns:
+        return None
+    from libzim.reader import Archive
+    scans = Archive(str(crawl))
+    try:
+        entry = scans.get_entry_by_path(article_path)
+    except KeyError:
+        return None
+    item = entry.get_item()
+    if item.mimetype.split(";", 1)[0].strip() != "application/pdf":
+        return None
+    return scans, item
 
 
 def disposition(media_type, filename):
@@ -201,7 +235,20 @@ def create_app(service=None, phonemizer=None):
             if doc.extraction_revision not in {"html-structural-v3", "html-structural-v4"}:
                 raise ContentError("unsupported_extraction_revision", "Text rendering for this retained archive is unavailable; original bytes remain installed", 409)
             from libzim.reader import Archive
-            entry = Archive(str(path)).get_entry_by_path(doc.article_path)
+            archive = Archive(str(path))
+            scan = scan_item(store.root, archive, doc.article_path)
+            if scan is not None:
+                scans, item = scan
+
+                def chunks(scans=scans, content=item.content):
+                    view = memoryview(content)
+                    for offset in range(0, len(view), SCAN_CHUNK_BYTES):
+                        yield bytes(view[offset:offset + SCAN_CHUNK_BYTES])
+
+                name = source_filename(doc, "application/pdf")
+                return StreamingResponse(chunks(), media_type="application/pdf", headers={**headers,
+                    "Content-Length": str(item.size), "Content-Disposition": disposition("application/pdf", name)})
+            entry = archive.get_entry_by_path(doc.article_path)
             text = "\n\n".join(block.text for block in html_blocks(decode_zim_html(entry.get_item()), doc.extraction_revision))
             attribution = f"{doc.title}\nSource: {doc.source_url}\nLicense: {doc.license}\n"
             if doc.edition:

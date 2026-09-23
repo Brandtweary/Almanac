@@ -1,0 +1,146 @@
+{
+  "schema_version": 2,
+  "id": "survivor-library-source-v1",
+  "scope": "acquisition and the installed index footprint of the Survivor Library crawl. The books are PDF entries the archive's own full-text index does not cover, so the indexed pack is a derived text archive built from each PDF's embedded text layer by content/tools/build_survivor_text_zim.py; the crawl itself is retained whole, scans included, and serves each book's scan as its source. Per-work rights and redistribution admission pending",
+  "footprint": {
+    "components": [
+      {
+        "name": "survivor-dense-vectors",
+        "target": "index_workspace_bytes",
+        "location": "index-storage",
+        "bytes": 22216704,
+        "derivation": "exact",
+        "formula": "entries-x-width",
+        "inputs": {
+          "entries": 14464,
+          "dimensions": 384,
+          "bytes_per_dimension": 4
+        },
+        "basis": "at most 14464 derived articles, one per PDF entry, counted from the crawl's own M/Counter over HTTP range requests with content/tools/inspect_remote_zim.py; a PDF with no usable text layer yields no article, so the built count can only be lower, one vector each at the encoder's 384 dimensions and the profile schema's default float32 vector datatype. Rights exclusions and a non-canonical selection policy can only lower the count, and a float16 profile halves the width"
+      },
+      {
+        "name": "survivor-dense-graph",
+        "target": "index_workspace_bytes",
+        "location": "index-storage",
+        "bytes": 2221671,
+        "derivation": "upstream-formula",
+        "formula": "qdrant-hnsw-graph",
+        "inputs": {
+          "entries": 14464,
+          "links_per_node": 16
+        },
+        "basis": "Qdrant's published capacity formula hnsw_size = points x m x 2 x 4 bytes x 1.2 at its default m of 16 (https://qdrant.tech/documentation/capacity-planning/); the collection adapters.Qdrant.create builds keeps the graph on disk and overrides no HNSW parameter"
+      },
+      {
+        "name": "survivor-dense-payload",
+        "target": "index_workspace_bytes",
+        "location": "index-storage",
+        "bytes": 8548224,
+        "derivation": "upstream-formula",
+        "formula": "qdrant-payload-disk",
+        "inputs": {
+          "entries": 14464,
+          "payload_bytes": 394
+        },
+        "basis": "Qdrant's published disk_size = points x avg_payload_size x 1.5, whose 1.5 covers backend storage overhead. Every point carries the same four-field record adapters.Qdrant.put builds, 394 bytes compactly encoded at this archive's widest entry index"
+      },
+      {
+        "name": "survivor-derived-text-archive",
+        "target": "index_workspace_bytes",
+        "location": "data-root",
+        "bytes": null,
+        "derivation": "unmeasured",
+        "basis": "the derived text archive holds one HTML article per book with a text layer, plus its own full-text index. Its size is the extracted text, which is not known until the scans are read"
+      },
+      {
+        "name": "survivor-passage-spans",
+        "target": "index_workspace_bytes",
+        "location": "content-state",
+        "bytes": null,
+        "derivation": "unmeasured",
+        "basis": "the article-spans artifact stores each article's extracted blocks, spans and representative compressed at zlib level 6, for the derived archive's one article per book. The only measured constant, 3190 bytes per article in oracle_content.precompute, was sampled from English Wikipedia and does not transfer to this archive's entries; sampling this archive is what would quantify it. The builder publishes whatever it reaches and stops at its own --min-free-bytes floor, so an unreserved shortfall costs coverage rather than the install"
+      },
+      {
+        "name": "dense-index-headroom",
+        "target": "index_workspace_bytes",
+        "location": "index-storage",
+        "bytes": 6597320,
+        "derivation": "upstream-formula",
+        "formula": "fraction-of-components",
+        "inputs": {
+          "components": [
+            "survivor-dense-vectors",
+            "survivor-dense-graph",
+            "survivor-dense-payload"
+          ],
+          "numerator": 1,
+          "denominator": 5
+        },
+        "basis": "the ~20% disk headroom the same Qdrant capacity page recommends, taken over the vector, graph and payload components it covers: the write-ahead log, snapshots and the optimizer's temporary segments. The article-spans artifact is a SQLite file outside the vector store and is deliberately not in this sum"
+      },
+      {
+        "name": "shared-service-runtime",
+        "target": "runtime_workspace_bytes",
+        "location": "content-state",
+        "bytes": 0,
+        "derivation": "exact",
+        "formula": "no-derived-state",
+        "inputs": {},
+        "basis": "indexing writes into the shared content state and the shared Qdrant store, and adds no per-pack runtime working set; the service's own bounded stores (CONTENT_SNAPSHOT_MAX_BYTES, CONTENT_FAILURE_LOG_MAX_BYTES) belong to the installation rather than to any one pack and are not multiplied by it"
+      },
+      {
+        "name": "archive-second-copy",
+        "target": "index_workspace_bytes",
+        "location": "content-state",
+        "bytes": 0,
+        "derivation": "exact",
+        "formula": "no-derived-state",
+        "inputs": {},
+        "basis": "prepare_native hardlinks the verified archive into the content state, so the original occupies its pinned artifact bytes once; a content state on another filesystem cannot hardlink and needs that many bytes again, which is a layout choice this manifest cannot see"
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "path": "notices/survivor-library.txt",
+      "bytes": 990,
+      "sha256": "adfa8cb81f8f5b2b2b3ba294cb005555b45c2dbeda5911d27ef5295a14386aa7",
+      "kind": "license",
+      "embedded_text": "Source pack: Survivor Library\nSnapshot: survivorlibrary.com_en_all_2025-12.zim\nPublisher of the archive: Kiwix (a Zimit crawl of survivorlibrary.com)\nOriginal library: https://www.survivorlibrary.com/\nArchive integrity metadata: https://download.kiwix.org/zim/zimit/survivorlibrary.com_en_all_2025-12.zim.meta4\n\nThe Survivor Library collects scanned books, most published before 1930, on the practical\nknowledge of pre-industrial and early industrial life. Most scans originate from the\nInternet Archive and Google Books. The archive carries no single license: each work's own\ncopyright status governs it, and works in the public domain in the United States may not be\nin the public domain elsewhere. Preserve each book's title, author, edition and scan source.\n\nThis acquisition manifest permits locally evaluating the upstream archive. Redistribution\nadmission and per-work rights review remain separate; download completion establishes\nneither a redistribution grant nor index coverage.\n",
+      "urls": [],
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://www.survivorlibrary.com/",
+          "https://download.kiwix.org/zim/zimit/survivorlibrary.com_en_all_2025-12.zim.meta4"
+        ],
+        "notice": "notices/survivor-library.txt"
+      }
+    },
+    {
+      "path": "sources/survivorlibrary.com_en_all_2025-12.zim",
+      "bytes": 251947683722,
+      "sha256": "c812c4ba3b9bcf7b77864cc965d526336d487e1b9ddc9364bad68fc55d2862e3",
+      "kind": "corpus",
+      "urls": [
+        "https://ny.mirror.driftle.ss/kiwix/zim/zimit/survivorlibrary.com_en_all_2025-12.zim",
+        "https://mirror.download.kiwix.org/zim/zimit/survivorlibrary.com_en_all_2025-12.zim",
+        "https://ftp.nluug.nl/pub/kiwix/zim/zimit/survivorlibrary.com_en_all_2025-12.zim"
+      ],
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://www.survivorlibrary.com/",
+          "https://download.kiwix.org/zim/zimit/survivorlibrary.com_en_all_2025-12.zim.meta4"
+        ],
+        "notice": "notices/survivor-library.txt"
+      },
+      "metalink": "https://download.kiwix.org/zim/zimit/survivorlibrary.com_en_all_2025-12.zim.meta4"
+    }
+  ],
+  "index_workspace_bytes": 39583919,
+  "runtime_workspace_bytes": 0,
+  "image_store_bytes": 0
+}

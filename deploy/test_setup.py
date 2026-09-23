@@ -254,7 +254,8 @@ class SetupTests(unittest.TestCase):
                + '</pieces><url>'+a['urls'][0]+'</url></file></metalink>').encode()
         requested = []
         def opener(request, **kwargs):
-            if isinstance(request, str):
+            self.assertEqual(request.get_header('User-agent'), setup.USER_AGENT)
+            if request.full_url == a['metalink']:
                 return Response(xml)
             if request.get_method() == 'HEAD':
                 return Response(ETag='"v1"', **{'Content-Length': str(len(self.content))})
@@ -290,7 +291,7 @@ class SetupTests(unittest.TestCase):
         staging.mkdir()
         def opener(request, **kwargs):
             response = original(request, **kwargs)
-            if not isinstance(request, str) and request.get_method() != 'HEAD':
+            if request.full_url != a['metalink'] and request.get_method() != 'HEAD':
                 response.headers['ETag'] = '"changed"'
             return response
         with self.assertRaisesRegex(setup.SetupError, 'validator mismatch'):

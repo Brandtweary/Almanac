@@ -1,0 +1,639 @@
+{
+  "source_sha256": "9bb5f3408707fd0300c6ef47a425c3217187f144cd9154a928183816aa72eead",
+  "extraction_revision": "html-structural-v4",
+  "selection_policy": "ifixit-repair-v1",
+  "checked": true,
+  "scope": "Representative iFixit guides, device pages and member profiles read through v4 extraction: guide steps, difficulty and time fields, device troubleshooting and the policy verdicts; not repair accuracy. Guides are CC BY-NC-SA 3.0, used non-commercially",
+  "archive": "9bb5f3408707fd0300c6ef47a425c3217187f144cd9154a928183816aa72eead",
+  "archive_uuid": "bff12bdb-1fac-6ab0-ed6c-9f5f030722b3",
+  "archive_bytes": 3570695757,
+  "entry_count": 894821,
+  "native_fulltext": true,
+  "counter": "application/javascript=1;application/vnd.ms-fontobject=1;font/sfnt=1;font/woff=1;font/woff2=6;image/gif=3;image/jpeg=15;image/png=24;image/svg+xml=5;image/vnd.microsoft.icon=1;image/webp=574954;text/css=18;text/html=253845;text/javascript=2",
+  "sample_seed": 1,
+  "observations": [
+    {
+      "path": "User/2194144/Χρήστος Δημητρούλης",
+      "title": "Χρήστος Δημητρούλης",
+      "html_bytes": 5185,
+      "blocks": 20,
+      "body_characters": 282,
+      "lead_characters": 0,
+      "lead_excerpt": "",
+      "body_text_sha256": "c36dbcf666b347f89e54a26b43d00779002e6e1935f416ae844332b29632e074",
+      "headings": [
+        [
+          "Χρήστος Δημητρούλης"
+        ],
+        [
+          "Χρήστος Δημητρούλης",
+          "Χρήστος Δημητρούλης"
+        ]
+      ],
+      "tables": 1,
+      "flags": [
+        "figure_requires_visual_inspection",
+        "merged_cells_inspect_original",
+        "table_headers_unverified"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "not_repair_content",
+        "license": null
+      }
+    },
+    {
+      "path": "Guide/Heyday+True+Wireless+Earbuds+8204+Case+Battery+Replacement/155971",
+      "title": "Heyday True Wireless Earbuds 8204 Case Battery Replacement",
+      "html_bytes": 42858,
+      "blocks": 74,
+      "body_characters": 3730,
+      "lead_characters": 63,
+      "lead_excerpt": "Difficulty\n\nDifficult\n\nSteps\n\n5\n\nTime Required\n\n15 - 30 minutes",
+      "body_text_sha256": "a327ebbd16d9c653c5eca63f9b2583c80a0c8d9c177a17a7b97375a61fb81f00",
+      "headings": [
+        [
+          "Heyday True Wireless Earbuds 8204 Case Battery Replacement"
+        ],
+        [
+          "Heyday True Wireless Earbuds 8204 Case Battery Replacement",
+          "Introduction"
+        ],
+        [
+          "Heyday True Wireless Earbuds 8204 Case Battery Replacement",
+          "Introduction",
+          "Tools"
+        ],
+        [
+          "Heyday True Wireless Earbuds 8204 Case Battery Replacement",
+          "Step 1 TODO: Handle step title (title of the step OR if not specified + first step of the section, 'subject' of the section) <span class=\"stepTitleTitle\" itemprop=\"name\"> Back Cover </span>"
+        ],
+        [
+          "Heyday True Wireless Earbuds 8204 Case Battery Replacement",
+          "Step 2 TODO: Handle step title (title of the step OR if not specified + first step of the section, 'subject' of the section) <span class=\"stepTitleTitle\" itemprop=\"name\"> Back Cover </span>"
+        ],
+        [
+          "Heyday True Wireless Earbuds 8204 Case Battery Replacement",
+          "Step 3 TODO: Handle step title (title of the step OR if not specified + first step of the section, 'subject' of the section) <span class=\"stepTitleTitle\" itemprop=\"name\"> Back Cover </span>"
+        ],
+        [
+          "Heyday True Wireless Earbuds 8204 Case Battery Replacement",
+          "Step 4 TODO: Handle step title (title of the step OR if not specified + first step of the section, 'subject' of the section) <span class=\"stepTitleTitle\" itemprop=\"name\"> Back Cover </span>"
+        ],
+        [
+          "Heyday True Wireless Earbuds 8204 Case Battery Replacement",
+          "Step 5 TODO: Handle step title (title of the step OR if not specified + first step of the section, 'subject' of the section) <span class=\"stepTitleTitle\" itemprop=\"name\"> Back Cover </span>"
+        ]
+      ],
+      "tables": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "User/1746028/Alex Ziemann",
+      "title": "Alex Ziemann",
+      "html_bytes": 5071,
+      "blocks": 20,
+      "body_characters": 263,
+      "lead_characters": 0,
+      "lead_excerpt": "",
+      "body_text_sha256": "ebe59b6734b753873f5efd2ddf2aaabc79a701e49c8c65e18f179ac44b818a1a",
+      "headings": [
+        [
+          "Alex Ziemann"
+        ],
+        [
+          "Alex Ziemann",
+          "Alex Ziemann"
+        ]
+      ],
+      "tables": 1,
+      "flags": [
+        "figure_requires_visual_inspection",
+        "merged_cells_inspect_original",
+        "table_headers_unverified"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "not_repair_content",
+        "license": null
+      }
+    },
+    {
+      "path": "User/4424935/CFW",
+      "title": "CFW",
+      "html_bytes": 5024,
+      "blocks": 20,
+      "body_characters": 243,
+      "lead_characters": 0,
+      "lead_excerpt": "",
+      "body_text_sha256": "78b09bee61aebf5a956ecd6ee547d632148a0c2834615ab28c06a27b3fefbdaa",
+      "headings": [
+        [
+          "CFW"
+        ],
+        [
+          "CFW",
+          "CFW"
+        ]
+      ],
+      "tables": 1,
+      "flags": [
+        "figure_requires_visual_inspection",
+        "merged_cells_inspect_original",
+        "table_headers_unverified"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "not_repair_content",
+        "license": null
+      }
+    },
+    {
+      "path": "Guide/iMac+Intel+17-Inch+Hard+Drive+Replacement/890",
+      "title": "iMac Intel 17\" Hard Drive Replacement",
+      "html_bytes": 68336,
+      "blocks": 122,
+      "body_characters": 8023,
+      "lead_characters": 58,
+      "lead_excerpt": "Difficulty\n\nModerate\n\nSteps\n\n5\n\nTime Required\n\nNo estimate",
+      "body_text_sha256": "9c8f95e3018a8f8f84c2741ed70114bf0a28ba3f37e3bb80c6da2495d97c070b",
+      "headings": [
+        [
+          "iMac Intel 17\" Hard Drive Replacement"
+        ],
+        [
+          "iMac Intel 17\" Hard Drive Replacement",
+          "Introduction"
+        ],
+        [
+          "iMac Intel 17\" Hard Drive Replacement",
+          "Introduction",
+          "Tools"
+        ],
+        [
+          "iMac Intel 17\" Hard Drive Replacement",
+          "Step 1 TODO: Handle step title (title of the step OR if not specified + first step of the section, 'subject' of the section) <span class=\"stepTitleTitle\" itemprop=\"name\"> Back Cover </span>"
+        ],
+        [
+          "iMac Intel 17\" Hard Drive Replacement",
+          "Step 2 TODO: Handle step title (title of the step OR if not specified + first step of the section, 'subject' of the section) <span class=\"stepTitleTitle\" itemprop=\"name\"> Back Cover </span>"
+        ],
+        [
+          "iMac Intel 17\" Hard Drive Replacement",
+          "Step 3 TODO: Handle step title (title of the step OR if not specified + first step of the section, 'subject' of the section) <span class=\"stepTitleTitle\" itemprop=\"name\"> Back Cover </span>"
+        ],
+        [
+          "iMac Intel 17\" Hard Drive Replacement",
+          "Step 4 TODO: Handle step title (title of the step OR if not specified + first step of the section, 'subject' of the section) <span class=\"stepTitleTitle\" itemprop=\"name\"> Back Cover </span>"
+        ],
+        [
+          "iMac Intel 17\" Hard Drive Replacement",
+          "Step 5 TODO: Handle step title (title of the step OR if not specified + first step of the section, 'subject' of the section) <span class=\"stepTitleTitle\" itemprop=\"name\"> Back Cover </span>"
+        ]
+      ],
+      "tables": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "Device/Milwaukee_Rotary_Hammer_271520__F99A_2016",
+      "title": "Milwaukee Rotary Hammer 2715-20 - F99A (2016)",
+      "html_bytes": 7696,
+      "blocks": 26,
+      "body_characters": 773,
+      "lead_characters": 108,
+      "lead_excerpt": "128,220\n\nFree manuals\n\n238,691\n\nSolutions\n\n73,688\n\nDevices\n\n100M+\n\nRepairs\n\n© 2025 iFixit — Creative Commons",
+      "body_text_sha256": "23bf8f8b1188a346769b062deb866de2daf3f8926d663bc8e7151c3563048cc0",
+      "headings": [
+        [
+          "Milwaukee Rotary Hammer 2715-20 - F99A (2016)"
+        ]
+      ],
+      "tables": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "Device/Amana_Refrigerator_ATB1632MR_0",
+      "title": "Amana Refrigerator ATB1632MR*0*",
+      "html_bytes": 12550,
+      "blocks": 53,
+      "body_characters": 2812,
+      "lead_characters": 235,
+      "lead_excerpt": "Repair and additional information for the Amana ATB1632MR*0* refrigerator—a 2007 top freezer model with an automatic defrost system and no ice dispenser. This page covers information for model numbers matching the pattern ATB1632MR*0*.",
+      "body_text_sha256": "1bd5d70c1a59e71366e2e025b926d5001152b66520a6915a63d325c6f45180d2",
+      "headings": [
+        [
+          "Amana Refrigerator ATB1632MR*0*"
+        ],
+        [
+          "Amana Refrigerator ATB1632MR*0*",
+          "Background"
+        ],
+        [
+          "Amana Refrigerator ATB1632MR*0*",
+          "Technical Specifications"
+        ]
+      ],
+      "tables": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "User/4959647/Ben Carrington",
+      "title": "Ben Carrington",
+      "html_bytes": 5066,
+      "blocks": 20,
+      "body_characters": 272,
+      "lead_characters": 0,
+      "lead_excerpt": "",
+      "body_text_sha256": "24f0090e6cc91eb56233acb5f35e1639b3d3a238eef6d8aff9cf9b56f6c08ad7",
+      "headings": [
+        [
+          "Ben Carrington"
+        ],
+        [
+          "Ben Carrington",
+          "Ben Carrington"
+        ]
+      ],
+      "tables": 1,
+      "flags": [
+        "figure_requires_visual_inspection",
+        "merged_cells_inspect_original",
+        "table_headers_unverified"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "not_repair_content",
+        "license": null
+      }
+    },
+    {
+      "path": "User/1125566/Clint",
+      "title": "Clint",
+      "html_bytes": 5038,
+      "blocks": 20,
+      "body_characters": 251,
+      "lead_characters": 0,
+      "lead_excerpt": "",
+      "body_text_sha256": "ca35a8f8ffdcfe79464725f80404ba22129a442a9ed22cfd3a28d95d576da233",
+      "headings": [
+        [
+          "Clint"
+        ],
+        [
+          "Clint",
+          "Clint"
+        ]
+      ],
+      "tables": 1,
+      "flags": [
+        "figure_requires_visual_inspection",
+        "merged_cells_inspect_original",
+        "table_headers_unverified"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "not_repair_content",
+        "license": null
+      }
+    },
+    {
+      "path": "Device/OLPC_XO-1.5",
+      "title": "OLPC XO-1.5",
+      "html_bytes": 26799,
+      "blocks": 73,
+      "body_characters": 3403,
+      "lead_characters": 118,
+      "lead_excerpt": "The One Laptop Per Child model 1.5, or OLPC XO-1.5, was released in 2010 and is the second version of the OLPC laptop.",
+      "body_text_sha256": "1743449e667f0586370df9398134a10e6c7afdb77bbe68791adc808e87084ff5",
+      "headings": [
+        [
+          "OLPC XO-1.5"
+        ],
+        [
+          "OLPC XO-1.5",
+          "Replacement Guides"
+        ],
+        [
+          "OLPC XO-1.5",
+          "Teardowns"
+        ],
+        [
+          "OLPC XO-1.5",
+          "Tools"
+        ],
+        [
+          "OLPC XO-1.5",
+          "Device History and Identification"
+        ],
+        [
+          "OLPC XO-1.5",
+          "Device Specifications"
+        ],
+        [
+          "OLPC XO-1.5",
+          "Troubleshooting Page"
+        ],
+        [
+          "OLPC XO-1.5",
+          "Additional Information"
+        ]
+      ],
+      "tables": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "Device/Kurio_7",
+      "title": "Kurio 7",
+      "html_bytes": 30539,
+      "blocks": 89,
+      "body_characters": 3660,
+      "lead_characters": 78,
+      "lead_excerpt": "Android 4.0 tablet for children/ blue back cover and white face/ released 2012",
+      "body_text_sha256": "51d46f6958e32444fc255c5fa877fe19665c8f2bb09f5c5f5b89f996f3da02ba",
+      "headings": [
+        [
+          "Kurio 7"
+        ],
+        [
+          "Kurio 7",
+          "Replacement Guides"
+        ],
+        [
+          "Kurio 7",
+          "Disassembly Guides"
+        ],
+        [
+          "Kurio 7",
+          "Tools"
+        ],
+        [
+          "Kurio 7",
+          "Troubleshooting"
+        ],
+        [
+          "Kurio 7",
+          "Identification and Features"
+        ],
+        [
+          "Kurio 7",
+          "Device Specs"
+        ],
+        [
+          "Kurio 7",
+          "External Links"
+        ]
+      ],
+      "tables": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "Device/Logitech_MX_Anywhere_2",
+      "title": "Logitech MX Anywhere 2",
+      "html_bytes": 41647,
+      "blocks": 90,
+      "body_characters": 3597,
+      "lead_characters": 175,
+      "lead_excerpt": "Repair and disassembly information for the Logitech MX Anywhere 2 portable wireless mouse. Released in 2015 and identified by model numbers M-R0067, 910-004967, or 910-004968.",
+      "body_text_sha256": "44d00aa24837462e131bc168079add13ddc847ba5f8ebadcbee26a8b1edca9d1",
+      "headings": [
+        [
+          "Logitech MX Anywhere 2"
+        ],
+        [
+          "Logitech MX Anywhere 2",
+          "Featured Guides"
+        ],
+        [
+          "Logitech MX Anywhere 2",
+          "Featured Guides",
+          "Logitech MX Anywhere 2 Battery Replacement"
+        ],
+        [
+          "Logitech MX Anywhere 2",
+          "Featured Guides",
+          "Techniques"
+        ],
+        [
+          "Logitech MX Anywhere 2",
+          "Featured Guides",
+          "Replacement Guides"
+        ],
+        [
+          "Logitech MX Anywhere 2",
+          "Tools"
+        ],
+        [
+          "Logitech MX Anywhere 2",
+          "Background"
+        ],
+        [
+          "Logitech MX Anywhere 2",
+          "Identification"
+        ]
+      ],
+      "tables": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "Device/Delta_Planer_22540__TYPE_1_2015",
+      "title": "Delta Planer 22-540 - TYPE 1 (2015)",
+      "html_bytes": 7719,
+      "blocks": 27,
+      "body_characters": 828,
+      "lead_characters": 173,
+      "lead_excerpt": "The Delta 22-540 is a 12 inch benchtop planer released in 2015.\n\n128,220\n\nFree manuals\n\n238,691\n\nSolutions\n\n73,688\n\nDevices\n\n100M+\n\nRepairs\n\n© 2025 iFixit — Creative Commons",
+      "body_text_sha256": "9bb38cc60e7b0b18ed3dbac216bc6ddf1555e95668815a4a640b624e79a3deaf",
+      "headings": [
+        [
+          "Delta Planer 22-540 - TYPE 1 (2015)"
+        ]
+      ],
+      "tables": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "User/4546348/Sigurd Hagen",
+      "title": "Sigurd Hagen",
+      "html_bytes": 5072,
+      "blocks": 20,
+      "body_characters": 264,
+      "lead_characters": 0,
+      "lead_excerpt": "",
+      "body_text_sha256": "41e5352a7c68af4e56fefe491006abb10223686d6e03cc264b9cbf398fbf1fae",
+      "headings": [
+        [
+          "Sigurd Hagen"
+        ],
+        [
+          "Sigurd Hagen",
+          "Sigurd Hagen"
+        ]
+      ],
+      "tables": 1,
+      "flags": [
+        "figure_requires_visual_inspection",
+        "merged_cells_inspect_original",
+        "table_headers_unverified"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "not_repair_content",
+        "license": null
+      }
+    },
+    {
+      "path": "Device/Motorola_Edge_Plus_2020",
+      "title": "Motorola Edge Plus 2020",
+      "html_bytes": 23828,
+      "blocks": 95,
+      "body_characters": 3976,
+      "lead_characters": 86,
+      "lead_excerpt": "The Motorola Edge Plus is an android smartphone made by the Lenovo subsidiary Motorola",
+      "body_text_sha256": "0340d3adb5dd80d0355ee8bcce20b199a63304186f5872ce783132a0e5158908",
+      "headings": [
+        [
+          "Motorola Edge Plus 2020"
+        ],
+        [
+          "Motorola Edge Plus 2020",
+          "Replacement Guides"
+        ],
+        [
+          "Motorola Edge Plus 2020",
+          "Tools"
+        ],
+        [
+          "Motorola Edge Plus 2020",
+          "Background"
+        ],
+        [
+          "Motorola Edge Plus 2020",
+          "Identification"
+        ],
+        [
+          "Motorola Edge Plus 2020",
+          "Troubleshooting"
+        ],
+        [
+          "Motorola Edge Plus 2020",
+          "Technical Specifications"
+        ],
+        [
+          "Motorola Edge Plus 2020",
+          "Additional Information"
+        ]
+      ],
+      "tables": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "User/4641857/otaku2",
+      "title": "otaku2",
+      "html_bytes": 5042,
+      "blocks": 20,
+      "body_characters": 252,
+      "lead_characters": 0,
+      "lead_excerpt": "",
+      "body_text_sha256": "373147de3fb7bf757fa15e565127548746e6d2bee314e3d6bb373a8558f3d285",
+      "headings": [
+        [
+          "otaku2"
+        ],
+        [
+          "otaku2",
+          "otaku2"
+        ]
+      ],
+      "tables": 1,
+      "flags": [
+        "figure_requires_visual_inspection",
+        "merged_cells_inspect_original",
+        "table_headers_unverified"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "not_repair_content",
+        "license": null
+      }
+    }
+  ]
+}

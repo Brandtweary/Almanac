@@ -21,6 +21,15 @@ class SetupError(Exception):
     pass
 
 
+# Archive hosts identify clients by User-Agent, and Wikimedia's dump mirror, first among
+# several pinned URLs, refuses any request that carries none of its own.
+USER_AGENT = 'Almanac-setup/1 (+https://github.com/Brandtweary/Almanac)'
+
+
+def request(url, method=None, headers=None):
+    return urllib.request.Request(url, method=method, headers={'User-Agent': USER_AGENT, **(headers or {})})
+
+
 def digest(path):
     h = hashlib.sha256()
     with path.open('rb') as stream:
@@ -258,7 +267,7 @@ def transfer(artifact, staging, opener=urllib.request.urlopen):
     for url in artifact.get('urls', []):
         try:
             old = json.loads(receipt.read_text()) if receipt.exists() else {}
-            with opener(urllib.request.Request(url, method='HEAD'), timeout=60) as head:
+            with opener(request(url, method='HEAD'), timeout=60) as head:
                 etag = head.headers.get('ETag')
                 validator = etag if etag and not etag.startswith('W/') else None
                 identity = {'url': url, 'etag': validator, 'sha256': artifact['sha256'], 'bytes': artifact['bytes']}
@@ -276,7 +285,7 @@ def transfer(artifact, staging, opener=urllib.request.urlopen):
             headers = {'Accept-Encoding': 'identity'}
             if offset:
                 headers.update({'Range': f'bytes={offset}-', 'If-Range': validator})
-            with opener(urllib.request.Request(url, headers=headers), timeout=60) as response:
+            with opener(request(url, headers=headers), timeout=60) as response:
                 if offset:
                     expected = f'bytes {offset}-{artifact["bytes"] - 1}/{artifact["bytes"]}'
                     if response.status != 206 or response.headers.get('Content-Range') != expected:
@@ -310,7 +319,7 @@ def segmented_transfer(artifact, staging, connections, opener=urllib.request.url
     metadata_url = artifact.get('metalink')
     if not metadata_url or not metadata_url.startswith('https://'):
         raise SetupError('Segmented acquisition requires HTTPS metalink with piece hashes')
-    with opener(metadata_url, timeout=60) as response:
+    with opener(request(metadata_url), timeout=60) as response:
         metadata = response.read(16 * 1024 * 1024 + 1)
     if len(metadata) > 16 * 1024 * 1024:
         raise SetupError('Metalink metadata exceeds parser limit')
@@ -334,7 +343,7 @@ def segmented_transfer(artifact, staging, connections, opener=urllib.request.url
     url = artifact['urls'][0]
     if url not in available_urls:
         raise SetupError('Selected segmented mirror is absent from pinned-file metalink')
-    with opener(urllib.request.Request(url, method='HEAD'), timeout=60) as response:
+    with opener(request(url, method='HEAD'), timeout=60) as response:
         etag = response.headers.get('ETag')
         if not etag or etag.startswith('W/') or response.headers.get('Content-Length') != str(artifact['bytes']):
             raise SetupError('Segmented acquisition requires strong validator and exact size')
@@ -382,7 +391,7 @@ def segmented_transfer(artifact, staging, connections, opener=urllib.request.url
             last_error = None
             for attempt in range(3):
                 try:
-                    with opener(urllib.request.Request(url, headers=headers), timeout=30) as response:
+                    with opener(request(url, headers=headers), timeout=30) as response:
                         if response.status != 206 or response.headers.get('Content-Range') != f'bytes {start}-{stop}/{artifact["bytes"]}' or response.headers.get('ETag') != etag:
                             raise SetupError('Segment range or source validator mismatch')
                         payload = response.read(stop - start + 2)

@@ -116,6 +116,88 @@ def test_a_declared_index_directory_without_its_own_reservation_is_refused(tmp_p
         build(Store(tmp_path / "state"), doc, p, NativeDense(), token_path, index_storage=index)
 
 
+def test_an_archive_still_indexing_never_joins_a_serving_library(tmp_path):
+    """The union is qualified only while every member's index is complete, and a gateway
+    refuses chat while it is not, so an archive added beside a served library joins only
+    once indexed. One built without joining joins, marked active, on its next run."""
+    doc, p, token_path = fixture(tmp_path)
+    p = p.model_validate({**p.model_dump(), "qualified": True, "receipts": ["fixture-admission.json"]})
+    store, dense = Store(tmp_path / "state"), NativeDense()
+    serving = build(store, doc, p, dense, token_path)
+    service = Service(store, p, dense, TokenCounter(str(token_path), p.encoder_tokenizer_sha256), ZimLexical())
+    added, _, _ = fixture(tmp_path, "second", water_body="<p>Cistern overflow valves.</p>")
+    dense.fail = True
+    with pytest.raises(RuntimeError):
+        build(store, added, p, dense, token_path)
+    assert store.active_generations() == [serving]
+    assert service.health()["qualified"]
+    dense.fail = False
+    held = build(store, added, p, dense, token_path, activate=False)
+    assert store.active_generations() == [serving]
+    assert build(store, added, p, dense, token_path) == held
+    assert set(store.active_generations()) == {serving, held}
+    assert service.health()["qualified"]
+
+
+def test_a_scanned_books_source_is_its_scan_while_the_scan_is_installed(tmp_path):
+    """A text archive read from scanned books sends a reader to the scan itself. The text
+    stands in while the scans are not installed, and a scan whose integrity receipt no
+    longer matches its bytes is never served."""
+    import os
+    import httpx
+    from libzim.writer import Item, StringProvider
+    from oracle_content.app import create_app
+    from oracle_content.ingest import publish_original
+
+    class Scan(Item):
+        def __init__(self, path, payload):
+            super().__init__()
+            self.path, self.payload = path, payload
+        def get_path(self):
+            return self.path
+        def get_title(self):
+            return self.path
+        def get_mimetype(self):
+            return "application/pdf"
+        def get_contentprovider(self):
+            return StringProvider(self.payload)
+        def get_hints(self):
+            return {Hint.FRONT_ARTICLE: False}
+
+    book = "www.example.org/library/field_manual_1902.pdf"
+    scan = "%PDF-1.4 scanned field manual " * 50000
+    crawl = tmp_path / "crawl.zim"
+    with Creator(str(crawl)) as archive:
+        archive.add_item(Scan(book, scan))
+    crawl_sha = hashlib.sha256(crawl.read_bytes()).hexdigest()
+    doc, p, token_path = fixture(tmp_path)
+    text = tmp_path / "text.zim"
+    with Creator(str(text)).config_indexing(True, "eng") as archive:
+        archive.add_metadata("Scans", crawl_sha)
+        archive.add_item(Article(book, "Field Manual (1902)", "<p>Trench revetment with brushwood fascines.</p>"))
+    doc = doc.model_copy(update={"sha256": hashlib.sha256(text.read_bytes()).hexdigest(), "original_path": str(text),
+                                 "extraction_revision": "html-structural-v4"})
+    store, dense = Store(tmp_path / "state"), NativeDense()
+    build(store, doc, p, dense, token_path)
+    service = Service(store, p, dense, TokenCounter(str(token_path), p.encoder_tokenizer_sha256), ZimLexical())
+    handle = asyncio.run(service.search(SearchRequest(query="revetment")))["hits"][0]["passage_id"]
+
+    async def source():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=create_app(service)), base_url="http://test") as client:
+            return await client.get("/v1/corpus/source/" + handle)
+
+    before = asyncio.run(source())
+    assert before.headers["content-type"].startswith("text/plain") and "revetment" in before.text
+    installed = publish_original(store, crawl, crawl_sha, False)
+    served = asyncio.run(source())
+    assert served.status_code == 200 and served.headers["content-type"] == "application/pdf"
+    assert served.content == scan.encode()
+    assert served.headers["content-disposition"].startswith("inline; ")
+    stat = installed.stat()
+    os.utime(installed, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1))
+    assert asyncio.run(source()).headers["content-type"].startswith("text/plain")
+
+
 def test_native_full_reader_and_independent_search_without_duplicate_catalog(tmp_path):
     doc, p, token_path = fixture(tmp_path)
     store, dense = Store(tmp_path / "state"), NativeDense()
@@ -271,6 +353,32 @@ def test_mainspace_policy_refuses_proofreading_namespaces_by_path_alone():
         assert selection(decoded, "wikisource-mainspace-v1", scan) == (False, "proofreading_scan_page", None)
     with pytest.raises(ValueError):
         selection(decoded, "wikisource-mainspace-v1")
+
+
+def test_repair_policy_admits_repair_content_and_not_member_profiles():
+    """Most of iFixit's archive is member profile pages, which hold a name and no repair
+    content; the policy decides from the path without decoding the page."""
+    def decoded():
+        raise AssertionError("a path-decided policy must not decode the article")
+    for repair in ("Guide/iPad+Mini+2+Headphone+Jack+Replacement/36038", "Device/Acer_Aspire_A515-47",
+                   "Teardown/Nintendo+Switch+Teardown/78263", "A/Guide/Fan+Replacement/1"):
+        assert selection(decoded, "ifixit-repair-v1", repair) == (True, None, None)
+    for other in ("User/4583204/Wilbert", "home", "about-us", "Guidelines"):
+        assert selection(decoded, "ifixit-repair-v1", other) == (False, "not_repair_content", None)
+    with pytest.raises(ValueError):
+        selection(decoded, "ifixit-repair-v1")
+
+
+def test_book_policy_admits_each_books_text_and_not_the_scrapers_catalog_pages():
+    """A Gutenberg archive's cover and author pages hold a title and no text; indexed, each
+    book answers a search twice and every author once more with nothing to read."""
+    book = '<html><head><meta name="dc.title" content="Heartbreak House"/></head><body><p>Act I.</p></body></html>'
+    catalog = "<html><body><header>Project Gutenberg Library The first producer of free ebooks</header></body></html>"
+    def never():
+        raise AssertionError("a cover is refused by its path without decoding")
+    assert selection(lambda: book, "gutenberg-books-v1", "Heartbreak House.3543") == (True, None, None)
+    assert selection(never, "gutenberg-books-v1", "Heartbreak House_cover.3543") == (False, "book_cover_page", None)
+    assert selection(lambda: catalog, "gutenberg-books-v1", "S. D. (Susan Dunning) Power.34868") == (False, "catalog_page", None)
 
 
 def test_mainspace_generation_indexes_assembled_works_and_not_their_scans(tmp_path):

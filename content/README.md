@@ -23,6 +23,8 @@ The [native archive setup](docs/native-install.md) gives the complete invocation
 
 `tools/build_pali_canon_zim.py` renders SuttaCentral's CC0 English translations of the Pali canon into a natively indexed ZIM, writing a receipt that counts what it produced against what the source declares; `tools/verify_pali_canon_zim.py` reads that archive back, resolving every declared text and comparing it segment by segment against the source, because an archive that is well formed and empty passes every cheaper check. Both require the `extraction` extra, and `tests_integration/test_pali_canon_zim.py` exercises them against archives broken on purpose.
 
+`tools/build_survivor_text_zim.py` turns a crawl of scanned books into a natively indexed text archive, one article per book at the path its scan has in the crawl: each book's text is its PDF's own text layer or, for an image-only scan, the Internet Archive's OCR of the same scan, admitted only when title, year, volume and page count agree. The archive names the crawl in its `Scans` metadata, and the source route serves a book's scan in place of its text whenever that crawl is installed among the originals. `tools/inspect_native.py` writes the inspection receipt a native preparation binds, from a seeded sample of the archive read through the build's own extraction and selection. Both require the `extraction` extra.
+
 `oracle_content.models.Profile` is the strict release-profile schema. It requires explicit encoder
 identity/revision/dimensions/tokenizer digest/window, chat tokenizer digest, candidate depths, fusion
 weights/constant, token budgets, batching and timeouts. `qualified` remains false until evaluation

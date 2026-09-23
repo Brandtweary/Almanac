@@ -1,0 +1,323 @@
+{
+  "source_sha256": "b428beb6b7dad9cc96a9b719b9a518fd650a128bf3545b29ea19333c47b0fd5d",
+  "extraction_revision": "html-structural-v4",
+  "selection_policy": "wikisource-mainspace-v1",
+  "checked": true,
+  "scope": "Representative English Wikisource entries read through v4 extraction under the mainspace policy: assembled works admitted, Page: and Index: proofreading scans refused; not transcription accuracy",
+  "archive": "b428beb6b7dad9cc96a9b719b9a518fd650a128bf3545b29ea19333c47b0fd5d",
+  "archive_uuid": "256a6256-23e6-967e-b407-1206813ca9ee",
+  "archive_bytes": 12058109982,
+  "entry_count": 4735801,
+  "native_fulltext": true,
+  "counter": "application/javascript=4;application/pdf=2;font/ttf=1;image/jpeg=1;image/png=14;image/svg+xml=27;image/svg+xml; charset=utf-8; profile=\"https://www.mediawiki.org/wiki/Specs/SVG/1.0.0\"=73407;text/css=35;text/html=4534580;text/html; charset=iso-8859-1=1;text/javascript=3",
+  "sample_seed": 0,
+  "observations": [
+    {
+      "path": "Page:The_Homes_of_the_New_World-_Vol._III.djvu/387",
+      "title": "Page:The Homes of the New World- Vol. III.djvu/387",
+      "html_bytes": 7101,
+      "blocks": 7,
+      "body_characters": 1983,
+      "lead_characters": 1895,
+      "lead_excerpt": "statistics, and she gave it with a liveliness which animated her whole audience. She, too, descended, and was criticised in her turn. In this way the young female teacher is early accustomed to the usual consequences of publicity, and early",
+      "body_text_sha256": "1cf46e438530695d986b5f24f91ee70b90bf16866d0b1a122e1b7ef868e61c83",
+      "headings": [],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "proofreading_scan_page",
+        "license": null
+      }
+    },
+    {
+      "path": "Page:The_War_Chief_(Burroughs).djvu/207",
+      "title": "Page:The War Chief (Burroughs).djvu/207",
+      "html_bytes": 6950,
+      "blocks": 7,
+      "body_characters": 1308,
+      "lead_characters": 1223,
+      "lead_excerpt": "warrior knew would come. Again the soldiers fired rapidly, half of them concentrating their fire upon the rocks from behind which the puffs of smoke had arisen while the other half arose, and, bent half double, raced forward to new and more",
+      "body_text_sha256": "4b4ddd712e156529d2903a6c9bf3b76c3602c16d4af3eac474e473b05d46cd7f",
+      "headings": [],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "proofreading_scan_page",
+        "license": null
+      }
+    },
+    {
+      "path": "Dictionary_of_National_Biography,_1885-1900/Sadler,_Michael_Thomas",
+      "title": "Dictionary of National Biography, 1885-1900/Sadler, Michael Thomas",
+      "html_bytes": 31130,
+      "blocks": 19,
+      "body_characters": 18970,
+      "lead_characters": 4096,
+      "lead_excerpt": "​SADLER, MICHAEL THOMAS (1780–1835), social reformer and political economist, born at Snelston, Derbyshire, on 3 Jan. 1780, was the youngest son of James Sadler of the Old Hall, Doveridge. According to tradition his family came from Warwick",
+      "body_text_sha256": "7477ac142aed0cc98ea1277cab22fcff7545b76a9bc48e85ed3bd1fd670ae9b8",
+      "headings": [],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "Page:Mind_(Old_Series)_Volume_11.djvu/287",
+      "title": "Page:Mind (Old Series) Volume 11.djvu/287",
+      "html_bytes": 8355,
+      "blocks": 2,
+      "body_characters": 4084,
+      "lead_characters": 4050,
+      "lead_excerpt": "286 NEW BOOKS. Dublin students are kept, if somewhat irregularly, in pretty close touch with the world outside, and nothing could surpass the liveliness of their teacher's manner as he darts from topic to topic over the whole field of philo",
+      "body_text_sha256": "1a902162c32a82e0c9e47798547a521da86f5e18db8e8cb98c2e03db302ddba4",
+      "headings": [],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "proofreading_scan_page",
+        "license": null
+      }
+    },
+    {
+      "path": "Page:William_Blackstone,_Commentaries_on_the_Laws_of_England_(3rd_ed,_1768,_vol_I).djvu/193",
+      "title": "Page:William Blackstone, Commentaries on the Laws of England (3rd ed, 1768, vol I).djvu/193",
+      "html_bytes": 10955,
+      "blocks": 10,
+      "body_characters": 2059,
+      "lead_characters": 1964,
+      "lead_excerpt": "As ſoon as the parliament is ſummoned, the lord chancellor (or if a vacancy happens during parliament, the ſpeaker, by order of the houſe) ſends his warrant to the clerk of the crown in chancery; who thereupon iſſues out writs to the ſherif",
+      "body_text_sha256": "bee960339b5c4caaba215eca70048aaf3e36131641b134b8dcb3e31ec2b41f24",
+      "headings": [],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "proofreading_scan_page",
+        "license": null
+      }
+    },
+    {
+      "path": "Page:United_States_Statutes_at_Large_Volume_50_Part_2.djvu/41",
+      "title": "Page:United States Statutes at Large Volume 50 Part 2.djvu/41",
+      "html_bytes": 7997,
+      "blocks": 3,
+      "body_characters": 3596,
+      "lead_characters": 3562,
+      "lead_excerpt": "75TH CONGRESS, 1ST SESSION-CHS. 113, 115, 116-APRIL 19, 20, 1937 [CHAPTER 113] April 19, 1937 [H. R . 1871] [Private, No. 46] John S. Hemrick. Provisions of Em- ployees' Compensa- tion Act extended to. 39 Stat. 746, 747. 5U. S. C . §765-770",
+      "body_text_sha256": "34d1f3852a28c90ee9ebb65bb38a257a5be1e80ede2b1d7394f639f83698c8a4",
+      "headings": [],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "proofreading_scan_page",
+        "license": null
+      }
+    },
+    {
+      "path": "Page:The_Poems_and_Prose_remains_of_Arthur_Hugh_Clough,_volume_2_(1869).djvu/56",
+      "title": "Page:The Poems and Prose remains of Arthur Hugh Clough, volume 2 (1869).djvu/56",
+      "html_bytes": 4459,
+      "blocks": 1,
+      "body_characters": 40,
+      "lead_characters": 0,
+      "lead_excerpt": "",
+      "body_text_sha256": "46bc8ec79e7485288d3556943c149890b9507dd5c284c193361bbe57a2f18e68",
+      "headings": [],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "proofreading_scan_page",
+        "license": null
+      }
+    },
+    {
+      "path": "Page:Popular_Science_Monthly_Volume_4.djvu/211",
+      "title": "Page:Popular Science Monthly Volume 4.djvu/211",
+      "html_bytes": 9115,
+      "blocks": 11,
+      "body_characters": 2661,
+      "lead_characters": 2603,
+      "lead_excerpt": "illustrated in those passages of his poems relating to the poplar. This is a tree with which he has been familiar from early childhood, as we gather from the \"Ode to Memory,\" where he fondly recalls—\n\n\"The seven elms, the poplars four, That",
+      "body_text_sha256": "773bf46a29dc58c276513c571494dec914b196df64714c464f37e55f5dba1205",
+      "headings": [],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "proofreading_scan_page",
+        "license": null
+      }
+    },
+    {
+      "path": "Page:United_States_Statutes_at_Large_Volume_2.djvu/424",
+      "title": "Page:United States Statutes at Large Volume 2.djvu/424",
+      "html_bytes": 13290,
+      "blocks": 19,
+      "body_characters": 3642,
+      "lead_characters": 3478,
+      "lead_excerpt": "Specific appropriations.seventy-five dollars in the appropriation for the year one thousand eight hundred and five, for the support of the said government, seven thousand seven hundred and twenty-five dollars.\n\nFor expenses of stationery, o",
+      "body_text_sha256": "2b0dc3365f379031f29de4b1bb28c543bf4be6c721405c1a2ec5ffe9eb8ad7d3",
+      "headings": [],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "proofreading_scan_page",
+        "license": null
+      }
+    },
+    {
+      "path": "Page:The_Arts_-_Volume_1.pdf/117",
+      "title": "Page:The Arts - Volume 1.pdf/117",
+      "html_bytes": 4974,
+      "blocks": 4,
+      "body_characters": 172,
+      "lead_characters": 114,
+      "lead_excerpt": "Courtesy of Wildenstein & Co.\n\nPORTRAIT OF MARQUIS DE CHILLON\n\nJoseph Sifrede Duplessis (French School, 1725-1802)",
+      "body_text_sha256": "b8a33758619d2b4046a821cca4258347982c2057d09bc9dbb46150f0880815cb",
+      "headings": [],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "proofreading_scan_page",
+        "license": null
+      }
+    },
+    {
+      "path": "Page:Idalia,_by_'Ouida'_volume_3.djvu/339",
+      "title": "Page:Idalia, by 'Ouida' volume 3.djvu/339",
+      "html_bytes": 6241,
+      "blocks": 9,
+      "body_characters": 1203,
+      "lead_characters": 1132,
+      "lead_excerpt": "and laid her hands upon his breast, and looked full upward to his eyes: and her voice was low, and had a strange sweetness in it.\n\n\"When to-night is over we shall never meet again. The truth may be told now. I have never betrayed you.\"\n\nA m",
+      "body_text_sha256": "295787a2a34c2025b13c4ff10540b1efb405801d623f802c4b5ee5285bcecf25",
+      "headings": [],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "proofreading_scan_page",
+        "license": null
+      }
+    },
+    {
+      "path": "Page:Výběr_národního_českého_vyšívání_z_Českého_průmyslového_musea_Náprstkových.pdf/57",
+      "title": "Page:Výběr národního českého vyšívání z Českého průmyslového musea Náprstkových.pdf/57",
+      "html_bytes": 5471,
+      "blocks": 2,
+      "body_characters": 141,
+      "lead_characters": 0,
+      "lead_excerpt": "",
+      "body_text_sha256": "4e90105a9a9f9f93f6c33cc65710a729c06dbe1e24ce95ad481435949d8f7c64",
+      "headings": [],
+      "tables": 1,
+      "flags": [
+        "merged_cells_inspect_original",
+        "table_headers_unverified"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "proofreading_scan_page",
+        "license": null
+      }
+    },
+    {
+      "path": "Page:Constantinople_by_Brodribb.djvu/190",
+      "title": "Page:Constantinople by Brodribb.djvu/190",
+      "html_bytes": 6695,
+      "blocks": 5,
+      "body_characters": 1713,
+      "lead_characters": 1633,
+      "lead_excerpt": "In April, 1203, the expedition left Zara, bound on the great and perilous adventure of Constantinople. Only the Venetians knew how difficult, how hopeless, save for the disorganized state of the empire, was the task before them. The fleet c",
+      "body_text_sha256": "e6c384f5023b29e3141694053ca20783b45a55384b7ada69f04433d1359af069",
+      "headings": [],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "proofreading_scan_page",
+        "license": null
+      }
+    },
+    {
+      "path": "Page:Orlando_by_Virginia_Woolf.djvu/237",
+      "title": "Page:Orlando by Virginia Woolf.djvu/237",
+      "html_bytes": 6890,
+      "blocks": 6,
+      "body_characters": 1441,
+      "lead_characters": 1410,
+      "lead_excerpt": "ORLANDO\n\ndifferent parts, for her sex changed far more frequently than those who have worn only one set of clothing can conceive; nor can there be any doubt that she reaped a twofold harvest by this device; the pleasures of life were increa",
+      "body_text_sha256": "4c25ff0c807f036ca04527a29c97d36291f9e5b76a222dfe50dd9506d44b9b67",
+      "headings": [],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "proofreading_scan_page",
+        "license": null
+      }
+    },
+    {
+      "path": "Page:Contraception;_1st_ed._(IA_in.ernet.dli.2015.94163).pdf/240",
+      "title": "Page:Contraception; 1st ed. (IA in.ernet.dli.2015.94163).pdf/240",
+      "html_bytes": 8398,
+      "blocks": 7,
+      "body_characters": 1290,
+      "lead_characters": 1076,
+      "lead_excerpt": "CONTRACEPTION\n\ncommonly supposed. Before relying on statistics we need to know in much greater detail the procedure of the private individuals from whom the statistics are compiled. Crude statistical evidence alone will not satisfy a mind t",
+      "body_text_sha256": "ffb360e5274be98b4b8c5d79c0537bd16b50987c19db9918269e4833302f9c11",
+      "headings": [],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "proofreading_scan_page",
+        "license": null
+      }
+    },
+    {
+      "path": "Page:American_Anthropologist_NS_vol._1.djvu/126",
+      "title": "Page:American Anthropologist NS vol. 1.djvu/126",
+      "html_bytes": 5908,
+      "blocks": 11,
+      "body_characters": 1592,
+      "lead_characters": 1558,
+      "lead_excerpt": "PRELIMINARY REVISION OF THE EVIDENCE RE- LATING TO AURIFEROUS GRAVEL MAN\n\nIN CALIFORNIA\n\nBy WILLIAM H. HOLMES\n\nFIRST PAPER\n\nINTRODUCTORY\n\nDuring recent years much has been said and written regarding the antiquity of man in America, and as o",
+      "body_text_sha256": "2df38efaa987441a36dd8a7e8d8b4f4c3444c57419c1fffe741cab1e1fcdf77d",
+      "headings": [],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "proofreading_scan_page",
+        "license": null
+      }
+    }
+  ]
+}

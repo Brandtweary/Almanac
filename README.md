@@ -108,6 +108,16 @@ research assistant, not a coding assistant: it can walk you through work somebod
 written down, but it will not stand up a production codebase or crack a hard engineering
 problem. Everything under that ceiling keeps working with the network unplugged.
 
+Software for self-reliance running in a web browser is an odd fit, and the browser is there
+because it is the most accessible way to demonstrate the idea: the demo is fully functional
+out of the box, and everything behind the page runs locally. For serious daily use the more
+natural shape is a local terminal agent, and it needs very little: a [Pi](https://github.com/earendil-works/pi)
+instance pointed at a local model, the same library downloaded and indexed the way Almanac
+indexes it, and permission to search it — plain `grep` works, and the agent can build its own
+retrieval tools from there. That shape also reaches note-taking, system troubleshooting and
+light code editing, which is where a command-line release of Almanac is headed once local
+models are dependable enough to be trusted with a shell and your files.
+
 Appropriate technology has always meant tools you can own, repair, and understand, and there is
 no good reason to hold AI apart from that. A capable model on your own machine, reading a
 library on your own disk, belongs in a workshop or a farmhouse. Almanac is a proof of concept

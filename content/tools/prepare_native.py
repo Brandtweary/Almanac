@@ -39,6 +39,8 @@ async def main():
     parser.add_argument("--embed-url", required=True)
     parser.add_argument("--qdrant-url", required=True)
     parser.add_argument("--workers", type=int, default=1, help="Bounded native article extraction workers")
+    parser.add_argument("--no-activate", action="store_true",
+        help="Build and index without joining the active library; a later run without it joins")
     parser.add_argument("--bulk-encoder-command", type=Path, help="Optional argv JSON for an already qualified local JSONL encoder process")
     args = parser.parse_args()
     if args.reserve_bytes is not None:
@@ -69,7 +71,7 @@ async def main():
                 selection_policy=args.selection_policy, inspection=args.inspection.read_text().strip(),
                 content_state_reserve_bytes=args.content_state_reserve_bytes,
                 index_storage=args.index_storage, index_storage_reserve_bytes=args.index_storage_reserve_bytes,
-                workers=args.workers, category=args.category)
+                workers=args.workers, category=args.category, activate=not args.no_activate)
             print(generation, flush=True)
         finally:
             if bulk is not None:

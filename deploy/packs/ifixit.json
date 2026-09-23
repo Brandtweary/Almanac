@@ -1,0 +1,140 @@
+{
+  "schema_version": 2,
+  "id": "ifixit-source-v1",
+  "scope": "acquisition and the installed index footprint of iFixit's English repair guides; non-commercial use under CC BY-NC-SA 3.0, redistribution admission pending. The archive is indexed under the ifixit-repair-v1 selection policy, which admits guides, device pages, teardowns and reference articles and refuses member profiles and site navigation",
+  "footprint": {
+    "components": [
+      {
+        "name": "ifixit-dense-vectors",
+        "target": "index_workspace_bytes",
+        "location": "index-storage",
+        "bytes": 158934528,
+        "derivation": "exact",
+        "formula": "entries-x-width",
+        "inputs": {
+          "entries": 103473,
+          "dimensions": 384,
+          "bytes_per_dimension": 4
+        },
+        "basis": "the 103473 HTML entries the ifixit-repair-v1 selection policy admits, counted over the acquired archive's entry table: 56536 Guide, 44856 Device, 1856 Teardown and 225 Info pages of its 253845 HTML entries, the refused remainder being 150359 member profile pages and 13 site navigation pages, one vector each at the encoder's 384 dimensions and the profile schema's default float32 vector datatype. Rights exclusions and a non-canonical selection policy can only lower the count, and a float16 profile halves the width"
+      },
+      {
+        "name": "ifixit-dense-graph",
+        "target": "index_workspace_bytes",
+        "location": "index-storage",
+        "bytes": 15893453,
+        "derivation": "upstream-formula",
+        "formula": "qdrant-hnsw-graph",
+        "inputs": {
+          "entries": 103473,
+          "links_per_node": 16
+        },
+        "basis": "Qdrant's published capacity formula hnsw_size = points x m x 2 x 4 bytes x 1.2 at its default m of 16 (https://qdrant.tech/documentation/capacity-planning/); the collection adapters.Qdrant.create builds keeps the graph on disk and overrides no HNSW parameter"
+      },
+      {
+        "name": "ifixit-dense-payload",
+        "target": "index_workspace_bytes",
+        "location": "index-storage",
+        "bytes": 61307753,
+        "derivation": "upstream-formula",
+        "formula": "qdrant-payload-disk",
+        "inputs": {
+          "entries": 103473,
+          "payload_bytes": 395
+        },
+        "basis": "Qdrant's published disk_size = points x avg_payload_size x 1.5, whose 1.5 covers backend storage overhead. Every point carries the same four-field record adapters.Qdrant.put builds, 395 bytes compactly encoded at this archive's widest entry index"
+      },
+      {
+        "name": "ifixit-passage-spans",
+        "target": "index_workspace_bytes",
+        "location": "content-state",
+        "bytes": null,
+        "derivation": "unmeasured",
+        "basis": "the article-spans artifact stores each article's extracted blocks, spans and representative compressed at zlib level 6, for the 103473 entries ifixit-repair-v1 admits. The only measured constant, 3190 bytes per article in oracle_content.precompute, was sampled from English Wikipedia and does not transfer to this archive's entries; sampling this archive is what would quantify it. The builder publishes whatever it reaches and stops at its own --min-free-bytes floor, so an unreserved shortfall costs coverage rather than the install"
+      },
+      {
+        "name": "dense-index-headroom",
+        "target": "index_workspace_bytes",
+        "location": "index-storage",
+        "bytes": 47227147,
+        "derivation": "upstream-formula",
+        "formula": "fraction-of-components",
+        "inputs": {
+          "components": [
+            "ifixit-dense-vectors",
+            "ifixit-dense-graph",
+            "ifixit-dense-payload"
+          ],
+          "numerator": 1,
+          "denominator": 5
+        },
+        "basis": "the ~20% disk headroom the same Qdrant capacity page recommends, taken over the vector, graph and payload components it covers: the write-ahead log, snapshots and the optimizer's temporary segments. The article-spans artifact is a SQLite file outside the vector store and is deliberately not in this sum"
+      },
+      {
+        "name": "shared-service-runtime",
+        "target": "runtime_workspace_bytes",
+        "location": "content-state",
+        "bytes": 0,
+        "derivation": "exact",
+        "formula": "no-derived-state",
+        "inputs": {},
+        "basis": "indexing writes into the shared content state and the shared Qdrant store, and adds no per-pack runtime working set; the service's own bounded stores (CONTENT_SNAPSHOT_MAX_BYTES, CONTENT_FAILURE_LOG_MAX_BYTES) belong to the installation rather than to any one pack and are not multiplied by it"
+      },
+      {
+        "name": "archive-second-copy",
+        "target": "index_workspace_bytes",
+        "location": "content-state",
+        "bytes": 0,
+        "derivation": "exact",
+        "formula": "no-derived-state",
+        "inputs": {},
+        "basis": "prepare_native hardlinks the verified archive into the content state, so the original occupies its pinned artifact bytes once; a content state on another filesystem cannot hardlink and needs that many bytes again, which is a layout choice this manifest cannot see"
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "path": "notices/ifixit.txt",
+      "bytes": 925,
+      "sha256": "f9c23482385081817b008dfcbfc8228a0122d2fa34414d06e50bc5a48e2182df",
+      "kind": "license",
+      "embedded_text": "Source pack: iFixit repair guides and answers\nSnapshot: ifixit_en_all_2025-12.zim\nPublisher of the archive: Kiwix, from iFixit contributors\nOriginal site: https://www.ifixit.com/\nArchive integrity metadata: https://download.kiwix.org/zim/ifixit/ifixit_en_all_2025-12.zim.meta4\n\niFixit's guides are licensed under Creative Commons Attribution-NonCommercial-ShareAlike 3.0.\nUse is permitted only for non-commercial purposes; attribution and share-alike apply to any\nadaptation. Preserve each guide's title, its authors as credited on iFixit, its page URL and\nthe license.\n\nLicensing: https://www.ifixit.com/Info/Licensing\nLicense legal text: https://creativecommons.org/licenses/by-nc-sa/3.0/legalcode\n\nThis acquisition manifest permits locally evaluating the upstream archive for non-commercial\nuse. Redistribution admission remains separate; download completion establishes neither a\nredistribution grant nor index coverage.\n",
+      "urls": [],
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://www.ifixit.com/Info/Licensing",
+          "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+          "https://download.kiwix.org/zim/ifixit/ifixit_en_all_2025-12.zim.meta4"
+        ],
+        "notice": "notices/ifixit.txt"
+      }
+    },
+    {
+      "path": "sources/ifixit_en_all_2025-12.zim",
+      "bytes": 3570695757,
+      "sha256": "9bb5f3408707fd0300c6ef47a425c3217187f144cd9154a928183816aa72eead",
+      "kind": "corpus",
+      "urls": [
+        "https://ny.mirror.driftle.ss/kiwix/zim/ifixit/ifixit_en_all_2025-12.zim",
+        "https://mirror.download.kiwix.org/zim/ifixit/ifixit_en_all_2025-12.zim",
+        "https://ftp.nluug.nl/pub/kiwix/zim/ifixit/ifixit_en_all_2025-12.zim"
+      ],
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://www.ifixit.com/Info/Licensing",
+          "https://creativecommons.org/licenses/by-nc-sa/3.0/",
+          "https://download.kiwix.org/zim/ifixit/ifixit_en_all_2025-12.zim.meta4"
+        ],
+        "notice": "notices/ifixit.txt"
+      },
+      "metalink": "https://download.kiwix.org/zim/ifixit/ifixit_en_all_2025-12.zim.meta4"
+    }
+  ],
+  "index_workspace_bytes": 283362881,
+  "runtime_workspace_bytes": 0,
+  "image_store_bytes": 0
+}

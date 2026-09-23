@@ -1,0 +1,258 @@
+{
+  "source_sha256": "416bc5ae5d5462c176a22dcb52d915a371771279e0cc33420f6de490748d1ace",
+  "extraction_revision": "html-structural-v4",
+  "selection_policy": "canonical-html",
+  "checked": true,
+  "scope": "Representative SuttaCentral English translations rendered by build_pali_canon_zim.py: segment text, headings and translator attribution read through v4 extraction; not translation accuracy",
+  "archive": "416bc5ae5d5462c176a22dcb52d915a371771279e0cc33420f6de490748d1ace",
+  "archive_uuid": "1a0ff6c6-fe93-851f-39d1-519413ef18dc",
+  "archive_bytes": 5749297,
+  "entry_count": 9493,
+  "native_fulltext": true,
+  "counter": "text/html=4802",
+  "sample_seed": 0,
+  "observations": [
+    {
+      "path": "suttacentral.net/sn34.8/en/sujato",
+      "title": " (sn34.8)",
+      "html_bytes": 971,
+      "blocks": 6,
+      "body_characters": 217,
+      "lead_characters": 330,
+      "lead_excerpt": "sn34.8 · translated by Bhikkhu Sujato · https://suttacentral.net/sn34.8/en/sujato\n\nAt Sāvatthī.\n\n“Mendicants, there are these four meditators. What four?\n\nOne meditator is skilled in immersion but not in practicing carefully for it. …”\n\nTra",
+      "body_text_sha256": "3a19ff31aa6557423ae0f562f8cf63a842c3a4dc3b4b1fc69a0479972eee1bc0",
+      "headings": [
+        [
+          "Carefulness in Immersion"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "suttacentral.net/an3.13/en/sujato",
+      "title": "Hopes (an3.13)",
+      "html_bytes": 4896,
+      "blocks": 11,
+      "body_characters": 4037,
+      "lead_characters": 4096,
+      "lead_excerpt": "an3.13 · translated by Bhikkhu Sujato · https://suttacentral.net/an3.13/en/sujato\n\n“These three individuals are found in the world. What three? The hopeless, the hopeful, and the one who has done away with hope. And what, mendicants, is a h",
+      "body_text_sha256": "748be80ca00295bb94ac7101c9e96fecba5be428b2df66e1bb6d61d841006b7a",
+      "headings": [
+        [
+          "Hopes"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "suttacentral.net/sn55.16/en/sujato",
+      "title": " (sn55.16)",
+      "html_bytes": 1406,
+      "blocks": 4,
+      "body_characters": 645,
+      "lead_characters": 746,
+      "lead_excerpt": "sn55.16 · translated by Bhikkhu Sujato · https://suttacentral.net/sn55.16/en/sujato\n\n“Mendicants, those who you have sympathy for, and those worth listening to—friends and colleagues, relatives and family—should be encouraged, supported, an",
+      "body_text_sha256": "cf021379a4fd90d3cc79b2d4aaa12a9a86262c93bbab0512b85e4d9b66f77d07",
+      "headings": [
+        [
+          "Friends and Colleagues (1st)"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "suttacentral.net/sn10.12/en/sujato",
+      "title": " (sn10.12)",
+      "html_bytes": 6271,
+      "blocks": 34,
+      "body_characters": 3257,
+      "lead_characters": 3382,
+      "lead_excerpt": "sn10.12 · translated by Bhikkhu Sujato · https://suttacentral.net/sn10.12/en/sujato\n\nSo I have heard. At one time the Buddha was staying near Āḷavī in the haunt of the native spirit Āḷavaka.\n\nThen the native spirit Āḷavaka went up to the Bu",
+      "body_text_sha256": "35a65bed5db600ccdbfd788d392009476d6feb5a9ba17dcd7ea3af086e6d1bfc",
+      "headings": [
+        [
+          "With Āḷavaka"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "suttacentral.net/pli-tv-bu-vb-sk73/en/brahmali",
+      "title": "73. Defecating while standing (pli-tv-bu-vb-sk73)",
+      "html_bytes": 2026,
+      "blocks": 13,
+      "body_characters": 874,
+      "lead_characters": 107,
+      "lead_excerpt": "pli-tv-bu-vb-sk73 · translated by Bhikkhu Brahmali · https://suttacentral.net/pli-tv-bu-vb-sk73/en/brahmali",
+      "body_text_sha256": "aafa3ac657c36ba8a6f268645287848db9af73f5ba2d0840438efad63f0a61b9",
+      "headings": [
+        [
+          "Defecating while standing"
+        ],
+        [
+          "Defecating while standing",
+          "Origin story"
+        ],
+        [
+          "Defecating while standing",
+          "Final ruling"
+        ],
+        [
+          "Defecating while standing",
+          "Non-offenses"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "suttacentral.net/thag1.53/en/sujato",
+      "title": " (thag1.53)",
+      "html_bytes": 1158,
+      "blocks": 5,
+      "body_characters": 239,
+      "lead_characters": 338,
+      "lead_excerpt": "thag1.53 · translated by Bhikkhu Sujato · https://suttacentral.net/thag1.53/en/sujato\n\nThe heavens rain like a sweet song; my hut is roofed and pleasant, sheltered from the wind. I meditate there, diligent: so rain forth, heavens, if you wi",
+      "body_text_sha256": "9ddd38616fd462139349f2424ed70752166b6b0fe60c79d75aaea500f12cddef",
+      "headings": [
+        [
+          "Valliya (1st)"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "suttacentral.net/sn12.3/en/sujato",
+      "title": " (sn12.3)",
+      "html_bytes": 1472,
+      "blocks": 9,
+      "body_characters": 686,
+      "lead_characters": 814,
+      "lead_excerpt": "sn12.3 · translated by Bhikkhu Sujato · https://suttacentral.net/sn12.3/en/sujato\n\nAt Sāvatthī.\n\n“Mendicants, I will teach you the wrong practice and the right practice. Listen and apply your mind well, I will speak.”\n\n“Yes, sir,” they repl",
+      "body_text_sha256": "ac781679f61cd42c5c4b5e489e0164450f249806b2534c93920b3be321e0951c",
+      "headings": [
+        [
+          "Practice"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "suttacentral.net/an5.167/en/sujato",
+      "title": " (an5.167)",
+      "html_bytes": 6769,
+      "blocks": 17,
+      "body_characters": 5820,
+      "lead_characters": 4096,
+      "lead_excerpt": "an5.167 · translated by Bhikkhu Sujato · https://suttacentral.net/an5.167/en/sujato\n\nThere Sāriputta addressed the mendicants: “Reverends, a mendicant who wants to accuse another should first establish five things in themselves.\n\nWhat five?",
+      "body_text_sha256": "ae1615679a34befdc80471109f27f1789230583522b1faab23e022ad7be98568",
+      "headings": [
+        [
+          "Accusation"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "suttacentral.net/an4.232/en/sujato",
+      "title": " (an4.232)",
+      "html_bytes": 1303,
+      "blocks": 9,
+      "body_characters": 513,
+      "lead_characters": 376,
+      "lead_excerpt": "an4.232 · translated by Bhikkhu Sujato · https://suttacentral.net/an4.232/en/sujato\n\n“Mendicants, I declare these four kinds of deeds, having realized them with my own insight. What four?\n\nThese are the four kinds of deeds that I declare, h",
+      "body_text_sha256": "e34a9fc5781f8cc1ea1c53ade2d8b975778f356b7c61361515d2f4253b8c2c95",
+      "headings": [
+        [
+          "Deeds In Brief"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "suttacentral.net/sn17.7/en/sujato",
+      "title": " (sn17.7)",
+      "html_bytes": 1142,
+      "blocks": 8,
+      "body_characters": 368,
+      "lead_characters": 491,
+      "lead_excerpt": "sn17.7 · translated by Bhikkhu Sujato · https://suttacentral.net/sn17.7/en/sujato\n\nAt Sāvatthī.\n\n“Possessions, honor, and popularity are grim …\n\nLet whom be pierced by a poisoned arrow? Let possessions, honor, and popularity come to a train",
+      "body_text_sha256": "28443d222622c6e8a9a266085710d705333bcc3289c5714400acba5c9b82a810",
+      "headings": [
+        [
+          "A Poisoned Arrow"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    }
+  ]
+}

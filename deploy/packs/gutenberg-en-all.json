@@ -1,0 +1,140 @@
+{
+  "schema_version": 2,
+  "id": "gutenberg-en-all-source-v1",
+  "scope": "acquisition and the installed index footprint of the complete English Project Gutenberg collection; per-work rights and redistribution admission pending. The archive is indexed under the gutenberg-books-v1 selection policy, one article per book; its EPUB, image and audio entries are retained and not indexed",
+  "footprint": {
+    "components": [
+      {
+        "name": "gutenberg-dense-vectors",
+        "target": "index_workspace_bytes",
+        "location": "index-storage",
+        "bytes": 216428544,
+        "derivation": "exact",
+        "formula": "entries-x-width",
+        "inputs": {
+          "entries": 140904,
+          "dimensions": 384,
+          "bytes_per_dimension": 4
+        },
+        "basis": "at most 140904 entries: the archive's HTML entries, read from its own M/Counter over HTTP range requests with content/tools/inspect_remote_zim.py. The gutenberg-books-v1 selection policy admits only each book's own text, refusing the scraper's per-book cover pages and per-author pages, so the built count is lower; a random sample of 24 HTML entries held 15 books, 7 covers and 2 author pages, one vector each at the encoder's 384 dimensions and the profile schema's default float32 vector datatype. Rights exclusions and a non-canonical selection policy can only lower the count, and a float16 profile halves the width"
+      },
+      {
+        "name": "gutenberg-dense-graph",
+        "target": "index_workspace_bytes",
+        "location": "index-storage",
+        "bytes": 21642855,
+        "derivation": "upstream-formula",
+        "formula": "qdrant-hnsw-graph",
+        "inputs": {
+          "entries": 140904,
+          "links_per_node": 16
+        },
+        "basis": "Qdrant's published capacity formula hnsw_size = points x m x 2 x 4 bytes x 1.2 at its default m of 16 (https://qdrant.tech/documentation/capacity-planning/); the collection adapters.Qdrant.create builds keeps the graph on disk and overrides no HNSW parameter"
+      },
+      {
+        "name": "gutenberg-dense-payload",
+        "target": "index_workspace_bytes",
+        "location": "index-storage",
+        "bytes": 83696976,
+        "derivation": "upstream-formula",
+        "formula": "qdrant-payload-disk",
+        "inputs": {
+          "entries": 140904,
+          "payload_bytes": 396
+        },
+        "basis": "Qdrant's published disk_size = points x avg_payload_size x 1.5, whose 1.5 covers backend storage overhead. Every point carries the same four-field record adapters.Qdrant.put builds, 396 bytes compactly encoded at this archive's widest entry index"
+      },
+      {
+        "name": "gutenberg-passage-spans",
+        "target": "index_workspace_bytes",
+        "location": "content-state",
+        "bytes": null,
+        "derivation": "unmeasured",
+        "basis": "the article-spans artifact stores each article's extracted blocks, spans and representative compressed at zlib level 6, for the books gutenberg-books-v1 admits. The only measured constant, 3190 bytes per article in oracle_content.precompute, was sampled from English Wikipedia and does not transfer to this archive's entries; sampling this archive is what would quantify it. The builder publishes whatever it reaches and stops at its own --min-free-bytes floor, so an unreserved shortfall costs coverage rather than the install"
+      },
+      {
+        "name": "dense-index-headroom",
+        "target": "index_workspace_bytes",
+        "location": "index-storage",
+        "bytes": 64353675,
+        "derivation": "upstream-formula",
+        "formula": "fraction-of-components",
+        "inputs": {
+          "components": [
+            "gutenberg-dense-vectors",
+            "gutenberg-dense-graph",
+            "gutenberg-dense-payload"
+          ],
+          "numerator": 1,
+          "denominator": 5
+        },
+        "basis": "the ~20% disk headroom the same Qdrant capacity page recommends, taken over the vector, graph and payload components it covers: the write-ahead log, snapshots and the optimizer's temporary segments. The article-spans artifact is a SQLite file outside the vector store and is deliberately not in this sum"
+      },
+      {
+        "name": "shared-service-runtime",
+        "target": "runtime_workspace_bytes",
+        "location": "content-state",
+        "bytes": 0,
+        "derivation": "exact",
+        "formula": "no-derived-state",
+        "inputs": {},
+        "basis": "indexing writes into the shared content state and the shared Qdrant store, and adds no per-pack runtime working set; the service's own bounded stores (CONTENT_SNAPSHOT_MAX_BYTES, CONTENT_FAILURE_LOG_MAX_BYTES) belong to the installation rather than to any one pack and are not multiplied by it"
+      },
+      {
+        "name": "archive-second-copy",
+        "target": "index_workspace_bytes",
+        "location": "content-state",
+        "bytes": 0,
+        "derivation": "exact",
+        "formula": "no-derived-state",
+        "inputs": {},
+        "basis": "prepare_native hardlinks the verified archive into the content state, so the original occupies its pinned artifact bytes once; a content state on another filesystem cannot hardlink and needs that many bytes again, which is a layout choice this manifest cannot see"
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "path": "notices/gutenberg-en-all.txt",
+      "bytes": 1320,
+      "sha256": "d0aae3c6d1159e70184e96e309c6932456f3bb7af099991d9f31f8d78370e286",
+      "kind": "license",
+      "embedded_text": "Source pack: Project Gutenberg, complete English collection\nSnapshot: gutenberg_en_all_2025-11.zim\nPublisher of the archive: Kiwix, from Project Gutenberg\nOriginal library: https://www.gutenberg.org/\nArchive integrity metadata: https://download.kiwix.org/zim/gutenberg/gutenberg_en_all_2025-11.zim.meta4\n\nProject Gutenberg distributes two distinct sets. The great majority of its texts are not\nrestricted under United States copyright law; a smaller set is copyrighted and carries its\nown permission terms inside each work. The archive contains both, so each retrieved work's\nown front matter governs it. Project Gutenberg also asserts trademark terms on the\n\"Project Gutenberg\" name, separate from the status of the text itself.\n\nCopyright status outside the United States is determined by local law and is not\nestablished by this archive. Preserve each work's title, author, translator, edition and\nits included Project Gutenberg license header.\n\nLicense terms: https://www.gutenberg.org/policy/license.html\nPermission and trademark detail: https://www.gutenberg.org/policy/permission.html\n\nThis acquisition manifest permits locally evaluating the upstream archive. Redistribution\nadmission and per-work rights review remain separate; download completion establishes\nneither a redistribution grant nor index coverage.\n",
+      "urls": [],
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://www.gutenberg.org/policy/license.html",
+          "https://www.gutenberg.org/policy/permission.html",
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_all_2025-11.zim.meta4"
+        ],
+        "notice": "notices/gutenberg-en-all.txt"
+      }
+    },
+    {
+      "path": "sources/gutenberg_en_all_2025-11.zim",
+      "bytes": 221251590584,
+      "sha256": "01677c8d554a1cab2cbfd020ac99ebca7dd6c74d3ce0d13f266a2ba603dfaf28",
+      "kind": "corpus",
+      "urls": [
+        "https://ny.mirror.driftle.ss/kiwix/zim/gutenberg/gutenberg_en_all_2025-11.zim",
+        "https://mirror.download.kiwix.org/zim/gutenberg/gutenberg_en_all_2025-11.zim",
+        "https://ftp.nluug.nl/pub/kiwix/zim/gutenberg/gutenberg_en_all_2025-11.zim"
+      ],
+      "rights": {
+        "acquisition": "permitted",
+        "redistribution": "unreviewed",
+        "evidence": [
+          "https://www.gutenberg.org/policy/license.html",
+          "https://www.gutenberg.org/policy/permission.html",
+          "https://download.kiwix.org/zim/gutenberg/gutenberg_en_all_2025-11.zim.meta4"
+        ],
+        "notice": "notices/gutenberg-en-all.txt"
+      },
+      "metalink": "https://download.kiwix.org/zim/gutenberg/gutenberg_en_all_2025-11.zim.meta4"
+    }
+  ],
+  "index_workspace_bytes": 386122050,
+  "runtime_workspace_bytes": 0,
+  "image_store_bytes": 0
+}

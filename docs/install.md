@@ -129,6 +129,8 @@ Prepare CD3WD's HTML articles in the same searchable library; the complete origi
   --embed-url "$CONTENT_EMBED_URL" --qdrant-url "$CONTENT_QDRANT_URL"
 ```
 
+The remaining packs follow the same two steps from their own manifests in `deploy/packs/`: the complete English Project Gutenberg (`gutenberg-en-all.json`, `gutenberg-books-v1`, which indexes each book's own text rather than the scraper's cover and author pages), iFixit (`ifixit.json`, `ifixit-repair-v1`, which indexes guides, device pages and teardowns rather than member profiles), English Wikisource (`scripture-and-canon.json`, `wikisource-mainspace-v1`) and the Pali canon (`pali-canon.json`, `canonical-html`). The Survivor Library (`survivor-library.json`) is a crawl whose books are PDF scans; build its text archive with `content/tools/build_survivor_text_zim.py`, prepare that archive with `canonical-html`, and publish the crawl among the originals so that each book's source is its scan ([scanned books](../content/docs/native-install.md#scanned-books)). Write each archive's inspection receipt with `content/tools/inspect_native.py`, and read its observations before preparing.
+
 The receipts bind the exact source hashes, v4 extraction and source-selection policies. These operations can take substantially longer than downloading a small reference pack. Keep both measured reserves and the preparation receipts when resuming them; dense vectors represent article titles/leads, while native lexical search and original reading cover complete article bodies.
 
 With `content-profile.json` and the activated content state in the data directory, start the content service in its own terminal or supervisor:

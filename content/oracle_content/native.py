@@ -44,7 +44,19 @@ def counted_html_entries(counter: str | None):
 
 KIND = "native-zim-article-v1"
 POLICIES = {"canonical-html", "appropedia-explicit-open-english-v1", "appropedia-open-english-v2",
-            "wikisource-mainspace-v1"}
+            "wikisource-mainspace-v1", "ifixit-repair-v1", "gutenberg-books-v1"}
+
+# iFixit's repair content: step-by-step guides, the device pages that collect them and
+# their troubleshooting, teardowns, and the site's own reference articles. The archive's
+# remaining pages are member profiles and site navigation.
+IFIXIT_REPAIR_SECTIONS = ("Guide", "Device", "Teardown", "Info")
+
+# A Gutenberg archive holds each book's own HTML beside pages its scraper generates: a
+# cover page per book, carrying the title, author and license and nothing of the text,
+# and a page per author, whose listing only a browser script fills. Covers are named by
+# path; every scraper page carries the site header below, and no book's own HTML does.
+GUTENBERG_COVER = re.compile(r"_cover\.\d+$")
+GUTENBERG_SCRAPER_PAGE = "The first producer of free ebooks"
 
 # MediaWiki proofreading namespaces, carrying one entry per scanned page and per
 # scanned volume. A selection policy naming them admits the assembled works alone.
@@ -186,6 +198,21 @@ def selection(html, policy, path=None):
         # out of the article body.
         if scan_workflow_page(path):
             return False, "proofreading_scan_page", None
+        return True, None, None
+    if policy == "ifixit-repair-v1":
+        if not isinstance(path, str):
+            raise ValueError("A path selection policy requires the entry path")
+        section = (path[2:] if re.match("[A-Z]/", path) else path).split("/", 1)[0]
+        if section not in IFIXIT_REPAIR_SECTIONS:
+            return False, "not_repair_content", None
+        return True, None, None
+    if policy == "gutenberg-books-v1":
+        if not isinstance(path, str):
+            raise ValueError("A path selection policy requires the entry path")
+        if GUTENBERG_COVER.search(path):
+            return False, "book_cover_page", None
+        if GUTENBERG_SCRAPER_PAGE in (html() if callable(html) else html):
+            return False, "catalog_page", None
         return True, None, None
     if policy not in {"appropedia-explicit-open-english-v1", "appropedia-open-english-v2"}:
         raise ValueError("Unknown native source selection policy")
@@ -493,6 +520,16 @@ class NativeReader:
         return NativeLexicalHits(selected, {pid: localized_passages[pid] for pid, _score in selected})
 
 
+def serving_generations(store):
+    """The generations the library is serving now, or none when nothing is active."""
+    try:
+        return store.active_generations()
+    except ContentError as error:
+        if error.code != "corpus_unready":
+            raise
+        return []
+
+
 async def build_native(store, template: Document, profile: Profile, dense, tokenizer_path: Path, *,
                        selection_policy: str, inspection: str, content_state_reserve_bytes: int, activate=True,
                        index_storage: Path | None = None, index_storage_reserve_bytes: int = 0,
@@ -509,6 +546,13 @@ async def build_native(store, template: Document, profile: Profile, dense, token
     `category` names the part of the library this archive is listed under. It describes the
     installation rather than the indexed bytes, so it stays out of the generation identity:
     naming or renaming one re-lists an archive without rebuilding it.
+
+    `activate` joins the generation to the active library union. The union is qualified
+    only while every member's dense index is complete, so a generation still indexing
+    joins at once only when nothing else is being served, where lexical search and
+    reading during indexing are worth having; beside a serving library it joins once
+    its own index completes. `activate=False` never joins, leaving the caller to finish
+    anything else first and join by running the build again.
     """
     from .ingest import publish_original
     if selection_policy not in POLICIES or not inspection or content_state_reserve_bytes < 1 or not 1 <= workers <= 64:
@@ -542,7 +586,7 @@ async def build_native(store, template: Document, profile: Profile, dense, token
             shutil.copyfile(tokenizer_path, directory / "encoder-tokenizer.json")
             TokenCounter(str(directory / "encoder-tokenizer.json"), profile.encoder_tokenizer_sha256)
             manifest = {**identity, "source": canonical.model_dump(), "generation": generation,
-                "stage": "active" if activate else "validated", "dense_stage": "indexing",
+                "stage": "validated", "dense_stage": "indexing",
                 "extraction_profile": profile.model_dump(), "inspection": evidence,
                 "packs": [template.pack_id], "document_count": 0, "passage_count": 0,
                 "entry_cursor": 0, "indexed_articles": 0, "excluded_entries": 0,
@@ -566,10 +610,19 @@ async def build_native(store, template: Document, profile: Profile, dense, token
         except (KeyError, UnicodeError):
             manifest["canonical_html_articles"] = None
         atomic_json(manifest_path, manifest)
-        if activate:
+
+        def join():
+            if manifest["stage"] != "active":
+                manifest["stage"] = "active"
+                atomic_json(manifest_path, manifest)
             store.include_active(generation)
+
         if manifest["dense_stage"] == "complete":
+            if activate:
+                join()
             return generation
+        if activate and (not serving_generations(store) or generation in serving_generations(store)):
+            join()
         manifest["dense_stage"] = "indexing"
         manifest.pop("failure", None)
         atomic_json(manifest_path, manifest)
@@ -666,4 +719,6 @@ async def build_native(store, template: Document, profile: Profile, dense, token
         finally:
             if executor is not None:
                 executor.shutdown(wait=True, cancel_futures=True)
+        if activate:
+            join()
         return generation
