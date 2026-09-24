@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import lzma
+import re
 import struct
 import sys
 import urllib.error
@@ -53,6 +54,8 @@ class Ranged:
         fine; what is never fine is bytes from somewhere else, so the origin's own
         `Content-Range` is compared with what was asked for before anything parses it.
         """
+        if type(start) is not int or start < 0 or type(length) is not int or length <= 0:
+            raise ValueError("A byte range needs a nonnegative offset and positive length")
         request = urllib.request.Request(self.url, headers={
             "Range": f"bytes={start}-{start + length - 1}", "Accept-Encoding": "identity"})
         with self.opener(request, timeout=self.timeout) as response:
@@ -60,9 +63,18 @@ class Ranged:
                 raise ValueError(f"{self.url} served {response.status} for a range request; "
                                  "a whole-file response cannot be inspected this way")
             served = response.headers.get("Content-Range")
-            payload = response.read()
-        if served is not None and not served.startswith(f"bytes {start}-"):
-            raise ValueError(f"{self.url} answered a request for byte {start} with {served!r}")
+            match = re.fullmatch(r"bytes ([0-9]+)-([0-9]+)/([0-9]+|\*)", served or "")
+            if not match:
+                raise ValueError(f"{self.url} answered a request for byte {start} with {served!r}")
+            first, last = int(match[1]), int(match[2])
+            if (first != start or not first <= last < start + length or
+                    (match[3] != "*" and last >= int(match[3]))):
+                raise ValueError(f"{self.url} answered a request for byte {start} with {served!r}")
+            # The origin controls the body independently of its status and headers.
+            # One extra byte detects an oversized response without allocating it whole.
+            payload = response.read(length + 1)
+        if len(payload) > length or len(payload) != last - first + 1:
+            raise ValueError(f"{self.url} returned bytes inconsistent with range {served!r}")
         if not payload:
             raise ValueError(f"{self.url} returned no bytes for the range beginning at {start}")
         self.requests += 1

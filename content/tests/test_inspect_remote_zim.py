@@ -79,8 +79,9 @@ class Served:
         served = self.content[start:stop + 1]
         return served if self.truncate_to is None else served[:self.truncate_to]
 
-    def read(self):
-        return self.body()
+    def read(self, size=-1):
+        payload = self.body()
+        return payload if size < 0 else payload[:size]
 
 
 def test_counter_is_read_from_a_fraction_of_the_archive():
@@ -107,6 +108,30 @@ def test_a_whole_file_response_is_refused_rather_than_misparsed():
     served = Served(archive(), status=200)
     with pytest.raises(ValueError, match="range request"):
         remote.inspect("https://example.org/a.zim", served)
+
+
+@pytest.mark.parametrize("content_range,body", [
+    ("bytes 0-7/64", b"x" * 64),
+    (None, b"x" * 8),
+    ("bytes 0-garbage/64", b"x" * 8),
+    ("bytes 0-6/64", b"x" * 8),
+    ("bytes 0-7/7", b"x" * 8),
+])
+def test_untrusted_range_responses_are_bounded_and_match_their_headers(content_range, body):
+    class Untrusted(Served):
+        def __call__(self, request, timeout=None):
+            super().__call__(request, timeout)
+            self.headers = {} if content_range is None else {"Content-Range": content_range}
+            return self
+
+        def read(self, size=-1):
+            assert 0 < size <= 9, "origin must never be read without the requested byte bound"
+            return body[:size]
+
+    source = remote.Ranged("https://example.org/a.zim", Untrusted(b"x" * 64))
+    with pytest.raises(ValueError):
+        source.read(0, 8)
+    assert source.requests == source.fetched_bytes == 0
 
 
 def test_a_file_that_is_not_a_zim_is_refused():

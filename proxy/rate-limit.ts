@@ -46,13 +46,23 @@ export function clientIp(c: Context, trustedProxies: string[]): string {
 export class RateLimiter {
 	private hits = new Map<string, number[]>();
 	private sweptAt = Date.now();
+	private overflowUntil = 0;
 	constructor(private readonly max: number, private readonly windowMs: number = WINDOW_MS) {}
 	/** Records the attempt and reports whether it exceeds the window. */
 	limited(client: string): boolean {
 		const now = Date.now();
-		if (now - this.sweptAt > this.windowMs || this.hits.size > MAX_TRACKED_CLIENTS) this.sweep(now);
+		if (now - this.sweptAt > this.windowMs) this.sweep(now);
+		if (!this.hits.has(client) && (this.hits.size >= MAX_TRACKED_CLIENTS || now < this.overflowUntil)) {
+			// Untracked denials still count as attempts. A shared deadline retains
+			// their constraint conservatively until they are outside the window.
+			this.overflowUntil = now + this.windowMs;
+			return true;
+		}
 		const live = (this.hits.get(client) ?? []).filter(t => t > now - this.windowMs);
 		live.push(now);
+		// Older attempts cannot affect admission while max + 1 newer attempts
+		// remain. Keeping the newest ones includes denials and preserves expiry.
+		if (live.length > this.max + 1) live.shift();
 		this.hits.set(client, live);
 		return live.length > this.max;
 	}

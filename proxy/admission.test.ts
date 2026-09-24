@@ -1,4 +1,4 @@
-import {test, expect} from "bun:test";
+import {test, expect, spyOn} from "bun:test";
 import {createGateway} from "./server";
 import {RateLimiter, ROUTE_LIMITS} from "./rate-limit";
 import {config, type ReleaseProfile} from "./config";
@@ -102,4 +102,47 @@ test("a sliding window forgets attempts older than its span", async () => {
   expect(limiter.limited("other")).toBe(false);
   await new Promise(resolve => setTimeout(resolve, 30));
   expect(limiter.limited("client")).toBe(false);
+});
+
+test("rejected traffic keeps bounded history without changing attempt-based decisions", () => {
+  let now = 1000;
+  const clock = spyOn(Date, "now").mockImplementation(() => now);
+  try {
+    const limiter = new RateLimiter(3, 100);
+    const state = limiter as unknown as {hits: Map<string, number[]>};
+    let attempts: number[] = [];
+    for (let index = 0; index < 1000; index++) {
+      now += index % 7 === 0 ? 30 : 0;
+      attempts = attempts.filter(time => time > now - 100);
+      attempts.push(now);
+      expect(limiter.limited("client")).toBe(attempts.length > 3);
+      expect(state.hits.get("client")!.length).toBeLessThanOrEqual(4);
+    }
+    now += 100;
+    expect(limiter.limited("client")).toBe(false);
+  } finally { clock.mockRestore(); }
+});
+
+test("client-table saturation rejects newcomers without evicting guards or repeated sweeps", () => {
+  let now = 1000;
+  const clock = spyOn(Date, "now").mockImplementation(() => now);
+  try {
+    const limiter = new RateLimiter(1, 100);
+    const state = limiter as unknown as {hits: Map<string, number[]>; sweep(now: number): void};
+    const sweep = spyOn(state, "sweep");
+    for (let index = 0; index < 20_000; index++) expect(limiter.limited(String(index))).toBe(false);
+    now = 1090;
+    expect(limiter.limited("0")).toBe(true);
+    for (let index = 0; index < 20; index++) expect(limiter.limited(`overflow-${index}`)).toBe(true);
+    expect(state.hits.size).toBe(20_000);
+    expect(sweep).not.toHaveBeenCalled();
+    now = 1101;
+    // Expired clients free capacity, but the recent denied attempts still constrain newcomers.
+    expect(limiter.limited("overflow-0")).toBe(true);
+    expect(limiter.limited("0")).toBe(true);
+    expect(state.hits.size).toBe(1);
+    expect(sweep).toHaveBeenCalledTimes(1);
+    now = 1201;
+    expect(limiter.limited("overflow-0")).toBe(false);
+  } finally { clock.mockRestore(); }
 });
