@@ -8,7 +8,7 @@ import { resolve, sep } from "node:path";
 import { config, validateProfile, type GatewayConfig, type ReleaseProfile } from "./config";
 import { AdmissionError, CompletionQueue } from "./queue";
 import { VoiceBroker, registerVoiceRoutes } from "./voice-broker";
-import { clientIp, createLimiters, WINDOW_MS, type RouteName } from "./rate-limit";
+import { clientIp, createLimiters, rateLimitKey, WINDOW_MS, type RouteName } from "./rate-limit";
 import { Subscribers } from "./subscribers";
 
 // Fingerprints tracked before the table resets; the reset costs a repeat of
@@ -60,7 +60,7 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
   // only thing standing between one visitor and a shared local backend.
   const limiters = createLimiters();
   const limit = (route: RouteName): MiddlewareHandler => async (c, next) => {
-    if (!limiters[route].limited(clientIp(c, cfg.trustedProxies))) return next();
+    if (!limiters[route].limited(rateLimitKey(clientIp(c, cfg.trustedProxies)))) return next();
     log({stage: "rate_limit", status: "rejected", route});
     return c.json({error: {code: "rate_limited"}}, 429, {"Retry-After": String(Math.ceil(WINDOW_MS / 1000))});
   };

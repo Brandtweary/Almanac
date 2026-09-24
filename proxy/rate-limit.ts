@@ -43,36 +43,55 @@ export function clientIp(c: Context, trustedProxies: string[]): string {
 	return peer;
 }
 
+/** The identity a per-client window counts against. An IPv6 address is reduced
+ *  to its /64, the smallest block routinely assigned to a single subscriber or
+ *  host, so one machine cannot present itself as unbounded distinct clients.
+ *  An IPv4-mapped IPv6 address counts as its IPv4 address. Anything that does
+ *  not parse as IPv6 is used verbatim. */
+export function rateLimitKey(address: string): string {
+	const bare = address.split("%")[0]!.toLowerCase();
+	if (!bare.includes(":")) return bare;
+	const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(bare);
+	if (mapped) return mapped[1]!;
+	// An embedded dotted-quad tail fills the last two groups.
+	const hex = bare.replace(/:\d{1,3}(?:\.\d{1,3}){3}$/, ":0:0");
+	const halves = hex.split("::");
+	if (halves.length > 2) return bare;
+	const head = halves[0] ? halves[0].split(":") : [];
+	const tail = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+	const fill = halves.length === 2 ? 8 - head.length - tail.length : 0;
+	if (fill < 0) return bare;
+	const groups = [...head, ...Array<string>(fill).fill("0"), ...tail];
+	if (groups.length !== 8 || !groups.every(g => /^[0-9a-f]{1,4}$/.test(g))) return bare;
+	return `${groups.slice(0, 4).map(g => parseInt(g, 16).toString(16)).join(":")}::/64`;
+}
+
 export class RateLimiter {
+	/** Clients in order of their most recent attempt, so every client whose
+	 *  window has fully expired sits at the front and is evicted from there. */
 	private hits = new Map<string, number[]>();
-	private sweptAt = Date.now();
-	private overflowUntil = 0;
 	constructor(private readonly max: number, private readonly windowMs: number = WINDOW_MS) {}
 	/** Records the attempt and reports whether it exceeds the window. */
 	limited(client: string): boolean {
 		const now = Date.now();
-		if (now - this.sweptAt > this.windowMs) this.sweep(now);
-		if (!this.hits.has(client) && (this.hits.size >= MAX_TRACKED_CLIENTS || now < this.overflowUntil)) {
-			// Untracked denials still count as attempts. A shared deadline retains
-			// their constraint conservatively until they are outside the window.
-			this.overflowUntil = now + this.windowMs;
-			return true;
+		const horizon = now - this.windowMs;
+		for (const [key, times] of this.hits) {
+			if (times[times.length - 1]! > horizon) break;
+			this.hits.delete(key);
 		}
-		const live = (this.hits.get(client) ?? []).filter(t => t > now - this.windowMs);
+		const tracked = this.hits.get(client);
+		// A full table holds only clients active within the window. A newcomer is
+		// refused without being recorded, so the refusal lasts exactly until the
+		// least recently active client expires and frees a slot.
+		if (!tracked && this.hits.size >= MAX_TRACKED_CLIENTS) return true;
+		const live = (tracked ?? []).filter(t => t > horizon);
 		live.push(now);
 		// Older attempts cannot affect admission while max + 1 newer attempts
 		// remain. Keeping the newest ones includes denials and preserves expiry.
 		if (live.length > this.max + 1) live.shift();
+		this.hits.delete(client);
 		this.hits.set(client, live);
 		return live.length > this.max;
-	}
-	private sweep(now: number) {
-		this.sweptAt = now;
-		for (const [client, times] of this.hits) {
-			const live = times.filter(t => t > now - this.windowMs);
-			if (live.length) this.hits.set(client, live);
-			else this.hits.delete(client);
-		}
 	}
 }
 

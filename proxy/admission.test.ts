@@ -123,26 +123,29 @@ test("rejected traffic keeps bounded history without changing attempt-based deci
   } finally { clock.mockRestore(); }
 });
 
-test("client-table saturation rejects newcomers without evicting guards or repeated sweeps", () => {
+test("a saturated client table refuses newcomers only until its least recent client expires", () => {
   let now = 1000;
   const clock = spyOn(Date, "now").mockImplementation(() => now);
   try {
     const limiter = new RateLimiter(1, 100);
-    const state = limiter as unknown as {hits: Map<string, number[]>; sweep(now: number): void};
-    const sweep = spyOn(state, "sweep");
+    const state = limiter as unknown as {hits: Map<string, number[]>};
     for (let index = 0; index < 20_000; index++) expect(limiter.limited(String(index))).toBe(false);
-    now = 1090;
+    now = 1050;
     expect(limiter.limited("0")).toBe(true);
-    for (let index = 0; index < 20; index++) expect(limiter.limited(`overflow-${index}`)).toBe(true);
+    // Newcomers arrive without pause; their refusals must not extend the saturation.
+    for (; now < 1100; now++) expect(limiter.limited(`overflow-${now}`)).toBe(true);
     expect(state.hits.size).toBe(20_000);
-    expect(sweep).not.toHaveBeenCalled();
-    now = 1101;
-    // Expired clients free capacity, but the recent denied attempts still constrain newcomers.
-    expect(limiter.limited("overflow-0")).toBe(true);
+    expect(limiter.limited("newcomer")).toBe(false);
+    // The client that stayed active keeps its window through the eviction.
     expect(limiter.limited("0")).toBe(true);
-    expect(state.hits.size).toBe(1);
-    expect(sweep).toHaveBeenCalledTimes(1);
-    now = 1201;
-    expect(limiter.limited("overflow-0")).toBe(false);
+    expect(state.hits.size).toBe(2);
   } finally { clock.mockRestore(); }
+});
+
+test("one IPv6 /64 counts as a single client", async () => {
+  const {app} = createGateway({...cfg, trustedProxies: ["*"]}, mock(), profile);
+  const signup = (from: string) => app.request("/v1/signup", {method: "POST", body: "{}", headers: {"x-forwarded-for": from}});
+  for (let i = 0; i < ROUTE_LIMITS.signup; i++) expect((await signup(`2001:db8:0:7::${i + 1}`)).status).not.toBe(429);
+  expect((await signup("2001:db8:0:7:ffff:1:2:3")).status).toBe(429);
+  expect((await signup("2001:db8:0:8::1")).status).not.toBe(429);
 });
