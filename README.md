@@ -29,10 +29,13 @@ hands are busy.
 
 ## The collection
 
-The searchable installation is English Wikipedia (full articles without images), Appropedia's
-practical-reference archive, CD3WD's development and trades manuals, and a scripture and
-canon collection drawn from English Wikisource, Project Gutenberg and SuttaCentral's
-English translations of the Pali canon. The
+The searchable installation spans four categories. Encyclopedia is English Wikipedia (full
+articles without images). Practical reference is Appropedia's archive, CD3WD's development
+and trades manuals, iFixit's repair guides and the Survivor Library's scanned practical and
+historical books. Scripture and canon is English Wikisource — carrying the Rigveda, the
+*Sacred Books of the East*, the Qur'an and two English Bibles — with SuttaCentral's English
+translations of the Pali canon. Literature is the complete English Project Gutenberg
+collection, 60,207 books searchable and readable in full text. The
 [collection guide](./docs/library.md) lists sources, editions, and publisher links, along with
 further reference originals — food preservation, crop water needs, seed production, drinking
 water, wood properties, electrical work, machining, and emergency care — which you download

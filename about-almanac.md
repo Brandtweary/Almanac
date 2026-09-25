@@ -17,6 +17,9 @@ In practice: whether the garlic goes in before this frost or after it, why the w
 - **English Wikipedia:** Full articles without images, covering science, technology, history, and general reference.
 - **Appropedia:** Practical material on sustainable living, appropriate technology, agriculture, water, sanitation, construction, and energy.
 - **CD3WD:** The compact web archive of development manuals and technical reference material, including farming, food processing, building, and trades.
+- **Repair and scanned manuals:** iFixit's repair guides and teardowns for consumer and household devices, and the Survivor Library's scanned practical and historical books.
+- **Scripture and canon:** English Wikisource, carrying the Rigveda, Müller's *Sacred Books of the East*, the Qur'an, and the King James and Jewish Publication Society Bibles, alongside SuttaCentral's English translations of the Pali canon.
+- **Literature:** The complete English Project Gutenberg collection — 60,207 books, each searchable and readable in full text rather than as an extract.
 - **Additional manuals:** Food preservation, crop-water needs, seed production, drinking-water systems, wood properties, electrical work, machining, and emergency care. Licensing varies by publisher, so these are not bundled: you download them yourself, and can index them alongside the rest.
 
 The [collection guide](https://github.com/Brandtweary/Almanac/blob/main/docs/library.md) lists sources, editions, and publisher links. The documents remain useful independently of the assistant.
