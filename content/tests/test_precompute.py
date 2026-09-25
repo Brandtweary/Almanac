@@ -152,3 +152,17 @@ def test_a_missing_article_reads_as_absent_rather_than_failing(tmp_path):
     assert spans.raw(7) is not None
     assert spans.raw(8) is None
     assert spans.articles == 1
+
+
+def test_a_damaged_row_reads_as_absent_and_is_counted(tmp_path):
+    """A row that no longer decodes costs that article its precompute, never its request,
+    and the count says the artifact is damaged rather than merely partial."""
+    doc, structure, settings, tokens, passages, generation = prepared()
+    expected = {"schema": SCHEMA, "generation": generation}
+    good = encode(structure, passages, lead_row(doc, generation), None)
+    write_artifact(tmp_path, expected, {7: good, 8: good[:len(good) // 2], 9: zlib.compress(b"{not json"),
+                                        10: zlib.compress(b"[[]]")})
+    spans = ArticleSpans.open(tmp_path, expected)
+    assert spans.raw(7) is not None
+    assert [spans.raw(index) for index in (8, 9, 10)] == [None, None, None]
+    assert spans.undecodable == 3

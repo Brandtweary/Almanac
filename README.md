@@ -31,8 +31,8 @@ hands are busy.
 
 The searchable installation spans four categories. Encyclopedia is English Wikipedia (full
 articles without images). Practical reference is Appropedia's archive, CD3WD's development
-and trades manuals, iFixit's repair guides and the Survivor Library's scanned practical and
-historical books. Scripture and canon is English Wikisource — carrying the Rigveda, the
+and trades manuals, iFixit's repair guides and the text recovered from the Survivor Library's
+scanned practical and historical books. Scripture and canon is English Wikisource — carrying the Rigveda, the
 *Sacred Books of the East*, the Qur'an and two English Bibles — with SuttaCentral's English
 translations of the Pali canon. Literature is the complete English Project Gutenberg
 collection, 60,207 books searchable and readable in full text. The

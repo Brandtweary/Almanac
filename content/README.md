@@ -100,6 +100,8 @@ Implementation references: [SQLite FTS5](https://www.sqlite.org/fts5.html),
 [libzim reader/search API](https://python-libzim.readthedocs.io/en/latest/), and
 [Docling usage](https://docling-project.github.io/docling/usage/).
 
+Installed archives are protected by [corpus integrity](docs/integrity.md): each is admitted once into a committed Merkle manifest under `deploy/integrity/`, re-read from the medium by a rate-limited offline scrub, localised to named documents when damaged, and mended in place from local parity, upstream mirrors or release parts with bytes that verify against the manifest. Damaged documents are refused and named while the rest of the library keeps serving. `tools/integrity.py` is the operator's maintenance tool.
+
 Optional real-archive integration: install the pinned `libzim` dependency and run
 `python -m pytest tests_integration`. This creates an indexed miniature ZIM locally, verifies a late
 identifier enters lexical results, and confirms no duplicate whole-archive FTS index is built.

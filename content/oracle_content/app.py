@@ -52,13 +52,16 @@ def source_filename(doc, media_type):
 SCAN_CHUNK_BYTES = 1024 * 1024
 
 
-def scan_item(root, archive, article_path):
+def scan_item(root, archive, article_path, integrity=None):
     """The scanned book a text archive's article was read from, or None.
 
     A text archive built from a crawl of scanned books names that crawl by SHA-256 in its
     `Scans` metadata and writes each book's article at the path its scan has in the crawl.
     When the crawl is installed among the originals with an unchanged integrity receipt,
     the scan is the source a reader is sent to; otherwise the article's text stands in.
+    A scan whose bytes integrity has quarantined is refused by name rather than replaced
+    by the text, so a damaged book never reads as a book that was never scanned. Returns
+    the crawl archive, the scan's item and the read-path re-hash outcome for it.
     """
     if "Scans" not in archive.metadata_keys:
         return None
@@ -71,16 +74,34 @@ def scan_item(root, archive, article_path):
     stat = crawl.stat()
     if receipt.get("sha256") != sha256 or receipt.get("size") != stat.st_size or receipt.get("mtime_ns") != stat.st_mtime_ns:
         return None
+    view = integrity.archive(sha256) if integrity is not None else None
+    if view is not None and view.withdrawn:
+        raise ContentError("source_damaged", "The scanned-book archive is damaged and withdrawn; this book's text "
+                           "remains readable through the reference tools")
     from libzim.reader import Archive
     scans = Archive(str(crawl))
     try:
         entry = scans.get_entry_by_path(article_path)
     except KeyError:
         return None
+    if entry.is_redirect:
+        entry = entry.get_redirect_entry()
+    from .integrity.overlay import NOT_ADMITTED, REFUSED
+    outcome = NOT_ADMITTED
+    if view is not None:
+        # This archive object was opened just now, so it holds nothing decoded before the
+        # current epoch; only the quarantine itself can refuse it.
+        if view.blocked(entry._index, integrity.epoch(sha256)) is not None:
+            outcome = REFUSED
+        else:
+            outcome = integrity.verify_entry(sha256, crawl, entry._index)
+        if outcome == REFUSED:
+            raise ContentError("source_damaged", "This book's scan is damaged in the installed archive; its text "
+                               "remains readable through the reference tools")
     item = entry.get_item()
     if item.mimetype.split(";", 1)[0].strip() != "application/pdf":
         return None
-    return scans, item
+    return scans, item, outcome
 
 
 def disposition(media_type, filename):
@@ -234,11 +255,16 @@ def create_app(service=None, phonemizer=None):
         if doc.media_type == "application/x-zim":
             if doc.extraction_revision not in {"html-structural-v3", "html-structural-v4"}:
                 raise ContentError("unsupported_extraction_revision", "Text rendering for this retained archive is unavailable; original bytes remain installed", 409)
+            native = store.native(match[1])
+            from .integrity.overlay import NOT_ADMITTED
+            # The read-path re-hash outcome for the bytes served, so a response the
+            # re-hash could not check is distinguishable from a checked one.
+            read_check = native.verify_read(int(doc.document_id.rsplit("_", 1)[1])) if native is not None else NOT_ADMITTED
             from libzim.reader import Archive
             archive = Archive(str(path))
-            scan = scan_item(store.root, archive, doc.article_path)
+            scan = scan_item(store.root, archive, doc.article_path, store.integrity)
             if scan is not None:
-                scans, item = scan
+                scans, item, scan_check = scan
 
                 def chunks(scans=scans, content=item.content):
                     view = memoryview(content)
@@ -247,7 +273,8 @@ def create_app(service=None, phonemizer=None):
 
                 name = source_filename(doc, "application/pdf")
                 return StreamingResponse(chunks(), media_type="application/pdf", headers={**headers,
-                    "Content-Length": str(item.size), "Content-Disposition": disposition("application/pdf", name)})
+                    "Content-Length": str(item.size), "Content-Disposition": disposition("application/pdf", name),
+                    "X-Integrity-Read": scan_check})
             entry = archive.get_entry_by_path(doc.article_path)
             text = "\n\n".join(block.text for block in html_blocks(decode_zim_html(entry.get_item()), doc.extraction_revision))
             attribution = f"{doc.title}\nSource: {doc.source_url}\nLicense: {doc.license}\n"
@@ -256,7 +283,8 @@ def create_app(service=None, phonemizer=None):
             if doc.publisher:
                 attribution += f"Attribution: {doc.publisher}\n"
             return Response(attribution + "\n" + text, media_type="text/plain",
-                headers={**headers, "Content-Disposition": disposition("text/plain", source_filename(doc, "text/plain"))})
+                headers={**headers, "Content-Disposition": disposition("text/plain", source_filename(doc, "text/plain")),
+                         "X-Integrity-Read": read_check})
         name = source_filename(doc, doc.media_type)
         return FileResponse(path, media_type=doc.media_type, headers={**headers, "Content-Disposition": disposition(doc.media_type, name)})
 

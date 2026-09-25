@@ -1,0 +1,792 @@
+{
+  "source_sha256": "91fa929f556c63f5d54f9c4f67d4737e7e7a1b20f59a7546f635b1e6433e48cd",
+  "extraction_revision": "html-structural-v4",
+  "selection_policy": "canonical-html",
+  "checked": true,
+  "scope": "Representative Survivor Library book articles built by build_survivor_text_zim.py from the scans' text layers and the Internet Archive's OCR, read through v4 extraction; not OCR accuracy",
+  "archive": "survivor-library-text_en_all_2025-12.zim",
+  "archive_uuid": "252bd961-d479-92f1-475e-a3dc50ead4a1",
+  "archive_bytes": 2301805873,
+  "entry_count": 12702,
+  "native_fulltext": true,
+  "counter": "text/html=12702",
+  "sample_seed": 0,
+  "observations": [
+    {
+      "path": "www.survivorlibrary.com/library/respiratory_diseases_and_disorders.pdf",
+      "title": "Respiratory Diseases And Disorders",
+      "html_bytes": 143122,
+      "blocks": 1022,
+      "body_characters": 137042,
+      "lead_characters": 121,
+      "lead_excerpt": "Respiratory Diseases And Disorders. A 98-page scanned book in the Survivor Library. Listed under Medical Courses US Army.",
+      "body_text_sha256": "e24945bacdb229982e2122721d7f65aa522cf29f92c75c46fa5e0ccd358c66d0",
+      "headings": [
+        [
+          "Respiratory Diseases And Disorders"
+        ],
+        [
+          "Respiratory Diseases And Disorders",
+          "About this text"
+        ],
+        [
+          "Respiratory Diseases And Disorders",
+          "Page 1"
+        ],
+        [
+          "Respiratory Diseases And Disorders",
+          "Page 2"
+        ],
+        [
+          "Respiratory Diseases And Disorders",
+          "Page 3"
+        ],
+        [
+          "Respiratory Diseases And Disorders",
+          "Page 4"
+        ],
+        [
+          "Respiratory Diseases And Disorders",
+          "Page 5"
+        ],
+        [
+          "Respiratory Diseases And Disorders",
+          "Page 6"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "www.survivorlibrary.com/library/vivid_scenes_in_american_history-a_series_of_readers_for_grammar_schools_1898.pdf",
+      "title": "Vivid Scenes In American History-a Series Of Readers For Grammar Schools (1898)",
+      "html_bytes": 186904,
+      "blocks": 1696,
+      "body_characters": 175296,
+      "lead_characters": 160,
+      "lead_excerpt": "Vivid Scenes In American History-a Series Of Readers For Grammar Schools (1898). A 148-page scanned book in the Survivor Library. Listed under History American.",
+      "body_text_sha256": "4e3c3f10214556282213f19903bedc6b84791667a15e40d913b463e9b18f3bf4",
+      "headings": [
+        [
+          "Vivid Scenes In American History-a Series Of Readers For Grammar Schools (1898)"
+        ],
+        [
+          "Vivid Scenes In American History-a Series Of Readers For Grammar Schools (1898)",
+          "About this text"
+        ],
+        [
+          "Vivid Scenes In American History-a Series Of Readers For Grammar Schools (1898)",
+          "Page 1"
+        ],
+        [
+          "Vivid Scenes In American History-a Series Of Readers For Grammar Schools (1898)",
+          "Page 2"
+        ],
+        [
+          "Vivid Scenes In American History-a Series Of Readers For Grammar Schools (1898)",
+          "Page 3"
+        ],
+        [
+          "Vivid Scenes In American History-a Series Of Readers For Grammar Schools (1898)",
+          "Page 7"
+        ],
+        [
+          "Vivid Scenes In American History-a Series Of Readers For Grammar Schools (1898)",
+          "Page 8"
+        ],
+        [
+          "Vivid Scenes In American History-a Series Of Readers For Grammar Schools (1898)",
+          "Page 9"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "www.survivorlibrary.com/library/scientific-american-1853-08-20-v08-n49.pdf",
+      "title": "Scientific-american-1853-08-20-v08-n49",
+      "html_bytes": 142379,
+      "blocks": 1699,
+      "body_characters": 129435,
+      "lead_characters": 129,
+      "lead_excerpt": "Scientific-american-1853-08-20-v08-n49. A 8-page scanned book in the Survivor Library. Listed under Scientific American Series 1.",
+      "body_text_sha256": "2ba84fdb4b4528dbeb61a4ed8d4f4a01def0dde044481cf2bba28425a06acd02",
+      "headings": [
+        [
+          "Scientific-american-1853-08-20-v08-n49"
+        ],
+        [
+          "Scientific-american-1853-08-20-v08-n49",
+          "About this text"
+        ],
+        [
+          "Scientific-american-1853-08-20-v08-n49",
+          "Page 1"
+        ],
+        [
+          "Scientific-american-1853-08-20-v08-n49",
+          "Page 2"
+        ],
+        [
+          "Scientific-american-1853-08-20-v08-n49",
+          "Page 3"
+        ],
+        [
+          "Scientific-american-1853-08-20-v08-n49",
+          "Page 4"
+        ],
+        [
+          "Scientific-american-1853-08-20-v08-n49",
+          "Page 5"
+        ],
+        [
+          "Scientific-american-1853-08-20-v08-n49",
+          "Page 6"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "www.survivorlibrary.com/library/a_history_of_english_law_vol_6_1924.pdf",
+      "title": "A History Of English Law Vol 6 (1924)",
+      "html_bytes": 2399926,
+      "blocks": 19811,
+      "body_characters": 2247907,
+      "lead_characters": 105,
+      "lead_excerpt": "A History Of English Law Vol 6 (1924). A 751-page scanned book in the Survivor Library. Listed under Law.",
+      "body_text_sha256": "135d44935b66f637df56f346488d6261c2765e5872e083708fe3a000763e2fa3",
+      "headings": [
+        [
+          "A History Of English Law Vol 6 (1924)"
+        ],
+        [
+          "A History Of English Law Vol 6 (1924)",
+          "About this text"
+        ],
+        [
+          "A History Of English Law Vol 6 (1924)",
+          "Page 1"
+        ],
+        [
+          "A History Of English Law Vol 6 (1924)",
+          "Page 2"
+        ],
+        [
+          "A History Of English Law Vol 6 (1924)",
+          "Page 3"
+        ],
+        [
+          "A History Of English Law Vol 6 (1924)",
+          "Page 5"
+        ],
+        [
+          "A History Of English Law Vol 6 (1924)",
+          "Page 6"
+        ],
+        [
+          "A History Of English Law Vol 6 (1924)",
+          "Page 7"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "www.survivorlibrary.com/library/how_to_make_and_use_electricity_1889.pdf",
+      "title": "How To Make And Use Electricity (1889)",
+      "html_bytes": 113842,
+      "blocks": 751,
+      "body_characters": 108755,
+      "lead_characters": 124,
+      "lead_excerpt": "How To Make And Use Electricity (1889). A 80-page scanned book in the Survivor Library. Listed under Engineering Electrical.",
+      "body_text_sha256": "3dc63090e286d256d977a5c6a4f238e3721f714e1d8e4855148aeb6f4d3b9b6a",
+      "headings": [
+        [
+          "How To Make And Use Electricity (1889)"
+        ],
+        [
+          "How To Make And Use Electricity (1889)",
+          "About this text"
+        ],
+        [
+          "How To Make And Use Electricity (1889)",
+          "Page 1"
+        ],
+        [
+          "How To Make And Use Electricity (1889)",
+          "Page 2"
+        ],
+        [
+          "How To Make And Use Electricity (1889)",
+          "Page 9"
+        ],
+        [
+          "How To Make And Use Electricity (1889)",
+          "Page 10"
+        ],
+        [
+          "How To Make And Use Electricity (1889)",
+          "Page 11"
+        ],
+        [
+          "How To Make And Use Electricity (1889)",
+          "Page 12"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "www.survivorlibrary.com/library/scientific-american-1883-10-20-v49-n16.pdf",
+      "title": "Scientific-american-1883-10-20-v49-n16",
+      "html_bytes": 258011,
+      "blocks": 3067,
+      "body_characters": 233670,
+      "lead_characters": 87,
+      "lead_excerpt": "Scientific-american-1883-10-20-v49-n16. A 16-page scanned book in the Survivor Library.",
+      "body_text_sha256": "5ffb9ef054acc089bb667130652eaaf7adfce06eb26fbaa63d2bef8e01e05185",
+      "headings": [
+        [
+          "Scientific-american-1883-10-20-v49-n16"
+        ],
+        [
+          "Scientific-american-1883-10-20-v49-n16",
+          "About this text"
+        ],
+        [
+          "Scientific-american-1883-10-20-v49-n16",
+          "Page 1"
+        ],
+        [
+          "Scientific-american-1883-10-20-v49-n16",
+          "Page 2"
+        ],
+        [
+          "Scientific-american-1883-10-20-v49-n16",
+          "Page 3"
+        ],
+        [
+          "Scientific-american-1883-10-20-v49-n16",
+          "Page 4"
+        ],
+        [
+          "Scientific-american-1883-10-20-v49-n16",
+          "Page 5"
+        ],
+        [
+          "Scientific-american-1883-10-20-v49-n16",
+          "Page 6"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "www.survivorlibrary.com/library/scientific-american-1875-06-26-v32-n26.pdf",
+      "title": "Scientific-american-1875-06-26-v32-n26",
+      "html_bytes": 333084,
+      "blocks": 3026,
+      "body_characters": 298230,
+      "lead_characters": 87,
+      "lead_excerpt": "Scientific-american-1875-06-26-v32-n26. A 16-page scanned book in the Survivor Library.",
+      "body_text_sha256": "e342b15bb89d719b8f4fd5f701d5d8b9a88d33cf40e836e4f868601839aadab4",
+      "headings": [
+        [
+          "Scientific-american-1875-06-26-v32-n26"
+        ],
+        [
+          "Scientific-american-1875-06-26-v32-n26",
+          "About this text"
+        ],
+        [
+          "Scientific-american-1875-06-26-v32-n26",
+          "Page 1"
+        ],
+        [
+          "Scientific-american-1875-06-26-v32-n26",
+          "Page 2"
+        ],
+        [
+          "Scientific-american-1875-06-26-v32-n26",
+          "Page 3"
+        ],
+        [
+          "Scientific-american-1875-06-26-v32-n26",
+          "Page 4"
+        ],
+        [
+          "Scientific-american-1875-06-26-v32-n26",
+          "Page 5"
+        ],
+        [
+          "Scientific-american-1875-06-26-v32-n26",
+          "Page 6"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "www.survivorlibrary.com/library/scientific-american-1848-07-29-v03-n45.pdf",
+      "title": "Scientific-american-1848-07-29-v03-n45",
+      "html_bytes": 140357,
+      "blocks": 1374,
+      "body_characters": 128582,
+      "lead_characters": 129,
+      "lead_excerpt": "Scientific-american-1848-07-29-v03-n45. A 8-page scanned book in the Survivor Library. Listed under Scientific American Series 1.",
+      "body_text_sha256": "247e07e82c9ba5a237d6a59cd46189f9d6b57882c8c9dfde3799a5523d778b30",
+      "headings": [
+        [
+          "Scientific-american-1848-07-29-v03-n45"
+        ],
+        [
+          "Scientific-american-1848-07-29-v03-n45",
+          "About this text"
+        ],
+        [
+          "Scientific-american-1848-07-29-v03-n45",
+          "Page 1"
+        ],
+        [
+          "Scientific-american-1848-07-29-v03-n45",
+          "Page 2"
+        ],
+        [
+          "Scientific-american-1848-07-29-v03-n45",
+          "Page 3"
+        ],
+        [
+          "Scientific-american-1848-07-29-v03-n45",
+          "Page 4"
+        ],
+        [
+          "Scientific-american-1848-07-29-v03-n45",
+          "Page 5"
+        ],
+        [
+          "Scientific-american-1848-07-29-v03-n45",
+          "Page 6"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "www.survivorlibrary.com/library/marks_of_american_potters_1904.pdf",
+      "title": "Marks Of American Potters (1904)",
+      "html_bytes": 199339,
+      "blocks": 1883,
+      "body_characters": 183177,
+      "lead_characters": 104,
+      "lead_excerpt": "Marks Of American Potters (1904). A 180-page scanned book in the Survivor Library. Listed under Pottery.",
+      "body_text_sha256": "ec68d2457f388a359d814e09484ccd0bd3830690b99d7ced61f61e3dce3163d6",
+      "headings": [
+        [
+          "Marks Of American Potters (1904)"
+        ],
+        [
+          "Marks Of American Potters (1904)",
+          "About this text"
+        ],
+        [
+          "Marks Of American Potters (1904)",
+          "Text"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "www.survivorlibrary.com/library/scientific-american-1872-06-01-v26-n23.pdf",
+      "title": "Scientific-american-1872-06-01-v26-n23",
+      "html_bytes": 343016,
+      "blocks": 8776,
+      "body_characters": 289199,
+      "lead_characters": 87,
+      "lead_excerpt": "Scientific-american-1872-06-01-v26-n23. A 16-page scanned book in the Survivor Library.",
+      "body_text_sha256": "78cd03d24400cc7d6f8cb5534ce0dfc0eb89cdfbaf21e237c3f48de499c3f1f5",
+      "headings": [
+        [
+          "Scientific-american-1872-06-01-v26-n23"
+        ],
+        [
+          "Scientific-american-1872-06-01-v26-n23",
+          "About this text"
+        ],
+        [
+          "Scientific-american-1872-06-01-v26-n23",
+          "Page 1"
+        ],
+        [
+          "Scientific-american-1872-06-01-v26-n23",
+          "Page 2"
+        ],
+        [
+          "Scientific-american-1872-06-01-v26-n23",
+          "Page 3"
+        ],
+        [
+          "Scientific-american-1872-06-01-v26-n23",
+          "Page 4"
+        ],
+        [
+          "Scientific-american-1872-06-01-v26-n23",
+          "Page 5"
+        ],
+        [
+          "Scientific-american-1872-06-01-v26-n23",
+          "Page 6"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "www.survivorlibrary.com/library/practical_home_and_school_methods_of_study_and_instruction_1913.pdf",
+      "title": "Practical Home And School Methods Of Study And Instruction (1913)",
+      "html_bytes": 1083077,
+      "blocks": 13782,
+      "body_characters": 995917,
+      "lead_characters": 138,
+      "lead_excerpt": "Practical Home And School Methods Of Study And Instruction (1913). A 552-page scanned book in the Survivor Library. Listed under Teaching.",
+      "body_text_sha256": "c2781023b23710cf18e5e26fe63b41541adb955efda0a70636fe5c8b3456a4fb",
+      "headings": [
+        [
+          "Practical Home And School Methods Of Study And Instruction (1913)"
+        ],
+        [
+          "Practical Home And School Methods Of Study And Instruction (1913)",
+          "About this text"
+        ],
+        [
+          "Practical Home And School Methods Of Study And Instruction (1913)",
+          "Page 2"
+        ],
+        [
+          "Practical Home And School Methods Of Study And Instruction (1913)",
+          "Page 3"
+        ],
+        [
+          "Practical Home And School Methods Of Study And Instruction (1913)",
+          "Page 4"
+        ],
+        [
+          "Practical Home And School Methods Of Study And Instruction (1913)",
+          "Page 6"
+        ],
+        [
+          "Practical Home And School Methods Of Study And Instruction (1913)",
+          "Page 7"
+        ],
+        [
+          "Practical Home And School Methods Of Study And Instruction (1913)",
+          "Page 8"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "www.survivorlibrary.com/library/scientific-american-1907-11-09-v97-n19.pdf",
+      "title": "Scientific-american-1907-11-09-v97-n19",
+      "html_bytes": 343679,
+      "blocks": 3912,
+      "body_characters": 313042,
+      "lead_characters": 87,
+      "lead_excerpt": "Scientific-american-1907-11-09-v97-n19. A 40-page scanned book in the Survivor Library.",
+      "body_text_sha256": "980cd3e861ec6e91ffc25407b6002463a040f4897334a0962a85dce6a8f810c6",
+      "headings": [
+        [
+          "Scientific-american-1907-11-09-v97-n19"
+        ],
+        [
+          "Scientific-american-1907-11-09-v97-n19",
+          "About this text"
+        ],
+        [
+          "Scientific-american-1907-11-09-v97-n19",
+          "Page 1"
+        ],
+        [
+          "Scientific-american-1907-11-09-v97-n19",
+          "Page 2"
+        ],
+        [
+          "Scientific-american-1907-11-09-v97-n19",
+          "Page 3"
+        ],
+        [
+          "Scientific-american-1907-11-09-v97-n19",
+          "Page 4"
+        ],
+        [
+          "Scientific-american-1907-11-09-v97-n19",
+          "Page 5"
+        ],
+        [
+          "Scientific-american-1907-11-09-v97-n19",
+          "Page 6"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "www.survivorlibrary.com/library/fn_fal_assault_rifle.pdf",
+      "title": "Fn Fal Assault Rifle",
+      "html_bytes": 34275,
+      "blocks": 429,
+      "body_characters": 31626,
+      "lead_characters": 100,
+      "lead_excerpt": "Fn Fal Assault Rifle. A 42-page scanned book in the Survivor Library. Listed under Firearms Manuals.",
+      "body_text_sha256": "ff0173728307392b6565379c36b613580065ddefb238926e8b05964b86310835",
+      "headings": [
+        [
+          "Fn Fal Assault Rifle"
+        ],
+        [
+          "Fn Fal Assault Rifle",
+          "About this text"
+        ],
+        [
+          "Fn Fal Assault Rifle",
+          "Page 1"
+        ],
+        [
+          "Fn Fal Assault Rifle",
+          "Page 2"
+        ],
+        [
+          "Fn Fal Assault Rifle",
+          "Page 3"
+        ],
+        [
+          "Fn Fal Assault Rifle",
+          "Page 4"
+        ],
+        [
+          "Fn Fal Assault Rifle",
+          "Page 5"
+        ],
+        [
+          "Fn Fal Assault Rifle",
+          "Page 6"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "www.survivorlibrary.com/library/scientific-american-1881-07-02-v45-n01.pdf",
+      "title": "Scientific-american-1881-07-02-v45-n01",
+      "html_bytes": 235820,
+      "blocks": 2538,
+      "body_characters": 213115,
+      "lead_characters": 87,
+      "lead_excerpt": "Scientific-american-1881-07-02-v45-n01. A 15-page scanned book in the Survivor Library.",
+      "body_text_sha256": "39a6c5d1f62d3bb0aca2938f781be306dcd240d51b81eced889d6ab4056485a5",
+      "headings": [
+        [
+          "Scientific-american-1881-07-02-v45-n01"
+        ],
+        [
+          "Scientific-american-1881-07-02-v45-n01",
+          "About this text"
+        ],
+        [
+          "Scientific-american-1881-07-02-v45-n01",
+          "Page 1"
+        ],
+        [
+          "Scientific-american-1881-07-02-v45-n01",
+          "Page 2"
+        ],
+        [
+          "Scientific-american-1881-07-02-v45-n01",
+          "Page 3"
+        ],
+        [
+          "Scientific-american-1881-07-02-v45-n01",
+          "Page 4"
+        ],
+        [
+          "Scientific-american-1881-07-02-v45-n01",
+          "Page 5"
+        ],
+        [
+          "Scientific-american-1881-07-02-v45-n01",
+          "Page 6"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "www.survivorlibrary.com/library/chemistry_inorganic_with_experiments_1923.pdf",
+      "title": "Chemistry Inorganic With Experiments (1923)",
+      "html_bytes": 2701048,
+      "blocks": 12566,
+      "body_characters": 2265447,
+      "lead_characters": 117,
+      "lead_excerpt": "Chemistry Inorganic With Experiments (1923). A 703-page scanned book in the Survivor Library. Listed under Chemistry.",
+      "body_text_sha256": "01c7fcd99d31373f5857a872d8c338e8d0d79b9ebdb9c4989e5be5eaf23ee564",
+      "headings": [
+        [
+          "Chemistry Inorganic With Experiments (1923)"
+        ],
+        [
+          "Chemistry Inorganic With Experiments (1923)",
+          "About this text"
+        ],
+        [
+          "Chemistry Inorganic With Experiments (1923)",
+          "Text"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "www.survivorlibrary.com/library/leather_manufacture-a_treatise_on_the_practical_workings_of_the_leather_manufacture_1891.pdf",
+      "title": "Leather Manufacture-a Treatise On The Practical Workings Of The Leather Manufacture (1891)",
+      "html_bytes": 634777,
+      "blocks": 4902,
+      "body_characters": 604076,
+      "lead_characters": 162,
+      "lead_excerpt": "Leather Manufacture-a Treatise On The Practical Workings Of The Leather Manufacture (1891). A 274-page scanned book in the Survivor Library. Listed under Leather.",
+      "body_text_sha256": "fb81ee7b295c7bf803e18c878af70c22324ce5c7b1f7f80b0e25035135ef31d9",
+      "headings": [
+        [
+          "Leather Manufacture-a Treatise On The Practical Workings Of The Leather Manufacture (1891)"
+        ],
+        [
+          "Leather Manufacture-a Treatise On The Practical Workings Of The Leather Manufacture (1891)",
+          "About this text"
+        ],
+        [
+          "Leather Manufacture-a Treatise On The Practical Workings Of The Leather Manufacture (1891)",
+          "Page 9"
+        ],
+        [
+          "Leather Manufacture-a Treatise On The Practical Workings Of The Leather Manufacture (1891)",
+          "Page 10"
+        ],
+        [
+          "Leather Manufacture-a Treatise On The Practical Workings Of The Leather Manufacture (1891)",
+          "Page 11"
+        ],
+        [
+          "Leather Manufacture-a Treatise On The Practical Workings Of The Leather Manufacture (1891)",
+          "Page 13"
+        ],
+        [
+          "Leather Manufacture-a Treatise On The Practical Workings Of The Leather Manufacture (1891)",
+          "Page 15"
+        ],
+        [
+          "Leather Manufacture-a Treatise On The Practical Workings Of The Leather Manufacture (1891)",
+          "Page 16"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    }
+  ]
+}

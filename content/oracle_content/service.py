@@ -1,8 +1,6 @@
 from __future__ import annotations
 import asyncio
-import hashlib
 import json
-import math
 import os
 import traceback
 import re
@@ -11,7 +9,6 @@ import time
 import uuid
 import weakref
 from contextvars import ContextVar
-from pathlib import Path
 from urllib.parse import quote
 from .models import ContentError, Document, Profile, SearchRequest, ReadRequest, Passage, digest
 from .store import HANDLE, Store, atomic_json
@@ -140,6 +137,11 @@ FAILURE_FINGERPRINTS_MAX = 512
 # request is answered at a single search's cost rather than the batch's.
 LEXICAL_CONCURRENCY = 1
 
+# An archive that cannot serve this request at all, rather than a stage that failed:
+# its original's receipt changed (a mend is between writing and recording it) or
+# integrity withdrew it. It costs that archive's hits, named in the degradation.
+ARCHIVE_LOSS = frozenset({"unavailable_version", "source_damaged"})
+
 # A listing names the works a staged pack carries. Past this many the remainder is counted
 # instead, so a pack acquired as thousands of separate documents stays a readable entry.
 COLLECTION_WORKS_LIMIT = 64
@@ -195,26 +197,64 @@ class Service:
         except OSError:
             pass  # Failure reporting cannot replace the original retrieval failure.
 
+    def pack_label(self, generation):
+        manifest = self.store.manifest(generation)
+        source = manifest.get("source") or {}
+        return source.get("pack_id") or ",".join(sorted(manifest.get("packs", []))) or generation[:12]
+
+    def withdrawn(self, generation):
+        """The integrity overlay's verdict that a whole archive is out of service, or None."""
+        manifest = self.store.manifest(generation)
+        if manifest.get("kind") != "native-zim-article-v1":
+            return None
+        view = self.store.integrity.archive(manifest["source"]["sha256"])
+        return view.withdrawn_reason if view is not None and view.withdrawn else None
+
     def health(self):
+        """Readiness of the library, where one archive's failure costs that archive alone.
+
+        An archive that cannot be opened or verified, or that integrity has withdrawn,
+        is excluded from the checks and named in `unavailable_archives` and in
+        `degradation`; the library stays ready while any archive serves. Qualification
+        is judged over the archives still serving. The gateway refuses every chat
+        completion while the library is not ready, so a single damaged header would
+        otherwise take the whole service down.
+        """
         try:
             generation = self.store.active()
             generations = self.store.active_generations()
-            ready, dense_complete = True, True
-            for source_generation in generations:
-                manifest = self.store.manifest(source_generation)
-                ready = ready and manifest["index_fingerprint"] == self.profile.index_fingerprint
+        except (ContentError, sqlite3.Error):
+            return {"ready": False, "generation": None, "profile_id": self.profile.profile_id, "qualified": False,
+                    "coverage": self.store.coverage(None), "degradation": [], "unavailable_archives": []}
+        ready, dense_complete, serving, unavailable = True, True, [], []
+        for source_generation in generations:
+            manifest = self.store.manifest(source_generation)
+            ready = ready and manifest["index_fingerprint"] == self.profile.index_fingerprint
+            try:
+                if self.withdrawn(source_generation) is not None:
+                    raise ContentError("source_damaged", "Archive withdrawn for integrity damage")
                 native = self.store.native(source_generation)
                 if native is not None:
                     native.verify_original()
-                    ready = ready and native.archive.has_fulltext_index
-                    dense_complete = dense_complete and manifest.get("dense_stage") == "complete"
+                    indexed = native.archive.has_fulltext_index
                 else:
                     with self.store.connect(source_generation) as db:
-                        ready = ready and db.execute("SELECT 1 FROM passages LIMIT 1").fetchone() is not None
-        except (ContentError, sqlite3.Error):
-            generation, ready, dense_complete = None, False, False
-        return {"ready": ready, "generation": generation, "profile_id": self.profile.profile_id,
-                "qualified": self.profile.qualified and dense_complete, "coverage": self.store.coverage(generation)}
+                        indexed = db.execute("SELECT 1 FROM passages LIMIT 1").fetchone() is not None
+            except (ContentError, sqlite3.Error, OSError, RuntimeError) as error:
+                code = getattr(error, "code", type(error).__name__)
+                pack = self.pack_label(source_generation)
+                unavailable.append({"generation": source_generation, "pack_id": pack, "code": code})
+                continue
+            ready = ready and indexed
+            if native is not None:
+                dense_complete = dense_complete and manifest.get("dense_stage") == "complete"
+            serving.append(source_generation)
+        degradation = [f"integrity:{row['pack_id']}:withdrawn" if row["code"] == "source_damaged"
+                       else f"archive_unavailable:{row['pack_id']}" for row in unavailable]
+        return {"ready": ready and bool(serving), "generation": generation, "profile_id": self.profile.profile_id,
+                "qualified": self.profile.qualified and dense_complete and bool(serving),
+                "coverage": self.store.coverage(generation), "degradation": degradation,
+                "unavailable_archives": unavailable}
 
     def collections(self):
         """List the installed library itself: what it holds, rather than what a query found.
@@ -407,9 +447,24 @@ class Service:
         return fuse(article_branches, article_weights, self.profile.rrf_k)
 
     async def candidates(self, query, document_id=None, generation=None):
-        """Evaluation seam: independent ranks and fused pool before reranking/packing."""
+        """Evaluation seam: independent ranks and fused pool before reranking/packing.
+
+        Integrity damage costs what it touches and no more. An archive the overlay
+        withdraws is left out and named; one whose original became unavailable mid-search
+        is dropped from this result and named; a withdrawn lexical index or failed dense
+        validation removes that branch for that archive alone; and hits on quarantined
+        documents are dropped. Each of these is a `degradation` code, so a result missing
+        pieces never reads as a complete one.
+        """
         if generation is None:
-            generations = self.store.active_generations()
+            generations, degradation = [], []
+            for value in self.store.active_generations():
+                if self.withdrawn(value) is None:
+                    generations.append(value)
+                else:
+                    degradation.append(f"integrity:{self.pack_label(value)}:withdrawn")
+            if not generations:
+                raise ContentError("source_damaged", "Every archive in the library is withdrawn for integrity damage")
             if document_id:
                 scoped = []
                 for candidate in generations:
@@ -422,32 +477,64 @@ class Service:
                 if not scoped:
                     raise ContentError("unknown_document", "Document is outside the active library", 404)
                 generations = scoped
-            if len(generations) > 1:
-                pools = await asyncio.gather(*(self.candidates(query, document_id, value) for value in generations))
-                branches = merge_branches(pools, self.profile.rrf_k)
-                rows = fuse(branches, {"lexical": self.profile.lexical_weight, "dense": self.profile.dense_weight}, self.profile.rrf_k)
-                passages = {key: value for pool in pools for key, value in pool["passages"].items()}
-                return {"generation": generations[0], "generations": generations, "branches": branches,
-                        "rows": remove_contained(rows, passages), "passages": passages,
-                        "degradation": sorted({value for pool in pools for value in pool["degradation"]})}
-            generation = generations[0]
+            if len(generations) == 1:
+                pool = await self.candidates(query, document_id, generations[0])
+                pool["degradation"] = [*pool["degradation"], *degradation]
+                return pool
+            results = await asyncio.gather(*(self.candidates(query, document_id, value) for value in generations),
+                                           return_exceptions=True)
+            pools, lost = [], None
+            for value, result in zip(generations, results):
+                if isinstance(result, ContentError) and result.code in ARCHIVE_LOSS:
+                    degradation.append(self.loss_label(value, result))
+                    lost = lost or result
+                    continue
+                if isinstance(result, BaseException):
+                    raise result
+                pools.append(result)
+            if not pools:
+                raise lost
+            branches = merge_branches(pools, self.profile.rrf_k)
+            rows = fuse(branches, {"lexical": self.profile.lexical_weight, "dense": self.profile.dense_weight}, self.profile.rrf_k)
+            passages = {key: value for pool in pools for key, value in pool["passages"].items()}
+            return {"generation": pools[0]["generation"], "generations": [pool["generation"] for pool in pools],
+                    "branches": branches, "rows": remove_contained(rows, passages), "passages": passages,
+                    "degradation": sorted({*degradation, *(value for pool in pools for value in pool["degradation"])})}
         generation = generation or self.active()
-        if self.store.manifest(generation)["index_fingerprint"] != self.profile.index_fingerprint:
+        manifest = self.store.manifest(generation)
+        if manifest["index_fingerprint"] != self.profile.index_fingerprint:
             raise ContentError("profile_mismatch", "Active corpus uses a different release profile")
         if document_id:
             self.store.document(generation, document_id)
+        pack = self.pack_label(generation)
+        view = (self.store.integrity.archive(manifest["source"]["sha256"])
+                if manifest.get("kind") == "native-zim-article-v1" else None)
+        lexical_withdrawn = view is not None and view.lexical_withdrawn
+        dense_withdrawn = self.store.integrity.dense_degraded(generation)
+
+        async def withheld():
+            return []
+
         dense_query, dense_truncated = self.fit_dense_query(query)
-        lexical, dense = await asyncio.gather(self.lexical(generation, query, document_id),
-            self.dense.search(generation, dense_query, document_id), return_exceptions=True)
+        lexical, dense = await asyncio.gather(
+            withheld() if lexical_withdrawn else self.lexical(generation, query, document_id),
+            withheld() if dense_withdrawn else self.dense.search(generation, dense_query, document_id),
+            return_exceptions=True)
         if isinstance(lexical, BaseException):
             if isinstance(lexical, asyncio.CancelledError):
+                raise lexical
+            if isinstance(lexical, ContentError) and lexical.code in ARCHIVE_LOSS:
                 raise lexical
             self.record_failure("lexical", generation, lexical)
             raise ContentError("lexical_unavailable", "Lexical retrieval failed; search was not completed") from lexical
         degradation = []
+        if lexical_withdrawn:
+            degradation.append(f"integrity:{pack}:lexical")
+        if dense_withdrawn:
+            degradation.append(f"integrity:{pack}:dense")
         if dense_truncated:
             degradation.append("dense_query_truncated")
-        if self.store.manifest(generation).get("kind") == "native-zim-article-v1" and self.store.manifest(generation).get("dense_stage") != "complete":
+        if manifest.get("kind") == "native-zim-article-v1" and manifest.get("dense_stage") != "complete":
             degradation.append("dense_index_incomplete")
         if isinstance(dense, BaseException):
             if isinstance(dense, asyncio.CancelledError):
@@ -462,14 +549,32 @@ class Service:
         # native archive that is tens to hundreds of milliseconds per hit and the
         # service runs one event loop, so it never happens on the loop itself.
         def resolve():
-            return [known.get(row["passage_id"]) or self.store.passage(generation, row["passage_id"]) for row in rows]
-        passages = {}
+            found = []
+            for row in rows:
+                try:
+                    found.append(known.get(row["passage_id"]) or self.store.passage(generation, row["passage_id"]))
+                except ContentError as error:
+                    if error.code != "source_damaged":
+                        raise
+                    found.append(None)
+            return found
+        passages, dropped = {}, getattr(lexical, "damaged", 0)
         for p in await asyncio.to_thread(resolve):
+            if p is None:
+                dropped += 1
+                continue
             if document_id and p.document_id != document_id:
                 raise ContentError("index_scope_mismatch", "Candidate escaped its document scope")
             passages[p.passage_id] = p
+        if dropped:
+            degradation.append(f"integrity:{pack}")
+            rows = [row for row in rows if row["passage_id"] in passages]
         return {"generation": generation, "branches": {"lexical": lexical, "dense": dense},
                 "rows": remove_contained(rows, passages), "passages": passages, "degradation": degradation}
+
+    def loss_label(self, generation, error):
+        pack = self.pack_label(generation)
+        return f"integrity:{pack}:withdrawn" if error.code == "source_damaged" else f"archive_unavailable:{pack}"
 
     def collection(self, generation, doc):
         """The work a document sits inside, for display alongside a title that alone says little.
@@ -691,12 +796,20 @@ class Service:
                 raise ContentError("unknown_document", "Document is outside the active library", 404)
             selected = None
         doc = self.store.document(generation, request.document_id)
+        native = self.store.native(generation)
+        degradation = []
+        if native is not None:
+            # A person is about to read this text: its bytes are re-hashed first, and a
+            # read of an admitted archive the re-hash could not check says so.
+            from .integrity.overlay import NOT_ADMITTED, VERIFIED
+            if native.verify_read(int(doc.document_id.rsplit("_", 1)[1])) not in (VERIFIED, NOT_ADMITTED):
+                degradation.append(f"integrity:{self.pack_label(generation)}:read_unverified")
         passages = list(self.store.passages(generation, doc.document_id))
         if selected:
             # Direct expansion starts one source neighbor earlier and can continue to the end.
             passages = [selected, *passages] if selected.kind == "article_lead" else passages[max(0, selected.ordinal - 1):]
         hits = [self.hit(generation, p, omit=selected is None) for p in passages]
-        snapshot = {**self.base(generation), "document": {"document_id": doc.document_id, "title": doc.title,
+        snapshot = {**self.base(generation, degradation), "document": {"document_id": doc.document_id, "title": doc.title,
             "collection": self.collection(generation, doc),
             "edition": doc.edition, "publisher": doc.publisher, "language": doc.language,
             "source_revision": doc.sha256, "license": doc.license, "rights_exceptions": doc.rights_exceptions},

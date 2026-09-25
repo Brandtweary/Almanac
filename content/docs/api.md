@@ -6,7 +6,7 @@ or filesystem-management endpoint is public. FastAPI `/openapi.json` exposes req
 
 | Route | Input | Output |
 |---|---|---|
-| `GET /health`, `GET /capabilities` | None | `ready`, `generation`, `profile_id`, `qualified`, `coverage` |
+| `GET /health`, `GET /capabilities` | None | `ready`, `generation`, `profile_id`, `qualified`, `coverage`, `degradation`, `unavailable_archives` |
 | `POST /v1/corpus/search` | `query`, optional `document_id`, `cursor`, `require_qualified` | Common envelope, `hits`, `cursor` |
 | `GET /v1/corpus/collections` | None | Common envelope, `collections` |
 | `POST /v1/corpus/read` | `document_id`, optional `passage_id`, `cursor` | Common envelope, `document`, `overview`, `passages`, `cursor` |
@@ -64,8 +64,38 @@ depends on a retained cursor.
 Errors use `{error: {code, message}, request_id}`. Malformed requests/cursors are 400,
 unknown documents/passages 404, unavailable historical generations/originals 410,
 index/profile readiness failures 503. Lexical failure blocks search. Dense failure labels
-lexical results `degraded`; reranker failure labels fused results `degraded`. A source checksum
-failure never serves different bytes under an old handle.
+lexical results `degraded`; reranker failure labels fused results `degraded`.
+
+A passage handle carries a digest of its own text, so a handle whose source bytes changed
+resolves to `unknown_passage` and never to different text. A fresh search or a read by
+document identity carries no such reference, so for those the protection is integrity:
+an archive admitted to it has every leaf re-read from the medium on a schedule and the
+leaves of a document re-hashed before it is read, and a document whose bytes are damaged
+is refused with `source_damaged` (503), including through a handle into it, which was
+valid and is not reported as unknown ([integrity](integrity.md)). An archive not admitted
+is checked only against its receipt's size and modification time, which does not read
+its bytes; its coverage entry says it is not admitted.
+
+Integrity damage costs what it touches. Search drops hits on damaged documents and adds
+`integrity:<pack>` to `degradation`; `integrity:<pack>:lexical` means that archive's
+search index is withdrawn, `integrity:<pack>:dense` that its dense index failed
+validation, and `integrity:<pack>:withdrawn` that the whole archive is out of service.
+`integrity:<pack>:read_unverified` on a read means the archive is admitted but its text was
+served without the read-time re-hash, and the source route's `X-Integrity-Read` header
+carries the same outcome (`verified`, `not_admitted` or the reason the re-hash did not run).
+`archive_unavailable:<pack>` means an archive could not be read for this request. Health
+excludes an unavailable or withdrawn archive from its checks, names it in
+`unavailable_archives` and `degradation`, and stays ready while any archive serves;
+qualification is judged over the archives serving. Each `coverage.native_archives` entry
+carries an `integrity` block: whether the archive is `admitted`, the `verified_fraction`
+of its leaves verified within the scrub window (a leaf never verified counts as
+unverified), damaged, unrepairable and pending-reload leaf counts, `damaged_documents`
+(null when some damage could not be localised), `lexical_withdrawn`, `withdrawn` with its
+reason, `last_full_pass`, `network_sources_available`, `upstream` (a newer listed edition
+and whether the installed one is still listed), `read_verification` (`active`, or why
+reads are not being re-hashed), `manifest` and `corpus_root`.
+`precomputed_undecodable` counts precomputed articles that no longer decode and fell back
+to the archive.
 
 A query longer than the sentence encoder's window is accepted, not rejected: the dense branch
 encodes the leading portion that fits and the results carry `dense_query_truncated`, so a narrower

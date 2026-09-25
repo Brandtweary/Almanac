@@ -1,0 +1,8 @@
+{
+  "artifacts": [],
+  "corpus_root": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "hash": "sha256",
+  "leaf_bytes": 4194304,
+  "schema": "almanac-integrity-v1",
+  "tree": "rfc6962-prefixed"
+}

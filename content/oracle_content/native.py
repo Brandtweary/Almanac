@@ -75,10 +75,15 @@ PASSAGE_CACHE_ENTRY_BYTES = 8 * 1024 * 1024
 
 
 class NativeLexicalHits(list):
-    """Carry already-localized evidence across the asynchronous retrieval boundary."""
-    def __init__(self, rows, passages):
+    """Carry already-localized evidence across the asynchronous retrieval boundary.
+
+    `damaged` counts archive hits dropped because their bytes are quarantined, so the
+    response can say that results are missing rather than presenting fewer as all.
+    """
+    def __init__(self, rows, passages, damaged=0):
         super().__init__(rows)
         self.passages = passages
+        self.damaged = damaged
 
 
 def article_lead(html, max_characters, revision="html-structural-v4", *, with_flags=False):
@@ -277,6 +282,13 @@ class NativeReader:
         self.profile = Profile.model_validate(manifest["extraction_profile"])
         self.tokenizer = TokenCounter(str(store.directory(generation) / "encoder-tokenizer.json"), self.profile.encoder_tokenizer_sha256)
         self.path = store.root / self.template.original_path
+        # The epochs are read before the archive is opened: a mend that lands in between
+        # then leaves this reader marked older than the mend, so it refuses what the mend
+        # touched until it is reopened, rather than trusting a cache it cannot vouch for.
+        self.integrity = store.integrity
+        self.artifact = self.template.sha256
+        self.integrity_epoch = self.integrity.epoch(self.artifact)
+        self.spans_epoch = self.integrity.epoch("spans-" + generation)
         self.archive = Archive(str(self.path))
         try:
             date = bytes(self.archive.get_metadata("Date")).decode("ascii") if "Date" in self.archive.metadata_keys else ""
@@ -297,6 +309,48 @@ class NativeReader:
         if receipt.get("sha256") != self.template.sha256 or receipt.get("size") != stat.st_size or receipt.get("mtime_ns") != stat.st_mtime_ns:
             raise ContentError("unavailable_version", "Original archive integrity receipt changed", 410)
 
+    def stale(self):
+        """Whether a mend, or a withdrawal of the spans, since this reader opened requires reopening it.
+
+        The archive's own withdrawal advances no epoch; the store checks it on every call.
+        """
+        return (self.integrity.epoch(self.artifact) != self.integrity_epoch
+                or self.integrity.epoch("spans-" + self.generation) != self.spans_epoch)
+
+    def admit_entry(self, index):
+        """Refuse an entry whose bytes lie in quarantine, before anything decodes them.
+
+        This is the one gate every path to an article's text passes: reads, search
+        localization, dense-hit resolution and cited handles, whether the text would
+        come from the archive or from its precomputed spans.
+        """
+        view = self.integrity.archive(self.artifact)
+        if view is None:
+            return
+        reason = view.blocked(index, self.integrity_epoch)
+        if reason is not None:
+            from .integrity.overlay import message
+            raise ContentError("source_damaged", message(reason, self.template.title))
+
+    def verify_read(self, index):
+        """Re-hash an article's leaves before its text is returned to a person reading it.
+
+        Returns the overlay's outcome, so a read the re-hash could not check is labelled
+        as such rather than passing for a verified one.
+        """
+        from .integrity.overlay import REFUSED
+        outcome = self.integrity.verify_entry(self.artifact, self.path, index)
+        if outcome == REFUSED:
+            from .integrity.overlay import message
+            raise ContentError("source_damaged", message("damaged", self.template.title))
+        return outcome
+
+    def usable_spans(self):
+        """The precomputed spans, unless integrity has withdrawn them; the query path then answers."""
+        if self.spans is None or not self.integrity.spans_usable(self.generation, self.spans_epoch):
+            return None
+        return self.spans
+
     def entry(self, index):
         if index < 0 or index >= self.archive.entry_count:
             raise ContentError("unknown_document", "Native article index is outside this archive", 404)
@@ -306,6 +360,9 @@ class NativeReader:
         return entry
 
     def document(self, document_id):
+        match = re.fullmatch(r"z_([a-f0-9]{64})_([0-9]+)", document_id)
+        if match and match[1] == self.template.sha256:
+            self.admit_entry(int(match[2]))
         with self.cache_lock:
             if document_id in self.document_cache:
                 self.document_cache.move_to_end(document_id)
@@ -330,7 +387,8 @@ class NativeReader:
             # parsing its whole DOM. An article present in the precomputed spans
             # was admitted by this same policy under this same binding when they
             # were built, and carries the license that admission resolved.
-            stored = self.spans.raw(index) if self.spans is not None else None
+            spans = self.usable_spans()
+            stored = spans.raw(index) if spans is not None else None
             if stored is not None and stored[3] is not None:
                 license = stored[3]
             else:
@@ -351,6 +409,7 @@ class NativeReader:
             "original_path": self.template.original_path})
 
     def blocks(self, index):
+        self.admit_entry(index)
         entry = self.entry(index)
         return html_blocks(decode_zim_html(entry.get_item()), self.template.extraction_revision)
 
@@ -371,12 +430,16 @@ class NativeReader:
 
     def _passages(self, document_id):
         self.verify_original()
+        match = re.fullmatch(r"z_([a-f0-9]{64})_([0-9]+)", document_id)
+        if match and match[1] == self.template.sha256:
+            self.admit_entry(int(match[2]))
         if document_id in self.cache:
             self.cache.move_to_end(document_id)
             return self.cache[document_id][0]
         document = self.document(document_id)
         index = int(document_id.rsplit("_", 1)[1])
-        stored = self.spans.raw(index) if self.spans is not None else None
+        spans = self.usable_spans()
+        stored = spans.raw(index) if spans is not None else None
         if stored is None:
             rows = self.segment_article(document, index)
         else:
@@ -417,8 +480,10 @@ class NativeReader:
         it has already done; `stored=False` makes it recompute, which is how the
         builder verifies what it is about to store.
         """
-        if stored and self.spans is not None:
-            precomputed = self.spans.raw(index)
+        self.admit_entry(index)
+        spans = self.usable_spans() if stored else None
+        if spans is not None:
+            precomputed = spans.raw(index)
             if precomputed is not None:
                 return precomputed[2]
         document = self.document(self.document_id(index))
@@ -478,6 +543,7 @@ class NativeReader:
         return await asyncio.to_thread(self._localize, paths, query, limit, document_id)
 
     def _localize(self, paths, query, limit, document_id):
+        damaged = 0
         if document_id:
             documents = [self.document(document_id)]
         else:
@@ -489,6 +555,9 @@ class NativeReader:
                 try:
                     documents.append(self.document(self.document_id(entry._index)))
                 except ContentError as error:
+                    if error.code == "source_damaged":
+                        damaged += 1
+                        continue
                     if error.code not in {"source_excluded", "unknown_document"}:
                         raise
         ranked = []
@@ -517,7 +586,7 @@ class NativeReader:
             for rank, pid in enumerate(candidates, 1):
                 ranked.append((pid, 1 / ((self.profile.rrf_k + article_rank) * (self.profile.rrf_k + rank))))
         selected = sorted(ranked, key=lambda row: (-row[1], row[0]))[:limit]
-        return NativeLexicalHits(selected, {pid: localized_passages[pid] for pid, _score in selected})
+        return NativeLexicalHits(selected, {pid: localized_passages[pid] for pid, _score in selected}, damaged)
 
 
 def serving_generations(store):

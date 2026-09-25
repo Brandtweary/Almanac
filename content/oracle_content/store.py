@@ -2,14 +2,13 @@
 from __future__ import annotations
 import contextlib
 import fcntl
-import hashlib
 import json
 import os
 from pathlib import Path
 import re
 import sqlite3
 import uuid
-from .models import ContentError, Document, Passage, Profile
+from .models import ContentError, Document, Passage
 
 HEX = re.compile(r"^[a-f0-9]{64}$")
 HANDLE = re.compile(r"^p:([a-f0-9]{64}):([a-f0-9]{64})$")
@@ -38,14 +37,34 @@ class Store:
         self.root = Path(root).resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         self._native_readers = {}
+        from .integrity.overlay import Overlay
+        self.integrity = Overlay(self.root)
 
     def native(self, generation):
+        """The generation's reader, reopened whenever a mend has advanced its archive's epoch.
+
+        A reader opened before a mend may hold the damaged cluster decoded in libzim's
+        cache, so it is replaced before it serves again. An archive the integrity state
+        withdraws is refused here, before libzim parses tables that may be damaged.
+        """
         from .native import KIND, NativeReader
-        if self.manifest(generation).get("kind") != KIND:
+        manifest = self.manifest(generation)
+        if manifest.get("kind") != KIND:
             return None
-        if generation not in self._native_readers:
-            self._native_readers[generation] = NativeReader(self, generation)
-        return self._native_readers[generation]
+        artifact = manifest["source"]["sha256"]
+        view = self.integrity.archive(artifact)
+        if view is not None and view.withdrawn:
+            # Checked before the cache: a withdrawal advances no epoch, so a reader
+            # opened earlier would otherwise keep serving the withdrawn archive.
+            self._native_readers.pop(generation, None)
+            from .integrity.overlay import message
+            raise ContentError("source_damaged", message(view.withdrawn_reason, manifest["source"].get("title", artifact)))
+        reader = self._native_readers.get(generation)
+        if reader is not None and not reader.stale():
+            return reader
+        reader = self._native_readers[generation] = NativeReader(self, generation)
+        self.integrity.acknowledge(artifact, reader.integrity_epoch)
+        return reader
 
     def active_generations(self):
         try:
@@ -199,11 +218,14 @@ class Store:
                 # Precompute coverage comes from the already-open reader, never a
                 # fresh artifact read: coverage is reported on every response.
                 try:
-                    spans = self.native(value).spans
+                    spans = self.native(value).usable_spans()
                 except (ContentError, OSError, RuntimeError):
                     spans = None
                 native.append({"generation": value, "pack_id": manifest["source"]["pack_id"],
                     "precomputed_articles": None if spans is None else spans.articles,
+                    "precomputed_undecodable": None if spans is None else spans.undecodable,
+                    "integrity": {**self.integrity.coverage(manifest["source"]["sha256"]),
+                                  **self.integrity.generation_flags(value)},
                     "lexical": "native full text within declared source selection", "reader": "complete articles",
                     "dense_representation": manifest["dense_representation"], "dense_stage": manifest["dense_stage"],
                     "indexed_articles": manifest["indexed_articles"], "entry_cursor": manifest["entry_cursor"],

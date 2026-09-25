@@ -146,6 +146,7 @@ class ArticleSpans:
     def __init__(self, path: Path, expected: dict):
         self.path, self.expected = path, expected
         self.local = threading.local()
+        self.undecodable = 0
         with self.connect() as db:
             stored = json.loads(db.execute("SELECT value FROM meta WHERE key='binding'").fetchone()[0])
             if stored != expected:
@@ -177,11 +178,26 @@ class ArticleSpans:
         return db
 
     def raw(self, index: int):
+        """One article's stored form, or None when the query path must answer for it.
+
+        A row that no longer decodes is damage to a derived artifact, and derived
+        artifacts are never a definition: the article falls back to being segmented from
+        the original, exactly as if it had never been precomputed. The fallback is
+        counted in `undecodable`, which coverage reports, so a damaged artifact is never
+        mistaken for a partial one.
+        """
         try:
             row = self.connect().execute("SELECT payload FROM articles WHERE entry_index=?", (index,)).fetchone()
         except sqlite3.Error:
             return None
-        return decode(row[0]) if row else None
+        if not row:
+            return None
+        try:
+            return decode(row[0])
+        except (zlib.error, ValueError, TypeError, KeyError, IndexError):
+            # ValueError covers malformed JSON and UTF-8 and a stored row the models reject.
+            self.undecodable += 1
+            return None
 
 
 _worker_reader = None
@@ -250,7 +266,7 @@ def status(directory: Path, value: dict):
 
 
 def build_spans(store, generation, *, workers=1, chunk=256, commit=8192,
-                min_free_bytes=8 * 1024 ** 3, log=print):
+                min_free_bytes=8 * 1024 ** 3, integrity_rate=None, log=print):
     """Build or resume one generation's article spans, publishing whatever it reaches.
 
     The artifact is written under a building name and moved into place when the
@@ -261,6 +277,9 @@ def build_spans(store, generation, *, workers=1, chunk=256, commit=8192,
     service exactly as it was. A resume moves a published artifact back under the
     building name first, so the live service is never reading a file being
     written; it therefore loses the precompute for the duration of the resume.
+
+    A completed artifact's leaves are then read for integrity at `integrity_rate`
+    bytes per second, the integrity default when None.
     """
     import fcntl
     import shutil
@@ -375,8 +394,29 @@ def build_spans(store, generation, *, workers=1, chunk=256, commit=8192,
             if building.exists():
                 building.replace(final)
                 state["published"] = True
+                if terminal == "complete":
+                    state["integrity"] = record_spans_leaves(store, generation, integrity_rate)
                 status(directory, state)
         return state
+
+
+def record_spans_leaves(store, generation, rate=None) -> dict:
+    """Take a completed artifact's leaf list for scrubbing, the moment it becomes immutable.
+
+    The read is one pass over the whole artifact on the disk the service is reading, so
+    it is held to `rate` bytes per second, or the integrity default read rate.
+    Failure here never unpublishes the artifact: the spans are an optimization, and the
+    account says the leaves were not recorded, so a later scrub reports it unmonitored
+    rather than healthy.
+    """
+    from .integrity.admit import admit_derived
+    from .integrity.medium import DEFAULT_READ_RATE, RateLimit
+    from .integrity.tree import LEAF_BYTES
+    try:
+        return {"recorded": True, **admit_derived(store.root, generation, leaf_bytes=LEAF_BYTES,
+                                                  rate=RateLimit(rate or DEFAULT_READ_RATE))}
+    except Exception as error:
+        return {"recorded": False, "error": f"{type(error).__name__}: {error}"}
 
 
 def create(path: Path, expected: dict) -> sqlite3.Connection:

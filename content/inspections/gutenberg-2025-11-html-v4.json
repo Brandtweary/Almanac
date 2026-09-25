@@ -1,0 +1,623 @@
+{
+  "source_sha256": "01677c8d554a1cab2cbfd020ac99ebca7dd6c74d3ce0d13f266a2ba603dfaf28",
+  "extraction_revision": "html-structural-v4",
+  "selection_policy": "gutenberg-books-v1",
+  "checked": true,
+  "scope": "Representative Project Gutenberg entries read through v4 extraction under the book policy: each book's own HTML admitted, the scraper's cover, author and catalog pages refused; not edition accuracy",
+  "archive": "01677c8d554a1cab2cbfd020ac99ebca7dd6c74d3ce0d13f266a2ba603dfaf28",
+  "archive_uuid": "a1e751b1-0b37-20fb-8991-6ed0968d900c",
+  "archive_bytes": 221251590584,
+  "entry_count": 1562228,
+  "native_fulltext": true,
+  "counter": "application/epub+zip=60357;application/javascript=6;application/pdf=1507;application/vnd.ms-fontobject=1;application/vnd.ms-opentype=1;application/vnd.musician=20;application/vnd.recordare.musicxml=3;application/xml=1507;application/zip=685;audio/midi=4515;audio/mpeg=2711;audio/ogg=14;audio/x-m4a=31;audio/x-wav=1;font/sfnt=14;font/woff=1;image/gif=9027;image/jpeg=975117;image/png=275922;image/svg+xml=8129;image/vnd.microsoft.icon=1;text/css=91;text/html=140904;text/javascript=81357;text/plain=2;text/x-lilypond=303;text/xml=1",
+  "sample_seed": 0,
+  "observations": [
+    {
+      "path": "Lily Munsell Ritchie.26143",
+      "title": "Lily Munsell Ritchie",
+      "html_bytes": 95618,
+      "blocks": 6,
+      "body_characters": 214,
+      "lead_characters": 0,
+      "lead_excerpt": "",
+      "body_text_sha256": "d76cf40b9d2761fa537cbc02bf1f363237b575e6b660c1a03256f083c5787503",
+      "headings": [
+        [
+          "Project Gutenberg Library"
+        ],
+        [
+          "Project Gutenberg Library",
+          "The first producer of free ebooks"
+        ]
+      ],
+      "tables": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "catalog_page",
+        "license": null
+      }
+    },
+    {
+      "path": "Ten American Girls from History_cover.20297",
+      "title": "Ten American Girls from History",
+      "html_bytes": 97678,
+      "blocks": 15,
+      "body_characters": 359,
+      "lead_characters": 0,
+      "lead_excerpt": "",
+      "body_text_sha256": "349615126c7e91f196f5e839b9628c934da53d6417ba461bb19d806d4e38a157",
+      "headings": [
+        [
+          "Project Gutenberg Library"
+        ],
+        [
+          "Project Gutenberg Library",
+          "The first producer of free ebooks"
+        ],
+        [
+          "Ten American Girls from History"
+        ]
+      ],
+      "tables": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "book_cover_page",
+        "license": null
+      }
+    },
+    {
+      "path": "The journal of Elizabeth Lady Holland (1791-1811) Volume 2 (of 2)_cover.73280",
+      "title": "The journal of Elizabeth Lady Holland (1791-1811) Volume 2 (of 2)",
+      "html_bytes": 97944,
+      "blocks": 15,
+      "body_characters": 404,
+      "lead_characters": 0,
+      "lead_excerpt": "",
+      "body_text_sha256": "bed14ac054d27c7cb8233a893a7eec9af482ada1bb40ece444d9db521eeec82c",
+      "headings": [
+        [
+          "Project Gutenberg Library"
+        ],
+        [
+          "Project Gutenberg Library",
+          "The first producer of free ebooks"
+        ],
+        [
+          "The journal of Elizabeth Lady Holland (1791-1811) Volume 2 (of 2)"
+        ]
+      ],
+      "tables": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "book_cover_page",
+        "license": null
+      }
+    },
+    {
+      "path": "Nigel Browning_cover.75102",
+      "title": "Nigel Browning",
+      "html_bytes": 97544,
+      "blocks": 15,
+      "body_characters": 332,
+      "lead_characters": 0,
+      "lead_excerpt": "",
+      "body_text_sha256": "d4ef2a82a0dc091131d30f95bf38660b64a65006abe96f0c6b8b18c994c65071",
+      "headings": [
+        [
+          "Project Gutenberg Library"
+        ],
+        [
+          "Project Gutenberg Library",
+          "The first producer of free ebooks"
+        ],
+        [
+          "Nigel Browning"
+        ]
+      ],
+      "tables": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "book_cover_page",
+        "license": null
+      }
+    },
+    {
+      "path": "Ian C. Hannah.43576",
+      "title": "Ian C. Hannah",
+      "html_bytes": 95604,
+      "blocks": 6,
+      "body_characters": 214,
+      "lead_characters": 0,
+      "lead_excerpt": "",
+      "body_text_sha256": "d76cf40b9d2761fa537cbc02bf1f363237b575e6b660c1a03256f083c5787503",
+      "headings": [
+        [
+          "Project Gutenberg Library"
+        ],
+        [
+          "Project Gutenberg Library",
+          "The first producer of free ebooks"
+        ]
+      ],
+      "tables": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "catalog_page",
+        "license": null
+      }
+    },
+    {
+      "path": "Fairy tales from South Africa_cover.75833",
+      "title": "Fairy tales from South Africa",
+      "html_bytes": 97654,
+      "blocks": 15,
+      "body_characters": 351,
+      "lead_characters": 0,
+      "lead_excerpt": "",
+      "body_text_sha256": "ab9c05c46cbdb2598d0b835fb1f6b1b47ac51e8a5617ccdfb3b233b0b53d14e4",
+      "headings": [
+        [
+          "Project Gutenberg Library"
+        ],
+        [
+          "Project Gutenberg Library",
+          "The first producer of free ebooks"
+        ],
+        [
+          "Fairy tales from South Africa"
+        ]
+      ],
+      "tables": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "book_cover_page",
+        "license": null
+      }
+    },
+    {
+      "path": "The Mouse's Wedding.27456",
+      "title": "The Mouse's Wedding",
+      "html_bytes": 21911,
+      "blocks": 30,
+      "body_characters": 4202,
+      "lead_characters": 342,
+      "lead_excerpt": "The illustration borders may not display correctly in all browsers. The thumbnails at the end of the file show the original page layout.\n\nThe background pattern is taken from the original book, but has been lightened for readability. The in",
+      "body_text_sha256": "a45d69a0c37a9ff7ed3dadca487468ba17b3fccc5f90cc8cb5a224bf05126364",
+      "headings": [
+        [
+          "THUMBNAILS"
+        ]
+      ],
+      "tables": 11,
+      "flags": [
+        "figure_requires_visual_inspection",
+        "merged_cells_inspect_original",
+        "table_headers_unverified"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "Arnold of Winkelried, the Hero of Sempach_cover.59751",
+      "title": "Arnold of Winkelried, the Hero of Sempach",
+      "html_bytes": 97732,
+      "blocks": 15,
+      "body_characters": 359,
+      "lead_characters": 0,
+      "lead_excerpt": "",
+      "body_text_sha256": "d232cae3432740794385ffe9eae98a1ec02d9de9c33a6d7ef7ac7bbaae01241d",
+      "headings": [
+        [
+          "Project Gutenberg Library"
+        ],
+        [
+          "Project Gutenberg Library",
+          "The first producer of free ebooks"
+        ],
+        [
+          "Arnold of Winkelried, the Hero of Sempach"
+        ]
+      ],
+      "tables": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "book_cover_page",
+        "license": null
+      }
+    },
+    {
+      "path": "The Repairing & Restoration of Violins.26878",
+      "title": "The Repairing & Restoration of Violins",
+      "html_bytes": 431473,
+      "blocks": 743,
+      "body_characters": 380898,
+      "lead_characters": 0,
+      "lead_excerpt": "",
+      "body_text_sha256": "c835e27f7d5f7e4d3567e54e495b3badca4861eee7a29cde40a5835543804273",
+      "headings": [
+        [
+          "THE REPAIRING & RESTORATION OF VIOLINS."
+        ],
+        [
+          "THE REPAIRING & RESTORATION OF VIOLINS.",
+          "THE"
+        ],
+        [
+          "REPAIRING & RESTORATION"
+        ],
+        [
+          "VIOLINS."
+        ],
+        [
+          "VIOLINS.",
+          "HORACE PETHERICK."
+        ],
+        [
+          "VIOLINS.",
+          "HORACE PETHERICK.",
+          "ILLUSTRATED BY THE AUTHOR."
+        ],
+        [
+          "VIOLINS.",
+          "HORACE PETHERICK.",
+          "CONTENTS."
+        ],
+        [
+          "VIOLINS.",
+          "HORACE PETHERICK.",
+          "PREFACE."
+        ]
+      ],
+      "tables": 32,
+      "flags": [
+        "table_headers_unverified"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "The Alfred Jewel: An Historical Essay.59372",
+      "title": "The Alfred Jewel: An Historical Essay",
+      "html_bytes": 343344,
+      "blocks": 989,
+      "body_characters": 222776,
+      "lead_characters": 0,
+      "lead_excerpt": "",
+      "body_text_sha256": "b0c7cb8148d2b47855063a591649ecf1af96614ad5e84af0b927713f8791ebc9",
+      "headings": [
+        [
+          "The Alfred Jewel:"
+        ],
+        [
+          "The Alfred Jewel:",
+          "PREFACE"
+        ],
+        [
+          "The Alfred Jewel:",
+          "TABLE OF CONTENTS"
+        ],
+        [
+          "The Alfred Jewel:",
+          "CHAPTER I DESCRIPTION OF THE ALFRED JEWEL"
+        ],
+        [
+          "The Alfred Jewel:",
+          "CHAPTER II THE EPIGRAPH OR LEGEND"
+        ],
+        [
+          "The Alfred Jewel:",
+          "CHAPTER III EARLY SPECULATIONS ABOUT ITS DESIGN AND MANNER OF USE"
+        ],
+        [
+          "The Alfred Jewel:",
+          "CHAPTER IV BISHOP CLIFFORD’S THEORY[10]"
+        ],
+        [
+          "The Alfred Jewel:",
+          "CHAPTER V A JEWEL IN THE CROWN"
+        ]
+      ],
+      "tables": 1,
+      "flags": [
+        "figure_requires_visual_inspection",
+        "merged_cells_inspect_original",
+        "table_headers_unverified"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "After the Divorce: A Romance.39834",
+      "title": "After the Divorce: A Romance",
+      "html_bytes": 500285,
+      "blocks": 1853,
+      "body_characters": 453549,
+      "lead_characters": 221,
+      "lead_excerpt": "BY GRAZIA DELEDDA\n\nTranslated from the Italian BY MARIA HORNOR LANSDALE\n\nNEW YORK HENRY HOLT AND COMPANY 1905\n\nCopyright, 1905 by HENRY HOLT AND COMPANY\n\nPublished March, 1905\n\nTHE MERSHON COMPANY PRESS RAHWAY, N. J.\n\n[1]",
+      "body_text_sha256": "d89c83e2fa11c91676897d53a4f29d6d207f7163e7313df0b18c199f36905aa0",
+      "headings": [
+        [
+          "AFTER THE DIVORCE A ROMANCE"
+        ],
+        [
+          "AFTER THE DIVORCE A ROMANCE",
+          "PART I"
+        ],
+        [
+          "AFTER THE DIVORCE A ROMANCE",
+          "PART I",
+          "CHAPTER I"
+        ],
+        [
+          "AFTER THE DIVORCE A ROMANCE",
+          "PART I",
+          "CHAPTER II"
+        ],
+        [
+          "AFTER THE DIVORCE A ROMANCE",
+          "PART I",
+          "CHAPTER III"
+        ],
+        [
+          "AFTER THE DIVORCE A ROMANCE",
+          "PART I",
+          "CHAPTER IV"
+        ],
+        [
+          "AFTER THE DIVORCE A ROMANCE",
+          "PART I",
+          "CHAPTER V"
+        ],
+        [
+          "AFTER THE DIVORCE A ROMANCE",
+          "PART I",
+          "CHAPTER VI"
+        ]
+      ],
+      "tables": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "Rogues and Vagabonds.46443",
+      "title": "Rogues and Vagabonds",
+      "html_bytes": 863992,
+      "blocks": 4665,
+      "body_characters": 787564,
+      "lead_characters": 0,
+      "lead_excerpt": "",
+      "body_text_sha256": "1263786475d016b85473255a9066ae3293d6ab641e524ad7eb901c8caa150497",
+      "headings": [
+        [
+          "ROGUES AND VAGABONDS"
+        ],
+        [
+          "ROGUES AND VAGABONDS",
+          "By George R. Sims"
+        ],
+        [
+          "ROGUES AND VAGABONDS",
+          "By George R. Sims",
+          "Chatto & Windus, Piccadilly"
+        ],
+        [
+          "ROGUES AND VAGABONDS",
+          "By George R. Sims",
+          "Chatto & Windus, Piccadilly",
+          "1892"
+        ],
+        [
+          "ROGUES AND VAGABONDS",
+          "By George R. Sims",
+          "To My Good Friends, Agostino and Stefano Gatti, This Story, Now First Published in Novel Form, Is Gratefully"
+        ],
+        [
+          "ROGUES AND VAGABONDS",
+          "CHAPTER I. THE WRECK OF THE ‘BON ESPOIR.’"
+        ],
+        [
+          "ROGUES AND VAGABONDS",
+          "CHAPTER II. TOPSEY TURVEY SEES A GHOST."
+        ],
+        [
+          "ROGUES AND VAGABONDS",
+          "CHAPTER III. MR. EDWARD MARSTON MEETS AN OLD FRIEND."
+        ]
+      ],
+      "tables": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    },
+    {
+      "path": "Eric, or Little by Little_cover.23126",
+      "title": "Eric, or Little by Little",
+      "html_bytes": 97662,
+      "blocks": 15,
+      "body_characters": 361,
+      "lead_characters": 0,
+      "lead_excerpt": "",
+      "body_text_sha256": "002f1bad5faf26beac505bc36c65d1d937dcb41fb7acd7ab87e8b50125379b0b",
+      "headings": [
+        [
+          "Project Gutenberg Library"
+        ],
+        [
+          "Project Gutenberg Library",
+          "The first producer of free ebooks"
+        ],
+        [
+          "Eric, or Little by Little"
+        ]
+      ],
+      "tables": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "book_cover_page",
+        "license": null
+      }
+    },
+    {
+      "path": "George Hay.41124",
+      "title": "George Hay",
+      "html_bytes": 95598,
+      "blocks": 6,
+      "body_characters": 214,
+      "lead_characters": 0,
+      "lead_excerpt": "",
+      "body_text_sha256": "d76cf40b9d2761fa537cbc02bf1f363237b575e6b660c1a03256f083c5787503",
+      "headings": [
+        [
+          "Project Gutenberg Library"
+        ],
+        [
+          "Project Gutenberg Library",
+          "The first producer of free ebooks"
+        ]
+      ],
+      "tables": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "catalog_page",
+        "license": null
+      }
+    },
+    {
+      "path": "Mark Clifton.25374",
+      "title": "Mark Clifton",
+      "html_bytes": 95602,
+      "blocks": 6,
+      "body_characters": 214,
+      "lead_characters": 0,
+      "lead_excerpt": "",
+      "body_text_sha256": "d76cf40b9d2761fa537cbc02bf1f363237b575e6b660c1a03256f083c5787503",
+      "headings": [
+        [
+          "Project Gutenberg Library"
+        ],
+        [
+          "Project Gutenberg Library",
+          "The first producer of free ebooks"
+        ]
+      ],
+      "tables": 0,
+      "flags": [
+        "figure_requires_visual_inspection"
+      ],
+      "lead_flags": [],
+      "selection": {
+        "admitted": false,
+        "reason": "catalog_page",
+        "license": null
+      }
+    },
+    {
+      "path": "The Decadent: Being the Gospel of Inaction.41490",
+      "title": "The Decadent: Being the Gospel of Inaction",
+      "html_bytes": 69284,
+      "blocks": 204,
+      "body_characters": 57704,
+      "lead_characters": 311,
+      "lead_excerpt": "PRIVATELY PRINTED FOR THE AUTHOR MDCCCXCIII\n\nTIBI · MEO · CARO · B · G · G · CVIVS · LABORIBVS · PRETIVM · NON · PROPRIVM · EI · FIEBAT· OPERA · TVA · EXARCHO · FRATRIBVSQVE · EIVS · ORDINIS · QVAE · SVMNIA · SIBI · FINGIT · DENIQVE · OMNIB",
+      "body_text_sha256": "87262c2f307f77eb4bc9f705636eccdf599c9553166b891bbd2e5f1a8c486322",
+      "headings": [
+        [
+          "THE DECADENT: BEING THE GOSPEL OF INACTION: WHEREIN ARE SET FORTH IN ROMANCE FORM CERTAIN REFLECTIONS TOUCHING THE CURIOUS CHARACTERISTICS OF THESE ULTIMATE YEARS, AND THE DIVERS CAUSES THEREOF."
+        ],
+        [
+          "THE DECADENT: BEING THE GOSPEL OF INACTION: WHEREIN ARE SET FORTH IN ROMANCE FORM CERTAIN REFLECTIONS TOUCHING THE CURIOUS CHARACTERISTICS OF THESE ULTIMATE YEARS, AND THE DIVERS CAUSES THEREOF.",
+          "THE DECADENT."
+        ],
+        [
+          "THE DECADENT: BEING THE GOSPEL OF INACTION: WHEREIN ARE SET FORTH IN ROMANCE FORM CERTAIN REFLECTIONS TOUCHING THE CURIOUS CHARACTERISTICS OF THESE ULTIMATE YEARS, AND THE DIVERS CAUSES THEREOF.",
+          "CONTENTS"
+        ],
+        [
+          "THE DECADENT: BEING THE GOSPEL OF INACTION: WHEREIN ARE SET FORTH IN ROMANCE FORM CERTAIN REFLECTIONS TOUCHING THE CURIOUS CHARACTERISTICS OF THESE ULTIMATE YEARS, AND THE DIVERS CAUSES THEREOF.",
+          "I."
+        ],
+        [
+          "THE DECADENT: BEING THE GOSPEL OF INACTION: WHEREIN ARE SET FORTH IN ROMANCE FORM CERTAIN REFLECTIONS TOUCHING THE CURIOUS CHARACTERISTICS OF THESE ULTIMATE YEARS, AND THE DIVERS CAUSES THEREOF.",
+          "II."
+        ],
+        [
+          "THE DECADENT: BEING THE GOSPEL OF INACTION: WHEREIN ARE SET FORTH IN ROMANCE FORM CERTAIN REFLECTIONS TOUCHING THE CURIOUS CHARACTERISTICS OF THESE ULTIMATE YEARS, AND THE DIVERS CAUSES THEREOF.",
+          "III."
+        ],
+        [
+          "THE DECADENT: BEING THE GOSPEL OF INACTION: WHEREIN ARE SET FORTH IN ROMANCE FORM CERTAIN REFLECTIONS TOUCHING THE CURIOUS CHARACTERISTICS OF THESE ULTIMATE YEARS, AND THE DIVERS CAUSES THEREOF.",
+          "Transcriber's Notes:"
+        ]
+      ],
+      "tables": 0,
+      "flags": [],
+      "lead_flags": [],
+      "selection": {
+        "admitted": true,
+        "reason": null,
+        "license": null
+      }
+    }
+  ]
+}
