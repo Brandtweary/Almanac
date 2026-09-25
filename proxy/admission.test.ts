@@ -1,6 +1,6 @@
 import {test, expect, spyOn} from "bun:test";
 import {createGateway} from "./server";
-import {RateLimiter, ROUTE_LIMITS} from "./rate-limit";
+import {RateLimiter, ROUTE_LIMITS, rateLimitKey} from "./rate-limit";
 import {config, type ReleaseProfile} from "./config";
 
 const profile: ReleaseProfile = {id:"fixture", qualified:true, receipts:["fixture"], model:{id:"fixture",name:"Fixture",contextWindow:4096,maxTokens:512,reasoning:false,input:["text"],artifactDigest:"a".repeat(64),tokenizerDigest:"b".repeat(64),templateDigest:"c".repeat(64),parser:"llama.cpp",quantization:"fixture"}, roles:Object.fromEntries(["chat","audit","memory","summary","compaction"].map(x=>[x,{maxInputTokens:3000,maxOutputTokens:256,maxStageOutputTokens:1024}])),limits:{queueCapacity:4,queueTimeoutMs:1000,executionTimeoutMs:1000,maxRequestBytes:100000,backgroundMaxTokens:256,speechConcurrency:1,speechTimeoutMs:1000,speechMaxBytes:10000}};
@@ -148,4 +148,13 @@ test("one IPv6 /64 counts as a single client", async () => {
   for (let i = 0; i < ROUTE_LIMITS.signup; i++) expect((await signup(`2001:db8:0:7::${i + 1}`)).status).not.toBe(429);
   expect((await signup("2001:db8:0:7:ffff:1:2:3")).status).toBe(429);
   expect((await signup("2001:db8:0:8::1")).status).not.toBe(429);
+});
+
+test("IPv4-mapped spellings share one IPv4 window without merging other clients", () => {
+  const limiter = new RateLimiter(1);
+  expect(limiter.limited(rateLimitKey("192.0.2.1"))).toBe(false);
+  for (const address of ["::ffff:192.0.2.1", "::ffff:c000:201", "0:0:0:0:0:ffff:192.0.2.1"]) {
+    expect(limiter.limited(rateLimitKey(address))).toBe(true);
+  }
+  expect(limiter.limited(rateLimitKey("::ffff:c000:202"))).toBe(false);
 });

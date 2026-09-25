@@ -51,10 +51,12 @@ export function clientIp(c: Context, trustedProxies: string[]): string {
 export function rateLimitKey(address: string): string {
 	const bare = address.split("%")[0]!.toLowerCase();
 	if (!bare.includes(":")) return bare;
-	const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(bare);
-	if (mapped) return mapped[1]!;
 	// An embedded dotted-quad tail fills the last two groups.
-	const hex = bare.replace(/:\d{1,3}(?:\.\d{1,3}){3}$/, ":0:0");
+	const hex = bare.replace(/:(\d{1,3}(?:\.\d{1,3}){3})$/, (_match, tail: string) => {
+		const bytes = tail.split(".").map(Number);
+		if (bytes.some(value => value > 255)) return _match;
+		return `:${((bytes[0]! << 8) | bytes[1]!).toString(16)}:${((bytes[2]! << 8) | bytes[3]!).toString(16)}`;
+	});
 	const halves = hex.split("::");
 	if (halves.length > 2) return bare;
 	const head = halves[0] ? halves[0].split(":") : [];
@@ -63,7 +65,11 @@ export function rateLimitKey(address: string): string {
 	if (fill < 0) return bare;
 	const groups = [...head, ...Array<string>(fill).fill("0"), ...tail];
 	if (groups.length !== 8 || !groups.every(g => /^[0-9a-f]{1,4}$/.test(g))) return bare;
-	return `${groups.slice(0, 4).map(g => parseInt(g, 16).toString(16)).join(":")}::/64`;
+	const values = groups.map(g => parseInt(g, 16));
+	if (values.slice(0, 5).every(value => value === 0) && values[5] === 0xffff) {
+		return [values[6]! >> 8, values[6]! & 255, values[7]! >> 8, values[7]! & 255].join(".");
+	}
+	return `${values.slice(0, 4).map(value => value.toString(16)).join(":")}::/64`;
 }
 
 export class RateLimiter {
