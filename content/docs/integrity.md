@@ -103,6 +103,10 @@ the leaf lists are absent from the manifest directory the scrub recorded or the 
 did not verify, carries `integrity:<pack>:read_unverified`, and the coverage block's
 `read_verification` names the reason.
 
+Continuations recheck document quarantine and original receipts, and read continuations
+repeat the read-verification gate; a repair epoch or index withdrawal invalidates the
+cached response with `invalid_cursor`, requiring a fresh request.
+
 A repaired leaf advances its archive's reader epoch, and a reader opened before that
 refuses what the leaf touched until it is reopened, because it may hold the damaged
 cluster decoded in its cache. Every coverage entry for a native archive carries an

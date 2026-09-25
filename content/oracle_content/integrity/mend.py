@@ -401,7 +401,11 @@ def release(state: State, artifact_id: str, index: int, reason: str) -> None:
     """
     current = state.leaf(artifact_id, index)
     status = current["status"] if current is not None else None
-    if status in QUARANTINED:
+    if status == WRITE_FAILED:
+        # A later readable copy does not complete a failed write transaction:
+        # its receipt and journal still require operator reconciliation.
+        state.set_leaf(artifact_id, index, WRITE_FAILED, verified=True)
+    elif status in QUARANTINED:
         epoch = state.bump_epoch(artifact_id)
         state.set_leaf(artifact_id, index, PENDING_RELOAD, verified=True, epoch=epoch, reason=reason)
     elif status == PENDING_RELOAD:

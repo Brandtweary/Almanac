@@ -150,8 +150,9 @@ def test_i13_localisation_uses_the_structure_taken_at_admission(tmp_path):
         assert located["class"] in ("document", "index")
 
 
-def test_i9_quarantined_bytes_never_reach_a_response(tmp_path):
-    item = library(tmp_path)
+@pytest.mark.parametrize("names", [("first",), ("first", "second")])
+def test_i9_quarantined_bytes_never_reach_a_response(tmp_path, names):
+    item = library(tmp_path, names=names)
     archive = item.archives["first"]
     target = entry_index(archive, "A030")
     document_id = f"z_{archive.sha}_{target}"
@@ -198,6 +199,93 @@ def test_i9_quarantined_bytes_never_reach_a_response(tmp_path):
                    if mapped.entry_extent(index) and leaf not in mapped.entry_leaves(index, LEAF))
     mapped.close()
     assert asyncio.run(item.service.read(ReadRequest(document_id=f"z_{archive.sha}_{healthy}")))["passages"]
+
+
+def test_continuations_obey_quarantine_and_cannot_outlive_a_mend(tmp_path, monkeypatch):
+    item = library(tmp_path)
+    item.service.profile = item.profile.model_copy(update={"page_size": 1})
+    archive = item.archives["first"]
+    target = entry_index(archive, "A030")
+    document_id = f"z_{archive.sha}_{target}"
+    overview = asyncio.run(item.service.read(ReadRequest(document_id=document_id)))
+    requests = [(item.service.search, SearchRequest(query="paraphrase")),
+                (item.service.read, ReadRequest(document_id=document_id,
+                                                passage_id=overview["passages"][0]["passage_id"]))]
+    continuations = []
+    for run, request in requests:
+        result = asyncio.run(run(request))
+        assert result["cursor"]
+        continuations.append((run, request.model_copy(update={"cursor": result["cursor"]})))
+
+    for run, request in continuations:
+        assert asyncio.run(run(request))["cursor"]
+
+    stat = archive.path.stat()
+    os.utime(archive.path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1))
+    for run, request in continuations:
+        with pytest.raises(ContentError) as refused:
+            asyncio.run(run(request))
+        assert refused.value.code == "unavailable_version"
+    os.utime(archive.path, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+
+    leaf = cluster_middle(item, archive, target) // LEAF
+    state = State(item.store.root / "integrity")
+    state.set_leaf(archive.sha, leaf, "damaged")
+    outcomes = []
+    for run, request in continuations:
+        try:
+            asyncio.run(run(request))
+        except ContentError as error:
+            outcomes.append(error.code)
+        else:
+            outcomes.append("served_quarantined_snapshot")
+
+    epoch = state.bump_epoch(archive.sha)
+    state.set_leaf(archive.sha, leaf, PENDING_RELOAD, verified=True, epoch=epoch)
+    state.close()
+    # The fresh reader acknowledges the repair. Durable cached text still belongs
+    # to the older reader epoch, even when current quarantine is empty.
+    assert asyncio.run(item.service.read(ReadRequest(document_id=document_id)))["passages"]
+    for run, request in continuations:
+        try:
+            asyncio.run(run(request))
+        except ContentError as error:
+            outcomes.append(error.code)
+        else:
+            outcomes.append("served_pre_mend_snapshot")
+    assert outcomes == ["source_damaged", "source_damaged", "invalid_cursor", "invalid_cursor"]
+
+    request = requests[1][1]
+    cited = asyncio.run(item.service.read(request))
+    reader = item.store.native(archive.generation)
+    document = reader.document
+
+    def mend_during_validation(document_id):
+        result = document(document_id)
+        state = State(item.store.root / "integrity")
+        state.bump_epoch(archive.sha)
+        state.close()
+        return result
+
+    with monkeypatch.context() as gate:
+        gate.setattr(reader, "document", mend_during_validation)
+        with pytest.raises(ContentError) as refused:
+            asyncio.run(item.service.read(request.model_copy(update={"cursor": cited["cursor"]})))
+        assert refused.value.code == "invalid_cursor"
+
+    save = item.service.save_snapshot
+
+    def mend_during_retrieval(*args, **kwargs):
+        state = State(item.store.root / "integrity")
+        state.bump_epoch(archive.sha)
+        state.close()
+        return save(*args, **kwargs)
+
+    monkeypatch.setattr(item.service, "save_snapshot", mend_during_retrieval)
+    for run, request in requests:
+        with pytest.raises(ContentError) as refused:
+            asyncio.run(run(request))
+        assert refused.value.code == "invalid_cursor"
 
 
 def test_i10_a_reader_opened_before_a_mend_refuses_until_reopened(tmp_path):
@@ -286,22 +374,29 @@ def test_a_withdrawal_retires_a_reader_already_open(tmp_path):
 def test_a_read_the_rehash_could_not_check_says_so(tmp_path):
     """The leaf lists live in a directory synced separately; moved, reads go unchecked and must be labelled."""
     item = library(tmp_path)
+    item.service.profile = item.profile.model_copy(update={"page_size": 1})
     document_id = f"z_{item.archives['first'].sha}_{entry_index(item.archives['first'], 'A012')}"
 
     def integrity():
         return {row["pack_id"]: row["integrity"] for row in item.service.health()["coverage"]["native_archives"]}
 
     read = asyncio.run(item.service.read(ReadRequest(document_id=document_id)))
+    request = ReadRequest(document_id=document_id, passage_id=read["passages"][0]["passage_id"])
+    cited = asyncio.run(item.service.read(request))
+    assert cited["cursor"]
     assert not [code for code in read["degradation"] if code.startswith("integrity:")]
     assert integrity()["first"]["read_verification"] == "active"
     item.manifest.rename(item.manifest.with_name("manifest-moved"))
     read = asyncio.run(item.service.read(ReadRequest(document_id=document_id)))
     assert "integrity:first:read_unverified" in read["degradation"] and read["status"] == "degraded"
     assert integrity()["first"]["read_verification"] == "leaf_list_unavailable"
+    resumed = asyncio.run(item.service.read(request.model_copy(update={"cursor": cited["cursor"]})))
+    assert "integrity:first:read_unverified" in resumed["degradation"] and resumed["status"] == "degraded"
 
 
 def test_damaged_spans_fall_back_to_the_archive_and_are_moved_aside(tmp_path):
     item = library(tmp_path)
+    item.service.profile = item.profile.model_copy(update={"page_size": 1})
     archive = item.archives["first"]
     result = build_spans(item.store, archive.generation, log=lambda line: None)
     assert result["integrity"]["recorded"] is True and result["integrity"]["read_rate"] == DEFAULT_READ_RATE
@@ -309,9 +404,15 @@ def test_damaged_spans_fall_back_to_the_archive_and_are_moved_aside(tmp_path):
     reader = item.store.native(archive.generation)
     assert reader.usable_spans() is not None
     handles = [row.passage_id for row in reader.passages(document_id)]
+    request = ReadRequest(document_id=document_id, passage_id=handles[0])
+    cited = asyncio.run(item.service.read(request))
+    assert cited["cursor"]
     spans = item.store.directory(archive.generation) / "article-spans.sqlite"
     damage(spans, spans.stat().st_size - 2 * LEAF + 100)
     scrub(item.store.root, item.manifest)
+    with pytest.raises(ContentError) as refused:
+        asyncio.run(item.service.read(request.model_copy(update={"cursor": cited["cursor"]})))
+    assert refused.value.code == "invalid_cursor"
     fresh = item.store.native(archive.generation)
     assert fresh.usable_spans() is None
     fresh.cache.clear()

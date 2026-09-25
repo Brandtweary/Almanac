@@ -421,6 +421,8 @@ def test_readback_failure_latches_the_mend_without_retrying(tmp_path, failure):
     mend_all(item.root, item.manifest, medium=medium, network=False)
     assert len(medium.writes) == 1 and leaf_status(item, 1) == "write_failed"
     assert item.receipt.read_bytes() == receipt
+    scrub(item.root, item.manifest)
+    assert leaf_status(item, 1) == "write_failed"
     mend_all(item.root, item.manifest, medium=medium, network=False)
     assert len(medium.writes) == 1
 

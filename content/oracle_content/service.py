@@ -569,6 +569,10 @@ class Service:
         if dropped:
             degradation.append(f"integrity:{pack}")
             rows = [row for row in rows if row["passage_id"] in passages]
+            # Union ranking consumes the branches again, so refused handles must
+            # leave both branch pools as well as the already-fused rows.
+            lexical = [(pid, score) for pid, score in lexical if pid in passages]
+            dense = [(pid, score) for pid, score in dense if pid in passages]
         return {"generation": generation, "branches": {"lexical": lexical, "dense": dense},
                 "rows": remove_contained(rows, passages), "passages": passages, "degradation": degradation}
 
@@ -638,11 +642,32 @@ class Service:
             path.unlink(missing_ok=True)
             total -= size
 
-    def save_snapshot(self, data, binding):
+    def snapshot_versions(self, generations):
+        """Bind cached text and ranks to the integrity state that produced them."""
+        versions = {}
+        for generation in generations:
+            manifest = self.store.manifest(generation)
+            if manifest.get("kind") != "native-zim-article-v1":
+                continue
+            integrity = self.store.integrity
+            artifact = manifest["source"]["sha256"]
+            spans_epoch = integrity.epoch("spans-" + generation)
+            view = integrity.archive(artifact)
+            versions[generation] = [integrity.epoch(artifact), spans_epoch,
+                                    integrity.spans_usable(generation, spans_epoch),
+                                    integrity.dense_degraded(generation),
+                                    view.lexical_withdrawn if view is not None else False]
+        return versions
+
+    def save_snapshot(self, data, binding, versions):
+        generations = data.get("generations", [data["generation"]])
+        current = self.snapshot_versions(generations)
+        if current != {generation: versions.get(generation) for generation in current}:
+            raise ContentError("invalid_cursor", "Corpus integrity changed during retrieval; repeat the request", 400)
         self.prune_snapshots()
         key = uuid.uuid4().hex
         path = self.store.root / "snapshots" / (key + ".json")
-        atomic_json(path, {"binding": binding, "data": data})
+        atomic_json(path, {"binding": binding, "data": data, "integrity_versions": current})
         self.snapshot_bytes_written += path.stat().st_size
         return key
 
@@ -660,9 +685,38 @@ class Service:
             raise ContentError("invalid_cursor", "Continuation is unavailable; repeat the search", 400) from None
         if snapshot["binding"] != binding:
             raise ContentError("invalid_cursor", "Continuation does not belong to this request", 400)
-        for generation in snapshot["data"].get("generations", [snapshot["data"]["generation"]]):
-            self.store.manifest(generation)
-        return key, int(offset), snapshot["data"]
+        data = snapshot["data"]
+        generations = data.get("generations", [data["generation"]])
+        versions = self.snapshot_versions(generations)
+        if snapshot.get("integrity_versions", {}) != versions:
+            raise ContentError("invalid_cursor", "Corpus integrity changed; repeat the request", 400)
+        readers = {}
+        for generation in generations:
+            native = self.store.native(generation)
+            if native is not None:
+                native.verify_original()
+                readers[generation] = native
+        documents = {(HANDLE.fullmatch(row["passage_id"])[1], row["document_id"])
+                     for row in data.get("hits", data.get("passages", []))}
+        if "document" in data:
+            documents.add((data["generation"], data["document"]["document_id"]))
+        degradation = list(data["degradation"])
+        for generation, document_id in documents:
+            native = readers.get(generation)
+            if native is None:
+                continue
+            native.document(document_id)
+            if "document" in data:
+                from .integrity.overlay import NOT_ADMITTED, VERIFIED
+                label = f"integrity:{self.pack_label(generation)}:read_unverified"
+                degradation = [value for value in degradation if value != label]
+                if native.verify_read(int(document_id.rsplit("_", 1)[1])) not in (VERIFIED, NOT_ADMITTED):
+                    degradation.append(label)
+        # A repair concurrent with validation also retires this cached response.
+        if self.snapshot_versions(generations) != versions:
+            raise ContentError("invalid_cursor", "Corpus integrity changed; repeat the request", 400)
+        data = {**data, **self.base(data["generation"], degradation)}
+        return key, int(offset), data
 
     def result_set(self, hits):
         """Describe the whole ranked set, so a page is not read as the whole library.
@@ -726,8 +780,9 @@ class Service:
             raise ContentError("profile_unqualified", "No qualified retrieval profile is installed")
         binding = digest(["search", query, request.document_id, request.require_qualified, self.profile.fingerprint])
         if request.cursor:
-            key, offset, snapshot = self.resume(request.cursor, binding)
+            key, offset, snapshot = await asyncio.to_thread(self.resume, request.cursor, binding)
         else:
+            versions = self.snapshot_versions(self.store.active_generations())
             pool = await self.candidates(query, request.document_id)
             generation, rows, degradation = pool["generation"], pool["rows"], pool["degradation"]
             if self.profile.ranking == "reranker":
@@ -759,13 +814,13 @@ class Service:
             hits = [self.hit(generation, pool["passages"][row["passage_id"]]) for row in rows]
             snapshot = {**self.base(generation, degradation), "generations": pool.get("generations", [generation]),
                 "result_set": self.result_set(hits), "hits": hits}
-            key, offset = self.save_snapshot(snapshot, binding), 0
+            key, offset = self.save_snapshot(snapshot, binding, versions), 0
         return self.page(snapshot, key, offset, "hits", self.profile.response_tokens)
 
     async def read(self, request: ReadRequest):
         binding = digest(["read", request.document_id, request.passage_id, self.profile.fingerprint])
         if request.cursor:
-            key, offset, snapshot = self.resume(request.cursor, binding)
+            key, offset, snapshot = await asyncio.to_thread(self.resume, request.cursor, binding)
         else:
             # Reading an uncached native article decodes and segments the whole
             # article synchronously; on the service's single event loop that
@@ -779,6 +834,7 @@ class Service:
             if not match:
                 raise ContentError("invalid_handle", "Malformed passage handle", 400)
             generation = match[1]
+            versions = self.snapshot_versions([generation])
             selected = self.store.passage(generation, request.passage_id)
             if selected.document_id != request.document_id:
                 raise ContentError("invalid_handle", "Passage belongs to another document", 400)
@@ -794,6 +850,7 @@ class Service:
                         raise
             if generation is None:
                 raise ContentError("unknown_document", "Document is outside the active library", 404)
+            versions = self.snapshot_versions([generation])
             selected = None
         doc = self.store.document(generation, request.document_id)
         native = self.store.native(generation)
@@ -814,4 +871,4 @@ class Service:
             "edition": doc.edition, "publisher": doc.publisher, "language": doc.language,
             "source_revision": doc.sha256, "license": doc.license, "rights_exceptions": doc.rights_exceptions},
             "overview": selected is None, "passages": hits}
-        return snapshot, self.save_snapshot(snapshot, binding), 0
+        return snapshot, self.save_snapshot(snapshot, binding, versions), 0
