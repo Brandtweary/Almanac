@@ -11,7 +11,7 @@ from oracle_content.models import Block, ContentError, Document, Profile, Search
 from oracle_content.extract import html_blocks, segment
 from oracle_content.ingest import build
 from oracle_content.store import Store, atomic_json
-from oracle_content.service import Service, fuse, remove_contained
+from oracle_content.service import Service, fuse, merge_branches, remove_contained
 from oracle_content.adapters import Qdrant, Reranker, vectors_valid
 from oracle_content.app import create_app
 
@@ -680,3 +680,74 @@ def test_http_listing_reports_the_installed_library(tmp_path):
             categories = {entry["category"] for entry in response.json()["collections"]}
             assert categories == {"", "Scripture and canon"}
     asyncio.run(check())
+
+
+def pool(generation, lexical, dense):
+    return {"branches": {"lexical": [("p:" + generation + ":" + pid, score) for pid, score in lexical],
+                         "dense": [("p:" + generation + ":" + pid, score) for pid, score in dense]}}
+
+
+def test_disjoint_generations_merge_on_relevance_not_on_handle_order():
+    # Handles ascend a < c < f while dense similarity ranks c above a above f, so
+    # a merge that tracks the query disagrees with the handle order in both
+    # directions and cannot be satisfied by sorting handles either way.
+    middle, best, worst = "a" * 64, "c" * 64, "f" * 64
+    merged = fuse(merge_branches([pool(middle, [("1" * 64, -3.0)], [("1" * 64, 0.52)]),
+                                  pool(best, [("2" * 64, -9.0)], [("2" * 64, 0.88)]),
+                                  pool(worst, [("3" * 64, -1.0)], [("3" * 64, 0.11)])], 60),
+                  {"lexical": 1, "dense": 1}, 60)
+    assert [row["passage_id"].split(":")[1] for row in merged] == [best, middle, worst]
+
+
+def part(tmp_path, name, title, pack, text):
+    path = tmp_path / (name + ".txt")
+    path.write_text(text)
+    return Document(document_id=name, work_id=name, pack_id=pack, title=title, language="en",
+        source_url="https://example.org/" + name, sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+        media_type="text/plain", license="CC0", extraction_revision="text-v1", original_path=str(path))
+
+
+class Ranked(Dense):
+    """One similarity per generation, as one encoder's cosine scores compare across collections."""
+    def __init__(self):
+        super().__init__()
+        self.scores = {}
+    async def search(self, generation, query, document_id=None):
+        return [(p.passage_id, self.scores[generation]) for p in self.points[generation].values()
+                if "paraphrase" in p.text and (not document_id or p.document_id == document_id)]
+
+
+def library(tmp_path):
+    """Two independently packed generations active at once, indexing disjoint works."""
+    p = profile()
+    store, dense = Store(tmp_path / "state"), Ranked()
+    generations = []
+    for name, title, pack in (("guide", "Repair guide", "tools"), ("survey", "Field survey", "papers")):
+        doc = part(tmp_path, name, title, pack, "Valve ZX-42 pressure.\n\nA paraphrase about the stopcock.")
+        generations.append(asyncio.run(build(store, [doc], p, dense, Tokens(), validation(doc))))
+    return Service(store, p, dense, Tokens()), generations
+
+
+def test_the_stronger_collection_leads_even_when_its_handle_sorts_last(tmp_path):
+    service, generations = library(tmp_path)
+    # The better-matching collection is the one a handle sort puts last, so an
+    # order taken from the handle rather than from the query answers wrongly.
+    strong, weak = max(generations), min(generations)
+    service.dense.scores = {strong: 0.91, weak: 0.14}
+    result = asyncio.run(service.search(SearchRequest(query="paraphrase stopcock")))
+    assert set(result["generations"]) == set(generations)
+    assert result["hits"][0]["passage_id"].split(":")[1] == strong
+
+
+def test_a_page_reports_the_ranked_set_it_is_a_slice_of(tmp_path):
+    service, generations = library(tmp_path)
+    service.dense.scores = {max(generations): 0.91, min(generations): 0.14}
+    first = asyncio.run(service.search(SearchRequest(query="ZX-42 paraphrase stopcock")))
+    reported = first["result_set"]
+    assert reported["total"] > len(first["hits"]) and reported["offset"] == 0
+    assert {entry["collection"] for entry in reported["collections"]} == {"Repair guide", "Field survey"}
+    assert [entry["best_rank"] for entry in reported["collections"]] == [1, 2]
+    assert sum(entry["hits"] for entry in reported["collections"]) == reported["total"]
+    second = asyncio.run(service.search(SearchRequest(query="ZX-42 paraphrase stopcock", cursor=first["cursor"])))
+    assert second["result_set"]["offset"] == len(first["hits"])
+    assert second["result_set"]["total"] == reported["total"]

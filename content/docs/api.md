@@ -15,6 +15,14 @@ or filesystem-management endpoint is public. FastAPI `/openapi.json` exposes req
 Common envelope: `generation`, `profile_id`, `status` (`ok`, `unqualified`, `degraded`),
 `degradation` (stage codes), `coverage`. Coverage identifies `active_packs`, `pending_packs`,
 `content_only`, `exclusions`. A successful empty hit array differs from any failed stage.
+A search also carries `result_set`, describing the ranked set the returned page is a slice of:
+`total` hits behind it, the page's `offset` into them, and per `collections` entry the
+`collection` a hit set belongs to, how many `hits` are its own, and the `best_rank` it reached.
+A collection whose best rank falls past the page is present in the library and absent from the
+response, which no stage code reports because no stage failed.
+Generations index disjoint archives, so candidates are unified per branch before fusion: dense
+scores compare directly across collections and merge by value, while lexical scores do not compare
+and merge by rank weighted by each generation's dense standing. Ranking never depends on a handle.
 Native archive lexical discovery combines exact-title navigation with full-text search through the shared ZIM adapter for both compact and passage-catalog generations; semantic retrieval remains independent.
 Qualification describes measured retrieval quality separately from mechanical readiness.
 `require_qualified` rejects unqualified profiles and any failed required retrieval stage.

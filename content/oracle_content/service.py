@@ -34,6 +34,58 @@ def fuse(branches, weights, k):
             for pid, score in sorted(scores.items(), key=lambda item: (-item[1], item[0]))]
 
 
+def merge_branches(pools, k):
+    """Unify each retrieval branch across generations indexing disjoint corpora.
+
+    Generations hold separate archives, so no passage appears in two pools.
+    Fusing their ranks against each other therefore scores every generation's
+    first hit identically, every second hit identically, and so on, and the
+    order inside each of those ties falls through to the fusion tiebreak — the
+    passage handle, whose leading component is the generation digest. The result
+    is a ranking decided by a content hash rather than by the query, invisible
+    with one or two archives installed and dominant with many. Each branch is
+    unified on a relevance signal instead.
+
+    Dense scores are directly comparable between generations. Every collection
+    is created with the dimensions, datatype and Cosine distance the active
+    profile pins, a search refuses a generation whose index fingerprint differs
+    from that profile, and one encoder produces every vector, so cosine
+    similarities out of different collections lie on a single scale and merge by
+    raw value. Equal scores keep the better within-generation rank first and then
+    the order the library declares its generations in.
+
+    Lexical scores do not compare. BM25 weights a term by the statistics of the
+    archive it ran over, and a native archive contributes fused article ranks
+    rather than BM25 at all, so the two branches of the library do not share a
+    scale or even a sign convention. Normalizing each pool over its own returned
+    depth would not recover one: it maps every generation's best hit to the same
+    value whatever that hit is worth, which is the same tie under another name.
+    The lexical lists are fused by rank, with each generation's contribution
+    weighted by where its dense evidence places it among the generations. That is
+    the reciprocal-rank weighting already used to combine the disjoint article
+    pools inside a native archive, and it carries a query-dependent signal into a
+    dimension that otherwise has none. A generation whose dense branch returned
+    nothing offers no such signal and is weighted below those that did.
+    """
+    affinity = []
+    for pool in pools:
+        scores = [score for _pid, score in pool["branches"]["dense"]]
+        affinity.append(max(scores) if scores else None)
+    order = sorted(range(len(pools)),
+                   key=lambda i: (affinity[i] is None, -affinity[i] if affinity[i] is not None else 0.0))
+    weights = {}
+    for position, index in enumerate(order, 1):
+        weights[str(index)] = 1 / (k + position)
+    lexical = fuse({str(i): pool["branches"]["lexical"] for i, pool in enumerate(pools)}, weights, k)
+    dense = []
+    for index, pool in enumerate(pools):
+        for rank, (pid, score) in enumerate(pool["branches"]["dense"], 1):
+            dense.append((-score, rank, index, pid, score))
+    dense.sort(key=lambda row: row[:3])
+    return {"lexical": [(row["passage_id"], row["score"]) for row in lexical],
+            "dense": [(pid, score) for _negated, _rank, _index, pid, score in dense]}
+
+
 def remove_contained(rows, passages):
     kept = []
     for row in rows:
@@ -372,11 +424,7 @@ class Service:
                 generations = scoped
             if len(generations) > 1:
                 pools = await asyncio.gather(*(self.candidates(query, document_id, value) for value in generations))
-                # Fuse source-local ranks, not incomparable raw BM25/dense scores.
-                branches = {name: [(row["passage_id"], row["score"]) for row in
-                    fuse({str(i): pool["branches"][name] for i, pool in enumerate(pools)},
-                         {str(i): 1 for i in range(len(pools))}, self.profile.rrf_k)]
-                    for name in ("lexical", "dense")}
+                branches = merge_branches(pools, self.profile.rrf_k)
                 rows = fuse(branches, {"lexical": self.profile.lexical_weight, "dense": self.profile.dense_weight}, self.profile.rrf_k)
                 passages = {key: value for pool in pools for key, value in pool["passages"].items()}
                 return {"generation": generations[0], "generations": generations, "branches": branches,
@@ -511,11 +559,42 @@ class Service:
             self.store.manifest(generation)
         return key, int(offset), snapshot["data"]
 
+    def result_set(self, hits):
+        """Describe the whole ranked set, so a page is not read as the whole library.
+
+        A response carries the leading few hits of a set that can run to hundreds
+        across several collections, and nothing else in the envelope separates
+        "this is the best the library holds" from "this is the first page of many,
+        and the collection that answers the question starts further down".
+        `degradation` does not: it names retrieval stages that failed or were
+        clipped, and a set whose good answers are simply off the page had no stage
+        fail. `cursor` says only that something follows.
+
+        `total` counts the ranked hits behind the page and `offset` locates the
+        page inside them. Each collection reports how many of those hits are its
+        own and the best rank it reached, which is what tells a caller holding
+        three rows whether a further page is worth asking for. A collection is
+        named the way its hits are, and falls back to the document title where a
+        hit carries no separate collection name.
+        """
+        collections = {}
+        for rank, hit in enumerate(hits, 1):
+            generation = HANDLE.fullmatch(hit["passage_id"])[1]
+            entry = collections.get(generation)
+            if entry is None:
+                collections[generation] = {"collection": hit["collection"] or hit["title"],
+                                           "hits": 1, "best_rank": rank}
+            else:
+                entry["hits"] += 1
+        return {"total": len(hits), "offset": 0, "collections": list(collections.values())}
+
     def page(self, snapshot, key, offset, field, budget):
         rows = snapshot[field]
         if offset > len(rows):
             raise ContentError("invalid_cursor", "Continuation offset exceeds result set", 400)
         result = {k: v for k, v in snapshot.items() if k != field}
+        if "result_set" in result:
+            result["result_set"] = {**result["result_set"], "offset": offset}
         selected = []
         end = min(len(rows), offset + self.profile.page_size)
         for row in rows[offset:end]:
@@ -572,8 +651,9 @@ class Service:
                     degradation.append("reranker_unavailable")
             if degradation and request.require_qualified:
                 raise ContentError("qualified_profile_unavailable", "Required retrieval stages failed")
+            hits = [self.hit(generation, pool["passages"][row["passage_id"]]) for row in rows]
             snapshot = {**self.base(generation, degradation), "generations": pool.get("generations", [generation]),
-                "hits": [self.hit(generation, pool["passages"][row["passage_id"]]) for row in rows]}
+                "result_set": self.result_set(hits), "hits": hits}
             key, offset = self.save_snapshot(snapshot, binding), 0
         return self.page(snapshot, key, offset, "hits", self.profile.response_tokens)
 
