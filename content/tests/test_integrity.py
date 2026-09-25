@@ -357,6 +357,74 @@ def receipt_holds(item):
     return receipt["size"] == stat.st_size and receipt["mtime_ns"] == stat.st_mtime_ns
 
 
+def test_recovery_refuses_a_resized_original_before_writing(tmp_path):
+    item = install(tmp_path)
+    damage(item.path, LEAF + 5)
+    scrub(item.root, item.manifest)
+    journal = item.root / "integrity" / "journal" / item.sha
+    journal.mkdir(parents=True)
+    (journal / "1.json").write_text(json.dumps({"leaf": 1}))
+    (journal / "1.leaf").write_bytes(item.data[LEAF:2 * LEAF])
+    # The damaged leaf remains readable, but the rest of the archive changed shape
+    # after the scrub and before recovery inspected the journal.
+    with item.path.open("r+b") as stream:
+        stream.truncate(len(item.data) - 1)
+    before, receipt = fingerprint(item.path), item.receipt.read_bytes()
+    medium = Recording()
+    mend_all(item.root, item.manifest, medium=medium, network=False)
+    assert medium.writes == []
+    assert fingerprint(item.path) == before and item.receipt.read_bytes() == receipt
+    assert (journal / "1.leaf").exists()
+    assert Overlay(item.root).archive(item.sha).withdrawn_reason == "size_mismatch"
+
+
+def test_journal_directory_entries_are_durable_before_the_original_write(tmp_path, monkeypatch):
+    item = install(tmp_path)
+    damage(item.path, LEAF + 5)
+    scrub(item.root, item.manifest)
+    synced = set()
+    fsync_dir = mending._fsync_dir
+
+    def record(path):
+        fsync_dir(path)
+        synced.add(Path(path))
+
+    monkeypatch.setattr(mending, "_fsync_dir", record)
+
+    class DurableJournal(Recording):
+        def write_leaf(self, path, offset, payload):
+            # Fsyncing files and the innermost directory leaves newly created
+            # ancestor entries vulnerable to disappearing on a power loss.
+            assert item.root / "integrity" in synced
+            assert item.root / "integrity" / "journal" in synced
+            return super().write_leaf(path, offset, payload)
+
+    medium = DurableJournal()
+    mend_all(item.root, item.manifest, medium=medium, network=False)
+    assert len(medium.writes) == 1 and item.path.read_bytes() == item.data
+
+
+@pytest.mark.parametrize("failure", [OSError(errno.EIO, "readback failed"), EOFError("short readback")])
+def test_readback_failure_latches_the_mend_without_retrying(tmp_path, failure):
+    item = install(tmp_path)
+    damage(item.path, LEAF + 5)
+    scrub(item.root, item.manifest)
+    receipt = item.receipt.read_bytes()
+
+    class UnreadableAfterWrite(Recording):
+        def read_leaf_fresh(self, path, index, size, leaf_bytes):
+            if self.writes and Path(path) == item.path:
+                raise failure
+            return super().read_leaf_fresh(path, index, size, leaf_bytes)
+
+    medium = UnreadableAfterWrite()
+    mend_all(item.root, item.manifest, medium=medium, network=False)
+    assert len(medium.writes) == 1 and leaf_status(item, 1) == "write_failed"
+    assert item.receipt.read_bytes() == receipt
+    mend_all(item.root, item.manifest, medium=medium, network=False)
+    assert len(medium.writes) == 1
+
+
 @pytest.mark.parametrize("step", ["candidate_chosen", "journal_written", "mid_write", "before_fdatasync", "before_receipt",
                                   "before_epoch"])
 def test_i7_i17_a_crash_at_any_step_converges_and_the_receipt_follows_verification(tmp_path, step):

@@ -33,8 +33,8 @@ the source tree unless `--manifest-dir` names another.
 ```sh
 PYTHONPATH=. python tools/integrity.py --data "$CONTENT_STATE_DIR" admit --sha256 <sha256> \
     --pack ../deploy/packs/<pack>.json --parity-dir /other/disk/parity --rate 50000000
-PYTHONPATH=. python tools/integrity.py --data "$CONTENT_STATE_DIR" publish --sha256 <sha256> \
-    --manifest-dir ../deploy/integrity
+PYTHONPATH=. python tools/integrity.py --data "$CONTENT_STATE_DIR" --manifest-dir ../deploy/integrity \
+    publish --sha256 <sha256>
 PYTHONPATH=. python tools/integrity.py --data "$CONTENT_STATE_DIR" run --rate 4000000 --repeat-after 3600
 PYTHONPATH=. python tools/integrity.py --data "$CONTENT_STATE_DIR" report
 ```

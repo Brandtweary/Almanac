@@ -118,6 +118,7 @@ class Mender:
 
     def __enter__(self):
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        _fsync_dir(self.lock_path.parent.parent)
         self.lock = open(self.lock_path, "a")
         try:
             fcntl.flock(self.lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -190,16 +191,26 @@ class Mender:
 
     # -- the transaction ------------------------------------------------------------
 
+    def present(self) -> bool:
+        """Only an original with its registered size may be repaired or receipted."""
+        try:
+            actual = self.path.stat().st_size
+        except FileNotFoundError:
+            self.state.set_artifact_status(self.id, "missing", {"path": str(self.path)})
+            return False
+        if actual != self.size:
+            self.state.set_artifact_status(self.id, "size_mismatch", {"expected": self.size, "actual": actual})
+            return False
+        return True
+
     def mend(self, index) -> str:
         try:
             _manifest, record, leaves = self.trusted_leaves()
         except ManifestDamaged as error:
             self.state.event("manifest_damaged", self.id, index, error=str(error), action="no write")
             return "manifest_damaged"
-        if self.path.stat().st_size != self.size:
-            self.state.set_artifact_status(self.id, "size_mismatch", {"expected": self.size,
-                                                                       "actual": self.path.stat().st_size})
-            return "size_mismatch"
+        if not self.present():
+            return self.state.artifact(self.id)["status"]
         current = self.medium.read_leaf_fresh(self.path, index, self.size, self.leaf_bytes)
         if leaf_hash(current) == leaves[index]:
             release(self.state, self.id, index, "verified_before_mend")
@@ -224,6 +235,9 @@ class Mender:
             self.state.set_leaf(self.id, index, DAMAGED, repair_held=source)
             return "held"
         self.journal.mkdir(parents=True, exist_ok=True)
+        # Persist the artifact directory's name as well as its contents before
+        # any original bytes change; recovery must survive a power loss too.
+        _fsync_dir(self.journal.parent)
         entry = {"artifact": self.id, "leaf": index, "expected": leaves[index].hex(),
                  "damaged_hash": leaf_hash(current).hex(), "source": source,
                  "offset": index * self.leaf_bytes, "length": len(payload)}
@@ -248,7 +262,11 @@ class Mender:
                 return "write_refused"
             self.fail_write(index, f"{type(error).__name__}: {error}")
             return "write_failed"
-        back = self.medium.read_leaf_fresh(self.path, index, self.size, self.leaf_bytes)
+        try:
+            back = self.medium.read_leaf_fresh(self.path, index, self.size, self.leaf_bytes)
+        except (OSError, EOFError) as error:
+            self.fail_write(index, f"read back after fdatasync failed: {type(error).__name__}: {error}")
+            return "write_failed"
         if leaf_hash(back) != leaves[index]:
             self.fail_write(index, "read back after fdatasync does not match the manifest")
             return "write_failed"
@@ -322,6 +340,8 @@ class Mender:
     def recover(self) -> list:
         """Resolve every journal entry a crash left behind. Returns what happened to each."""
         outcomes = []
+        if not self.present():
+            return [("skipped", self.state.artifact(self.id)["status"])]
         records = ({path.stem for path in self.journal.glob("*.json") if path.stem.isdigit()}
                    if self.journal.exists() else set())
         for orphan in (self.journal.iterdir() if self.journal.exists() else ()):
@@ -506,4 +526,3 @@ def mend_all(store_root: Path, manifest_dir: Path, *, medium: Medium | None = No
     finally:
         state.close()
     return summary
-
