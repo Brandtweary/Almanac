@@ -1,6 +1,21 @@
 {
-  "artifacts": [],
-  "corpus_root": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "artifacts": [
+    {
+      "admission": {
+        "tool_version": "source-sha256:b7e6adc404760b4352612f0a04073418704dcd18dc8bb202781950b673ef56b6",
+        "upstream_pieces": null,
+        "whole_file_sha256_verified": true
+      },
+      "bytes": 2301805873,
+      "kind": "derived",
+      "leaf_count": 549,
+      "pack_path": "sources-survivor-text/survivor-library-text_en_all_2025-12.zim",
+      "root": "fdd3064e2345dc6d6ef84fe5a81cc8fe919bd81832298c0c5ab961ec1fc15b84",
+      "sha256": "91fa929f556c63f5d54f9c4f67d4737e7e7a1b20f59a7546f635b1e6433e48cd",
+      "sources": []
+    }
+  ],
+  "corpus_root": "60dbed44c5f926e4aa32a9d4cab1cd969f7a90c40877702acdcab8d952c818a7",
   "hash": "sha256",
   "leaf_bytes": 4194304,
   "schema": "almanac-integrity-v1",
