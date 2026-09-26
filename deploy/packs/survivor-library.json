@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "id": "survivor-library-source-v1",
-  "scope": "acquisition and the installed index footprint of the Survivor Library crawl. The books are PDF entries the archive's own full-text index does not cover, so the indexed pack is a derived text archive built from each PDF's embedded text layer by content/tools/build_survivor_text_zim.py; the crawl itself is retained whole, scans included, and serves each book's scan as its source. Per-work rights and redistribution admission pending",
+  "scope": "acquisition and the installed index footprint of the Survivor Library crawl. The books are PDF entries the archive's own full-text index does not cover, so the indexed pack is a derived text archive built from each PDF's embedded text layer by content/tools/build_survivor_text_zim.py; the crawl itself is retained whole, scans included, and serves each book's scan as its source. The derived text archive is published as a release asset of this repository for integrity repair; the crawl's own redistribution is unreviewed, and each work's own status governs it",
   "footprint": {
     "components": [
       {
