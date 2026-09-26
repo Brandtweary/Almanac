@@ -71,13 +71,14 @@ and the gateway holds no provider keys and no billing state.
 | **Library service** | Python, over an immutable ingested generation of each archive |
 | **Lexical search** | SQLite FTS5, plus each archive's own native index where it has one |
 | **Semantic search** | Qdrant, embedded with `all-MiniLM-L6-v2` |
+| **Corpus integrity** | RFC 6962 Merkle manifest over every archive; background scrub, per-document quarantine, repair from parity or upstream |
 | **Speech in** | faster-whisper, local |
 | **Speech out** | Pocket TTS on CPU, stock Alba voice |
 | **Web search** | SearXNG, local, optional |
 | **Your data** | IndexedDB, in your browser |
 
 Longer descriptions, for anyone installing or modifying it: [browser runtime](./docs/browser-oracle.md),
-[gateway](./proxy/README.md), [content service](./content/README.md), [CPU speech](./speech/README.md),
+[gateway](./proxy/README.md), [content service](./content/README.md), [corpus integrity](./content/docs/integrity.md), [CPU speech](./speech/README.md),
 [self-hosting](./docs/self-hosting.md), and [web search](./docs/web-search.md).
 
 ## Installation
