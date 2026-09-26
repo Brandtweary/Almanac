@@ -194,17 +194,40 @@ def command_validate_dense(args):
     return 0
 
 
+def cycle_record(data: Path, started: float | None = None):
+    """The start time of the last completed `run` cycle, recorded in local state when `started` is given."""
+    state = State(data / "integrity")
+    try:
+        if started is not None:
+            state.set_meta("run_cycle_completed", {"started": started, "completed": time.time()})
+        return (state.get_meta("run_cycle_completed") or {}).get("started")
+    finally:
+        state.close()
+
+
 def command_run(args):
+    """Maintenance cycles; with `--repeat-after`, cycle starts are that many seconds apart.
+
+    The period runs from the start of the last completed cycle, recorded in local state, so
+    a supervisor restarting this command keeps the schedule. A cycle cut short is not
+    recorded, and the next launch resumes it at once.
+    """
+    if args.repeat_after is not None:
+        last = cycle_record(args.data)
+        if last is not None:
+            time.sleep(max(0.0, last + args.repeat_after - time.time()))
     while True:
+        started = time.time()
         cycle = {"scrub": scrub(args.data, args.manifest_dir, rate=RateLimit(args.rate), budget=args.budget),
                  "mend": mend_all(args.data, args.manifest_dir, rate=RateLimit(args.rate),
                                   write=not args.no_artifact_writes, network=not args.no_network)}
         if not args.no_network:
             cycle["probe"] = probe_all(args.data, args.manifest_dir)
+        cycle_record(args.data, started)
         print(json.dumps(cycle, default=str), flush=True)
         if args.repeat_after is None:
             return 0
-        time.sleep(args.repeat_after)
+        time.sleep(max(0.0, started + args.repeat_after - time.time()))
 
 
 def command_report(args):
@@ -266,7 +289,8 @@ def main(argv=None):
         if name != "run":
             sub.add_argument("--artifact", action="append", default=[], help="Limit to one artifact id")
         else:
-            sub.add_argument("--repeat-after", type=float, help="Seconds to wait between cycles; one cycle when absent")
+            sub.add_argument("--repeat-after", type=float, help="Seconds from one cycle's start to the next's, kept "
+                             "across restarts; one cycle when absent")
 
     probe = commands.add_parser("probe", help="Probe byte sources and upstream listings")
     probe.set_defaults(handler=command_probe)

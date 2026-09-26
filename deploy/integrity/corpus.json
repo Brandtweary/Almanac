@@ -12,10 +12,81 @@
       "pack_path": "sources-survivor-text/survivor-library-text_en_all_2025-12.zim",
       "root": "fdd3064e2345dc6d6ef84fe5a81cc8fe919bd81832298c0c5ab961ec1fc15b84",
       "sha256": "91fa929f556c63f5d54f9c4f67d4737e7e7a1b20f59a7546f635b1e6433e48cd",
-      "sources": []
+      "sources": [
+        {
+          "parts": [
+            {
+              "first_leaf": 0,
+              "leaf_count": 511,
+              "url": "https://github.com/Brandtweary/Almanac/releases/download/survivor-library-text-2025-12/survivor-library-text_en_all_2025-12.zim.part0"
+            },
+            {
+              "first_leaf": 511,
+              "leaf_count": 38,
+              "url": "https://github.com/Brandtweary/Almanac/releases/download/survivor-library-text-2025-12/survivor-library-text_en_all_2025-12.zim.part1"
+            }
+          ],
+          "type": "release-parts"
+        }
+      ]
+    },
+    {
+      "admission": {
+        "tool_version": "source-sha256:b7e6adc404760b4352612f0a04073418704dcd18dc8bb202781950b673ef56b6",
+        "upstream_pieces": {
+          "count": 2875,
+          "length": 4194304,
+          "matched": 2875,
+          "metalink_sha256": "1e10bc3983f911555f932f2594fda72db9aba2894ea021bda8fefc6b96f0e968",
+          "type": "sha-1"
+        },
+        "whole_file_sha256_verified": true
+      },
+      "bytes": 12058109982,
+      "kind": "upstream",
+      "leaf_count": 2875,
+      "pack_path": "sources/wikisource_en_all_nopic_2026-08.zim",
+      "root": "335f1cbc9913a34660c759aff2cb417448ac89402168c6edef56ba12e066e00a",
+      "sha256": "b428beb6b7dad9cc96a9b719b9a518fd650a128bf3545b29ea19333c47b0fd5d",
+      "sources": [
+        {
+          "type": "http-range",
+          "url": "https://ny.mirror.driftle.ss/kiwix/zim/wikisource/wikisource_en_all_nopic_2026-08.zim"
+        },
+        {
+          "type": "http-range",
+          "url": "https://dumps.wikimedia.org/kiwix/zim/wikisource/wikisource_en_all_nopic_2026-08.zim"
+        },
+        {
+          "type": "http-range",
+          "url": "https://wi.mirror.driftle.ss/kiwix/zim/wikisource/wikisource_en_all_nopic_2026-08.zim"
+        },
+        {
+          "type": "http-range",
+          "url": "https://ftpmirror.your.org/pub/kiwix/zim/wikisource/wikisource_en_all_nopic_2026-08.zim"
+        },
+        {
+          "type": "http-range",
+          "url": "https://ftp.nluug.nl/pub/kiwix/zim/wikisource/wikisource_en_all_nopic_2026-08.zim"
+        },
+        {
+          "type": "http-range",
+          "url": "https://mirror.download.kiwix.org/zim/wikisource/wikisource_en_all_nopic_2026-08.zim"
+        },
+        {
+          "type": "http-range",
+          "url": "https://mirror-sites-in.mblibrary.info/mirror-sites/download.kiwix.org/zim/wikisource/wikisource_en_all_nopic_2026-08.zim"
+        },
+        {
+          "edition": "2026-08",
+          "name": "wikisource_en_all_nopic",
+          "type": "upstream-listing",
+          "url": "https://download.kiwix.org/zim/wikisource/"
+        }
+      ]
     }
   ],
-  "corpus_root": "60dbed44c5f926e4aa32a9d4cab1cd969f7a90c40877702acdcab8d952c818a7",
+  "corpus_root": "9977160514d862cb3e98e234177678fe43f899212c0ce2c6a0184a9eac8cd88c",
   "hash": "sha256",
   "leaf_bytes": 4194304,
   "schema": "almanac-integrity-v1",

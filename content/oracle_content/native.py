@@ -289,7 +289,12 @@ class NativeReader:
         self.artifact = self.template.sha256
         self.integrity_epoch = self.integrity.epoch(self.artifact)
         self.spans_epoch = self.integrity.epoch("spans-" + generation)
-        self.archive = Archive(str(self.path))
+        try:
+            self.archive = Archive(str(self.path))
+        except RuntimeError:
+            # libzim reports a missing or unparseable file this way; either is the loss of
+            # this one archive, which the library serves around.
+            raise ContentError("unavailable_version", "Original archive cannot be opened", 410) from None
         try:
             date = bytes(self.archive.get_metadata("Date")).decode("ascii") if "Date" in self.archive.metadata_keys else ""
             self.archive_edition = "Archive " + date if re.fullmatch(r"\d{4}-\d{2}-\d{2}", date) else ""
@@ -304,8 +309,12 @@ class NativeReader:
         self.spans = ArticleSpans.open(store.directory(generation), spans_binding(self))
 
     def verify_original(self):
-        stat = self.path.stat()
-        receipt = json.loads(self.path.with_suffix(".receipt.json").read_text())
+        """Refuse an original that is gone, unreadable or changed since its receipt, as the loss of this archive."""
+        try:
+            stat = self.path.stat()
+            receipt = json.loads(self.path.with_suffix(".receipt.json").read_text())
+        except (OSError, ValueError):
+            raise ContentError("unavailable_version", "Original archive is unavailable", 410) from None
         if receipt.get("sha256") != self.template.sha256 or receipt.get("size") != stat.st_size or receipt.get("mtime_ns") != stat.st_mtime_ns:
             raise ContentError("unavailable_version", "Original archive integrity receipt changed", 410)
 
@@ -339,7 +348,10 @@ class NativeReader:
         as such rather than passing for a verified one.
         """
         from .integrity.overlay import REFUSED
-        outcome = self.integrity.verify_entry(self.artifact, self.path, index)
+        try:
+            outcome = self.integrity.verify_entry(self.artifact, self.path, index)
+        except OSError:
+            raise ContentError("unavailable_version", "Original archive is unavailable", 410) from None
         if outcome == REFUSED:
             from .integrity.overlay import message
             raise ContentError("source_damaged", message("damaged", self.template.title))

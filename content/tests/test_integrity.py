@@ -827,3 +827,71 @@ def test_upstream_listing_reports_a_newer_edition(tmp_path):
         "reachable": True, "installed_edition_listed": False,
         "successor": {"edition": "2026-09", "url": "https://mirror.example/zim/wikipedia/wikipedia_en_all_nopic_2026-09.zim"}}
     assert [event["kind"] for event in events(item, "upstream_successor_listed")] == ["upstream_successor_listed"]
+
+
+
+def test_generation_identity_is_judged_by_the_fields_its_manifest_was_written_with(tmp_path):
+    """A generation written before its manifest carried rights exclusions reproduces its name without
+    them; dropping the field from a manifest written with it is still a mismatch."""
+    from oracle_content.integrity.scrub import check_generations
+    from oracle_content.models import digest
+    from oracle_content.native import KIND
+    earlier = {"kind": KIND, "source": {"sha256": "ab" * 32, "pack_id": "fixture"}, "index_fingerprint": "f",
+               "selection_policy": "canonical-html", "representation": "title-lead-v1", "vector_datatype": "float16"}
+    current = {**earlier, "representation": "title-lead-v2", "rights_exclusions": {"A/Held": "publisher reserves it"}}
+    root_dir = tmp_path / "state"
+    for manifest in (earlier, current):
+        (root_dir / "generations" / digest(manifest)).mkdir(parents=True)
+        (root_dir / "generations" / digest(manifest) / "manifest.json").write_text(json.dumps(manifest))
+    (root_dir / "integrity").mkdir()
+
+    def judged():
+        state = State(root_dir / "integrity")
+        try:
+            return check_generations(state, root_dir)
+        finally:
+            state.close()
+
+    assert judged() == {digest(earlier): True, digest(current): True}
+    stripped = {key: value for key, value in current.items() if key != "rights_exclusions"}
+    (root_dir / "generations" / digest(current) / "manifest.json").write_text(json.dumps(stripped))
+    assert judged()[digest(current)] is False
+
+
+def test_maintenance_cycles_start_a_period_apart_across_restarts(tmp_path, monkeypatch):
+    """`run --repeat-after` spaces cycle starts, and a restarted process keeps the schedule a
+    completed cycle set rather than starting a fresh pass on every launch."""
+    from tools import integrity as tool
+    clock = {"now": 1_000_000.0}
+    started, sleeps = [], []
+
+    class Stop(Exception):
+        pass
+
+    def cycle(*args, **kwargs):
+        started.append(clock["now"])
+        clock["now"] += 3600  # one cycle's scrub takes an hour
+        return {}
+
+    def sleep(seconds):
+        sleeps.append(seconds)
+        if len(sleeps) == 2:
+            raise Stop
+        clock["now"] += seconds
+
+    monkeypatch.setattr(tool, "scrub", cycle)
+    monkeypatch.setattr(tool, "mend_all", lambda *args, **kwargs: {})
+    monkeypatch.setattr(tool.time, "time", lambda: clock["now"])
+    monkeypatch.setattr(tool.time, "sleep", sleep)
+    (tmp_path / "integrity").mkdir()
+    argv = ["--data", str(tmp_path), "run", "--no-network", "--repeat-after", "86400"]
+    with pytest.raises(Stop):
+        tool.main(argv)
+    assert started == [1_000_000.0, 1_086_400.0] and sleeps[0] == 86400 - 3600
+
+    # A restart two hours after the last cycle began waits out the rest of the period.
+    started.clear(), sleeps.clear()
+    clock["now"] = 1_086_400.0 + 7200
+    with pytest.raises(Stop):
+        tool.main(argv)
+    assert sleeps[0] == 86400 - 7200 and started == [1_172_800.0]

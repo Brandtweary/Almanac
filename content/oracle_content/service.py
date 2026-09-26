@@ -466,17 +466,7 @@ class Service:
             if not generations:
                 raise ContentError("source_damaged", "Every archive in the library is withdrawn for integrity damage")
             if document_id:
-                scoped = []
-                for candidate in generations:
-                    try:
-                        self.store.document(candidate, document_id)
-                        scoped.append(candidate)
-                    except ContentError as error:
-                        if error.code not in {"unknown_document", "source_excluded"}:
-                            raise
-                if not scoped:
-                    raise ContentError("unknown_document", "Document is outside the active library", 404)
-                generations = scoped
+                generations = self.holding(document_id, generations)
             if len(generations) == 1:
                 pool = await self.candidates(query, document_id, generations[0])
                 pool["degradation"] = [*pool["degradation"], *degradation]
@@ -575,6 +565,31 @@ class Service:
             dense = [(pid, score) for pid, score in dense if pid in passages]
         return {"generation": generation, "branches": {"lexical": lexical, "dense": dense},
                 "rows": remove_contained(rows, passages), "passages": passages, "degradation": degradation}
+
+    def holding(self, document_id, generations, first=False):
+        """The generations among `generations` that hold `document_id`, in order.
+
+        An archive that cannot be consulted at all is skipped, so the loss of one archive
+        never hides a document another holds; the loss is raised only when no archive
+        holds the document.
+        """
+        found, lost = [], None
+        for candidate in generations:
+            try:
+                self.store.document(candidate, document_id)
+            except ContentError as error:
+                if error.code in ARCHIVE_LOSS:
+                    lost = lost or error
+                    continue
+                if error.code not in {"unknown_document", "source_excluded"}:
+                    raise
+                continue
+            found.append(candidate)
+            if first:
+                break
+        if not found:
+            raise lost or ContentError("unknown_document", "Document is outside the active library", 404)
+        return found
 
     def loss_label(self, generation, error):
         pack = self.pack_label(generation)
@@ -839,17 +854,7 @@ class Service:
             if selected.document_id != request.document_id:
                 raise ContentError("invalid_handle", "Passage belongs to another document", 400)
         else:
-            generation = None
-            for candidate in self.store.active_generations():
-                try:
-                    self.store.document(candidate, request.document_id)
-                    generation = candidate
-                    break
-                except ContentError as error:
-                    if error.code not in {"unknown_document", "source_excluded"}:
-                        raise
-            if generation is None:
-                raise ContentError("unknown_document", "Document is outside the active library", 404)
+            generation = self.holding(request.document_id, self.store.active_generations(), first=True)[0]
             versions = self.snapshot_versions([generation])
             selected = None
         doc = self.store.document(generation, request.document_id)

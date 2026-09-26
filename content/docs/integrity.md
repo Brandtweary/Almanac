@@ -35,7 +35,7 @@ PYTHONPATH=. python tools/integrity.py --data "$CONTENT_STATE_DIR" admit --sha25
     --pack ../deploy/packs/<pack>.json --parity-dir /other/disk/parity --rate 50000000
 PYTHONPATH=. python tools/integrity.py --data "$CONTENT_STATE_DIR" --manifest-dir ../deploy/integrity \
     publish --sha256 <sha256>
-PYTHONPATH=. python tools/integrity.py --data "$CONTENT_STATE_DIR" run --rate 4000000 --repeat-after 3600
+PYTHONPATH=. python tools/integrity.py --data "$CONTENT_STATE_DIR" run --rate 4000000 --repeat-after 604800
 PYTHONPATH=. python tools/integrity.py --data "$CONTENT_STATE_DIR" report
 ```
 
@@ -65,6 +65,10 @@ PYTHONPATH=. python tools/integrity.py --data "$CONTENT_STATE_DIR" report
   reads the leaf's whole group. `--no-artifact-writes` keeps verified candidates under
   `integrity/held/`, fetched once, and writes nothing; `--no-network` mends from parity
   alone.
+- `run` is one cycle of scrub, mend and probe. With `--repeat-after`, cycle starts are that
+  many seconds apart, counted from the start of the last completed cycle recorded in local
+  state, so a supervisor restarting the command keeps the schedule and an interrupted cycle
+  resumes at once.
 - `probe` checks each byte source by size and strong validator, and reads the upstream
   listing an upstream archive's record names to report a newer edition, and whether the
   installed edition is still listed. Neither acts on the result.
@@ -96,7 +100,11 @@ from searches, which carry `integrity:<pack>` in `degradation`. Damage to a sear
 withdraws lexical search for that archive (`integrity:<pack>:lexical`); damage to the
 tables the reader navigates by, a resized or missing file, or damage the stored map
 cannot localise withdraws the archive (`integrity:<pack>:withdrawn`), which then costs
-readiness nothing: the library stays ready while any archive serves. Reads of a document
+readiness nothing: the library stays ready while any archive serves. An original that is
+missing or cannot be opened costs its archive the same way before any scrub has seen it,
+named `archive_unavailable:<pack>`. Integrity state that cannot be read costs nothing: the
+last state read stays in force, coverage carries the error in `state_error`, and a read with
+no state to check against carries `integrity:<pack>:read_unverified`. Reads of a document
 re-hash the leaves its text comes from once per scrub window, so damage between scrub
 passes is caught on the path a person reads. A read the re-hash could not check, because
 the leaf lists are absent from the manifest directory the scrub recorded or the manifest

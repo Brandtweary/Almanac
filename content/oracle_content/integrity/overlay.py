@@ -18,7 +18,10 @@ serves normally. The epoch comparison is per reader, which keeps the rule exact 
 many processes serve the library.
 
 With no integrity state at all, nothing is quarantined and every archive reports that
-it has not been admitted, never that it is healthy.
+it has not been admitted, never that it is healthy. State that exists but cannot be
+read costs the service nothing: the last state read stays in force, so known damage
+stays refused, and until a read succeeds again coverage and every read not re-hashed
+say `state_unreadable`.
 """
 from __future__ import annotations
 
@@ -47,6 +50,7 @@ VERIFIED, REFUSED, NOT_ADMITTED = "verified", "refused", "not_admitted"
 UNMAPPED = "unmapped"
 MANIFEST_UNVERIFIED = "manifest_unverified"
 LEAF_LIST_UNAVAILABLE = "leaf_list_unavailable"
+STATE_UNREADABLE = "state_unreadable"
 
 
 def _iso(ns):
@@ -127,6 +131,7 @@ class Overlay:
         self.coverage_cache = {}
         self.leaf_lists = {}
         self.verified = OrderedDict()
+        self.state_error = None
 
     # -- state loading ----------------------------------------------------------------
 
@@ -154,15 +159,26 @@ class Overlay:
         own two writes clear `version` themselves.
         """
         with self.lock:
-            db = self._connection()
-            if db is None:
-                if self.snapshot is not None or self.version is not None:
-                    self.snapshot, self.views, self.coverage_cache, self.version = None, {}, {}, None
-                return None
-            version = db.execute("PRAGMA data_version").fetchone()[0]
-            if version != self.version or self.snapshot is None:
-                self.snapshot = self._load(db)
-                self.version, self.views = version, {}
+            try:
+                db = self._connection()
+                if db is None:
+                    self.state_error = None
+                    if self.snapshot is not None or self.version is not None:
+                        self.snapshot, self.views, self.coverage_cache, self.version = None, {}, {}, None
+                    return None
+                version = db.execute("PRAGMA data_version").fetchone()[0]
+                if version != self.version or self.snapshot is None:
+                    self.snapshot = self._load(db)
+                    self.version, self.views = version, {}
+            except sqlite3.Error as error:
+                # Unreadable state never stops the service. The last state read stays in
+                # force, and the connection is reopened on the next call.
+                self.state_error = f"{type(error).__name__}: {error}"
+                if self.db is not None:
+                    self.db.close()
+                self.db, self.identity, self.version = None, None, None
+                return self.snapshot
+            self.state_error = None
             return self.snapshot
 
     def _load(self, db):
@@ -320,7 +336,7 @@ class Overlay:
         """Whether reads of an archive are re-hashed now: `active`, or the outcome naming why not."""
         view = self.archive(artifact_id)
         if view is None:
-            return NOT_ADMITTED
+            return NOT_ADMITTED if self.state_error is None else STATE_UNREADABLE
         if view.structure is None:
             return UNMAPPED
         leaves, reason = self.leaf_hashes(artifact_id)
@@ -338,7 +354,7 @@ class Overlay:
         """
         view = self.archive(artifact_id)
         if view is None:
-            return NOT_ADMITTED
+            return NOT_ADMITTED if self.state_error is None else STATE_UNREADABLE
         if view.structure is None:
             return UNMAPPED
         leaves, reason = self.leaf_hashes(artifact_id)
@@ -385,6 +401,8 @@ class Overlay:
         """The per-archive integrity block every coverage response carries."""
         with self.lock:
             snapshot = self.refresh()
+            if self.state_error is not None:
+                return self.unreadable_coverage(artifact_id, snapshot)
             if snapshot is None or artifact_id not in snapshot["artifacts"]:
                 return {"admitted": False, "verified_fraction": 0.0, "withdrawn": False, "lexical_withdrawn": False,
                         "note": "not admitted: no leaf list exists for this archive, so nothing about its bytes is verified"}
@@ -398,6 +416,27 @@ class Overlay:
             cached = self.coverage_cache.get(artifact_id)
             if cached is not None and cached[0] == signature and time.monotonic() - cached[1] < COVERAGE_REFRESH_SECONDS:
                 return {**cached[2], "read_verification": self.read_verification(artifact_id)}
+            try:
+                block = self._coverage_block(artifact_id, snapshot)
+            except sqlite3.Error as error:
+                self.state_error = f"{type(error).__name__}: {error}"
+                return self.unreadable_coverage(artifact_id, snapshot, self.state_error)
+            self.coverage_cache[artifact_id] = (signature, time.monotonic(), block)
+            # Read outside the cache: a moved manifest directory turns the read-path
+            # re-hash off at once, and the label has to say so at once.
+            return {**block, "read_verification": self.read_verification(artifact_id)}
+
+    def unreadable_coverage(self, artifact_id, snapshot, error=None):
+        """The integrity block while the state cannot be read: what the last read state enforces, and why."""
+        error = error or self.state_error
+        view = self.archive(artifact_id) if snapshot is not None else None
+        return {"admitted": None if view is None else True, "verified_fraction": None,
+                "withdrawn": bool(view and view.withdrawn), "lexical_withdrawn": bool(view and view.lexical_withdrawn),
+                "state_error": error, "read_verification": self.read_verification(artifact_id),
+                "note": "integrity state is unreadable; the last state read is enforced and nothing is newly verified"}
+
+    def _coverage_block(self, artifact_id, snapshot):
+        with self.lock:
             db = self._connection()
             row = snapshot["artifacts"][artifact_id]
             meta = snapshot["meta"]
@@ -442,10 +481,7 @@ class Overlay:
                                                          for ok, detail in readings if ok)},
                      "manifest": "verified" if manifest.get("ok") else "damaged" if manifest else "unchecked",
                      "corpus_root": manifest.get("corpus_root") if manifest.get("ok") else None}
-            self.coverage_cache[artifact_id] = (signature, time.monotonic(), block)
-            # Read outside the cache: a moved manifest directory turns the read-path
-            # re-hash off at once, and the label has to say so at once.
-            return {**block, "read_verification": self.read_verification(artifact_id)}
+            return block
 
     def generation_flags(self, generation):
         snapshot = self.refresh()

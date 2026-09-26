@@ -344,6 +344,67 @@ def test_i18_an_archive_that_fails_to_verify_costs_only_itself(tmp_path):
     assert found["hits"] and "archive_unavailable:first" in found["degradation"]
 
 
+@pytest.mark.parametrize("reader_open", [True, False])
+def test_i18_a_missing_original_costs_only_itself(tmp_path, reader_open):
+    """An original gone from disk before any scrub notices is archive loss, whether or not its reader is open."""
+    item = library(tmp_path, names=("first", "second"), qualified=True)
+    first, second = item.archives["first"], item.archives["second"]
+    kept = f"z_{second.sha}_{entry_index(second, 'A010')}"
+    asyncio.run(item.service.search(SearchRequest(query="paraphrase")))
+    if not reader_open:
+        item.store._native_readers.clear()
+    first.path.unlink()
+    health = item.service.health()
+    assert health["ready"] is True and "archive_unavailable:first" in health["degradation"]
+    found = asyncio.run(item.service.search(SearchRequest(query="paraphrase")))
+    assert found["hits"] and {hit["source"]["sha256"] for hit in found["hits"]} == {second.sha}
+    assert "archive_unavailable:first" in found["degradation"]
+    scoped = asyncio.run(item.service.search(SearchRequest(query="paraphrase", document_id=kept)))
+    assert scoped["hits"] and {hit["document_id"] for hit in scoped["hits"]} == {kept}
+    assert asyncio.run(item.service.read(ReadRequest(document_id=kept)))["passages"]
+    with pytest.raises(ContentError) as refused:
+        asyncio.run(item.service.read(ReadRequest(document_id=f"z_{first.sha}_1")))
+    assert refused.value.code == "unavailable_version"
+
+
+def unreadable_state(item):
+    """Replace the integrity state with bytes that are not a database, as a new file."""
+    path = item.store.root / "integrity" / "state.sqlite"
+    spoiled = path.with_name("spoiled")
+    spoiled.write_bytes(b"\0" * 8192)
+    os.replace(spoiled, path)
+
+
+def test_i18_unreadable_integrity_state_costs_nothing_and_says_so(tmp_path):
+    item = library(tmp_path, names=("first",), qualified=True)
+    archive = item.archives["first"]
+    document_id = f"z_{archive.sha}_{entry_index(archive, 'A012')}"
+    unreadable_state(item)
+    health = item.service.health()
+    assert health["ready"] is True and health["qualified"] is True
+    block = health["coverage"]["native_archives"][0]["integrity"]
+    assert block["state_error"] and block["read_verification"] == "state_unreadable"
+    assert asyncio.run(item.service.search(SearchRequest(query="paraphrase")))["hits"]
+    read = asyncio.run(item.service.read(ReadRequest(document_id=document_id)))
+    assert read["passages"] and "integrity:first:read_unverified" in read["degradation"]
+
+
+def test_known_damage_stays_refused_while_the_state_is_unreadable(tmp_path):
+    item = library(tmp_path)
+    archive = item.archives["first"]
+    target = entry_index(archive, "A030")
+    state = State(item.store.root / "integrity")
+    state.set_leaf(archive.sha, cluster_middle(item, archive, target) // LEAF, "damaged")
+    state.close()
+    with pytest.raises(ContentError):
+        asyncio.run(item.service.read(ReadRequest(document_id=f"z_{archive.sha}_{target}")))
+    unreadable_state(item)
+    with pytest.raises(ContentError) as refused:
+        asyncio.run(item.service.read(ReadRequest(document_id=f"z_{archive.sha}_{target}")))
+    assert refused.value.code == "source_damaged"
+    assert item.service.health()["coverage"]["native_archives"][0]["integrity"]["state_error"]
+
+
 def test_a_read_rehashes_the_bytes_it_returns(tmp_path):
     item = library(tmp_path)
     archive = item.archives["first"]

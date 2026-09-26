@@ -93,7 +93,9 @@ unverified), damaged, unrepairable and pending-reload leaf counts, `damaged_docu
 (null when some damage could not be localised), `lexical_withdrawn`, `withdrawn` with its
 reason, `last_full_pass`, `network_sources_available`, `upstream` (a newer listed edition
 and whether the installed one is still listed), `read_verification` (`active`, or why
-reads are not being re-hashed), `manifest` and `corpus_root`.
+reads are not being re-hashed), `manifest` and `corpus_root`. While the integrity state
+cannot be read the block carries `state_error` instead of counts, `admitted` is null
+unless an earlier read of the state still applies, and `verified_fraction` is null.
 `precomputed_undecodable` counts precomputed articles that no longer decode and fell back
 to the archive.
 

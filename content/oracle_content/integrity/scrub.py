@@ -196,6 +196,11 @@ def check_generations(state: State, store_root: Path) -> dict:
     manifest altered after publication, including the field naming which original the
     generation reads, no longer reproduces its own name. The check is reported, never
     acted on: the service keeps serving and the coverage labels the mismatch.
+
+    `rights_exclusions` joined the identity after the first generations were written, and
+    those manifests carry no such field, so it is part of the identity exactly when the
+    manifest carries it. Removing it from a manifest written with it still changes the
+    digest, so its absence cannot pass for an earlier generation.
     """
     from ..native import KIND
     results = {}
@@ -213,8 +218,9 @@ def check_generations(state: State, store_root: Path) -> dict:
             identity = {"kind": manifest["kind"],
                         "source": {key: value for key, value in manifest["source"].items() if key != "original_path"},
                         "index_fingerprint": manifest["index_fingerprint"], "selection_policy": manifest["selection_policy"],
-                        "representation": manifest["representation"], "vector_datatype": manifest["vector_datatype"],
-                        "rights_exclusions": manifest["rights_exclusions"]}
+                        "representation": manifest["representation"], "vector_datatype": manifest["vector_datatype"]}
+            if "rights_exclusions" in manifest:
+                identity["rights_exclusions"] = manifest["rights_exclusions"]
             ok = digest(identity) == generation
         except (KeyError, TypeError, AttributeError) as error:
             state.record_generation_check(generation, "identity", False, error=f"identity fields absent: {error}")
