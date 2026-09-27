@@ -127,7 +127,8 @@
           "https://lb.download.kiwix.org/zim/zimit/cd3wdproject.org_en_all_2025-11.zim.meta4"
         ],
         "notice": "notices/cd3wd.txt"
-      }
+      },
+      "metalink": "https://download.kiwix.org/zim/zimit/cd3wdproject.org_en_all_2025-11.zim.meta4"
     }
   ]
 }

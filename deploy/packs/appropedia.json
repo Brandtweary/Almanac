@@ -127,7 +127,8 @@
           "https://lb.download.kiwix.org/zim/other/appropedia_en_all_maxi_2026-02.zim.meta4"
         ],
         "notice": "notices/appropedia.txt"
-      }
+      },
+      "metalink": "https://download.kiwix.org/zim/other/appropedia_en_all_maxi_2026-02.zim.meta4"
     }
   ]
 }

@@ -2,6 +2,109 @@
   "artifacts": [
     {
       "admission": {
+        "tool_version": "source-sha256:606806d62fb29a683ece003cd4ad7052d20f46a241ee45cd09aba2604a77134b",
+        "upstream_pieces": {
+          "count": 52751,
+          "length": 4194304,
+          "matched": 52751,
+          "metalink_sha256": "d8e7fe72c93c0f509b6e12fe531c6713ec61a772d25f49f1baf6c9c40df18765",
+          "type": "sha-1"
+        },
+        "whole_file_sha256_verified": true
+      },
+      "bytes": 221251590584,
+      "kind": "upstream",
+      "leaf_count": 52751,
+      "pack_path": "sources/gutenberg_en_all_2025-11.zim",
+      "root": "174e621bd31f789c6c85fd06a1459f43001afc229bc89db56590fa5e7dbeabc4",
+      "sha256": "01677c8d554a1cab2cbfd020ac99ebca7dd6c74d3ce0d13f266a2ba603dfaf28",
+      "sources": [
+        {
+          "type": "http-range",
+          "url": "https://ny.mirror.driftle.ss/kiwix/zim/gutenberg/gutenberg_en_all_2025-11.zim"
+        },
+        {
+          "type": "http-range",
+          "url": "https://mirror.download.kiwix.org/zim/gutenberg/gutenberg_en_all_2025-11.zim"
+        },
+        {
+          "type": "http-range",
+          "url": "https://ftp.nluug.nl/pub/kiwix/zim/gutenberg/gutenberg_en_all_2025-11.zim"
+        },
+        {
+          "edition": "2025-11",
+          "name": "gutenberg_en_all",
+          "type": "upstream-listing",
+          "url": "https://download.kiwix.org/zim/gutenberg/"
+        }
+      ]
+    },
+    {
+      "admission": {
+        "tool_version": "source-sha256:606806d62fb29a683ece003cd4ad7052d20f46a241ee45cd09aba2604a77134b",
+        "upstream_pieces": null,
+        "whole_file_sha256_verified": true
+      },
+      "bytes": 5749297,
+      "kind": "derived",
+      "leaf_count": 2,
+      "pack_path": "sources/pali-canon_en_all_2026-09.zim",
+      "root": "0ea47cb31dc5e6693a37dc085c4b4ffe6b8386d4a9b09c035403e76d148c69a0",
+      "sha256": "416bc5ae5d5462c176a22dcb52d915a371771279e0cc33420f6de490748d1ace",
+      "sources": [
+        {
+          "parts": [
+            {
+              "first_leaf": 0,
+              "leaf_count": 2,
+              "url": "https://github.com/Brandtweary/Almanac/releases/download/pali-canon-2026-09/pali-canon_en_all_2026-09.zim"
+            }
+          ],
+          "type": "release-parts"
+        }
+      ]
+    },
+    {
+      "admission": {
+        "tool_version": "source-sha256:606806d62fb29a683ece003cd4ad7052d20f46a241ee45cd09aba2604a77134b",
+        "upstream_pieces": {
+          "count": 12563,
+          "length": 4194304,
+          "matched": 12563,
+          "metalink_sha256": "339dbf4453317cb67d6e102ef3a778e81466312371f693aaa3962da14258e230",
+          "type": "sha-1"
+        },
+        "whole_file_sha256_verified": true
+      },
+      "bytes": 52690706555,
+      "kind": "upstream",
+      "leaf_count": 12563,
+      "pack_path": "sources/wikipedia_en_all_nopic_2026-06.zim",
+      "root": "c0e1e15c7832f7090ef501391d7396c3fd6e412186530429a5ee468e7733fb47",
+      "sha256": "441a56d9e05b2d98f8ae9acb7986a513ed47904d73852c92dc6b7d50baa122e5",
+      "sources": [
+        {
+          "type": "http-range",
+          "url": "https://ny.mirror.driftle.ss/kiwix/zim/wikipedia/wikipedia_en_all_nopic_2026-06.zim"
+        },
+        {
+          "type": "http-range",
+          "url": "https://mirror.download.kiwix.org/zim/wikipedia/wikipedia_en_all_nopic_2026-06.zim"
+        },
+        {
+          "type": "http-range",
+          "url": "https://ftp.nluug.nl/pub/kiwix/zim/wikipedia/wikipedia_en_all_nopic_2026-06.zim"
+        },
+        {
+          "edition": "2026-06",
+          "name": "wikipedia_en_all_nopic",
+          "type": "upstream-listing",
+          "url": "https://download.kiwix.org/zim/wikipedia/"
+        }
+      ]
+    },
+    {
+      "admission": {
         "tool_version": "source-sha256:b7e6adc404760b4352612f0a04073418704dcd18dc8bb202781950b673ef56b6",
         "upstream_pieces": null,
         "whole_file_sha256_verified": true
@@ -27,6 +130,45 @@
             }
           ],
           "type": "release-parts"
+        }
+      ]
+    },
+    {
+      "admission": {
+        "tool_version": "source-sha256:606806d62fb29a683ece003cd4ad7052d20f46a241ee45cd09aba2604a77134b",
+        "upstream_pieces": {
+          "count": 852,
+          "length": 4194304,
+          "matched": 852,
+          "metalink_sha256": "c1970ccf75c8863bfbb7b21257d97b7f6967e4ff82bdd090fcde514c01a28771",
+          "type": "sha-1"
+        },
+        "whole_file_sha256_verified": true
+      },
+      "bytes": 3570695757,
+      "kind": "upstream",
+      "leaf_count": 852,
+      "pack_path": "sources/ifixit_en_all_2025-12.zim",
+      "root": "f5bc854ffd1870e5937ae57cfc4282ed083e4ba4179e4ebffdb16244c0eaaebb",
+      "sha256": "9bb5f3408707fd0300c6ef47a425c3217187f144cd9154a928183816aa72eead",
+      "sources": [
+        {
+          "type": "http-range",
+          "url": "https://ny.mirror.driftle.ss/kiwix/zim/ifixit/ifixit_en_all_2025-12.zim"
+        },
+        {
+          "type": "http-range",
+          "url": "https://mirror.download.kiwix.org/zim/ifixit/ifixit_en_all_2025-12.zim"
+        },
+        {
+          "type": "http-range",
+          "url": "https://ftp.nluug.nl/pub/kiwix/zim/ifixit/ifixit_en_all_2025-12.zim"
+        },
+        {
+          "edition": "2025-12",
+          "name": "ifixit_en_all",
+          "type": "upstream-listing",
+          "url": "https://download.kiwix.org/zim/ifixit/"
         }
       ]
     },
@@ -84,9 +226,110 @@
           "url": "https://download.kiwix.org/zim/wikisource/"
         }
       ]
+    },
+    {
+      "admission": {
+        "tool_version": "source-sha256:606806d62fb29a683ece003cd4ad7052d20f46a241ee45cd09aba2604a77134b",
+        "upstream_pieces": {
+          "count": 60070,
+          "length": 4194304,
+          "matched": 60070,
+          "metalink_sha256": "4db0bade6a2094b2204b2e8b9b05c4beb9ef05b7ae6ac50ea1ecccb86b51ceef",
+          "type": "sha-1"
+        },
+        "whole_file_sha256_verified": true
+      },
+      "bytes": 251947683722,
+      "kind": "upstream",
+      "leaf_count": 60070,
+      "pack_path": "sources/survivorlibrary.com_en_all_2025-12.zim",
+      "root": "0645f4fccbfb3d0283f71ade3cd6a9c970fe57e1fc946727aed8250bb058aed2",
+      "sha256": "c812c4ba3b9bcf7b77864cc965d526336d487e1b9ddc9364bad68fc55d2862e3",
+      "sources": [
+        {
+          "type": "http-range",
+          "url": "https://ny.mirror.driftle.ss/kiwix/zim/zimit/survivorlibrary.com_en_all_2025-12.zim"
+        },
+        {
+          "type": "http-range",
+          "url": "https://mirror.download.kiwix.org/zim/zimit/survivorlibrary.com_en_all_2025-12.zim"
+        },
+        {
+          "type": "http-range",
+          "url": "https://ftp.nluug.nl/pub/kiwix/zim/zimit/survivorlibrary.com_en_all_2025-12.zim"
+        },
+        {
+          "edition": "2025-12",
+          "name": "survivorlibrary.com_en_all",
+          "type": "upstream-listing",
+          "url": "https://download.kiwix.org/zim/zimit/"
+        }
+      ]
+    },
+    {
+      "admission": {
+        "tool_version": "source-sha256:606806d62fb29a683ece003cd4ad7052d20f46a241ee45cd09aba2604a77134b",
+        "upstream_pieces": {
+          "count": 139,
+          "length": 4194304,
+          "matched": 139,
+          "metalink_sha256": "7aeaa7f8f664e0fc26491fbd5f9e0b375adb9912aacd15259de208a8d6e3c224",
+          "type": "sha-1"
+        },
+        "whole_file_sha256_verified": true
+      },
+      "bytes": 581641351,
+      "kind": "upstream",
+      "leaf_count": 139,
+      "pack_path": "sources/appropedia_en_all_maxi_2026-02.zim",
+      "root": "e478b3d468db69df94c3c36493a96ee3b697cb37a186016ecfda01dafabbe36c",
+      "sha256": "dcf200ba723c27397e1c9a2e4891ff91fa13993df1fa285315190d8525a53469",
+      "sources": [
+        {
+          "type": "http-range",
+          "url": "https://mirror.download.kiwix.org/zim/other/appropedia_en_all_maxi_2026-02.zim"
+        },
+        {
+          "edition": "2026-02",
+          "name": "appropedia_en_all_maxi",
+          "type": "upstream-listing",
+          "url": "https://download.kiwix.org/zim/other/"
+        }
+      ]
+    },
+    {
+      "admission": {
+        "tool_version": "source-sha256:606806d62fb29a683ece003cd4ad7052d20f46a241ee45cd09aba2604a77134b",
+        "upstream_pieces": {
+          "count": 139,
+          "length": 4194304,
+          "matched": 139,
+          "metalink_sha256": "10c5b1246cbf5b47d037e6674cf91415ed3eda90dab538daa31bb147782465e3",
+          "type": "sha-1"
+        },
+        "whole_file_sha256_verified": true
+      },
+      "bytes": 581165229,
+      "kind": "upstream",
+      "leaf_count": 139,
+      "pack_path": "sources/cd3wdproject.org_en_all_2025-11.zim",
+      "root": "a884648e9022f8bf4b2eb2b357dd8ffac4735720bf0750fde5cc604a5433b867",
+      "sha256": "f79a27413af0bd17d14adb3a556d282515a8bc1e127d791a5961c93ea9167b92",
+      "sources": [
+        {
+          "type": "http-range",
+          "url": "https://lb.download.kiwix.org/zim/zimit/cd3wdproject.org_en_all_2025-11.zim"
+        },
+        {
+          "edition": "2025-11",
+          "name": "cd3wdproject.org_en_all",
+          "type": "upstream-listing",
+          "url": "https://download.kiwix.org/zim/zimit/"
+        }
+      ]
     }
   ],
-  "corpus_root": "9977160514d862cb3e98e234177678fe43f899212c0ce2c6a0184a9eac8cd88c",
+  "corpus_root": "9ea4b4bf5eaee32dfa595031738767dd84126e5c462322844c9fc1c8b896091d",
   "hash": "sha256",
   "leaf_bytes": 4194304,
   "schema": "almanac-integrity-v1",
