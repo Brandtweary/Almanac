@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "cymbiont-proxy",
+      "name": "almanac-gateway",
       "dependencies": {
         "hono": "4.12.26",
       },
