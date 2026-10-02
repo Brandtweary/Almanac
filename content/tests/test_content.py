@@ -735,7 +735,7 @@ def test_the_stronger_collection_leads_even_when_its_handle_sorts_last(tmp_path)
     strong, weak = max(generations), min(generations)
     service.dense.scores = {strong: 0.91, weak: 0.14}
     result = asyncio.run(service.search(SearchRequest(query="paraphrase stopcock")))
-    assert set(result["generations"]) == set(generations)
+    assert len(result["result_set"]["collections"]) == len(generations)
     assert result["hits"][0]["passage_id"].split(":")[1] == strong
 
 
@@ -781,3 +781,36 @@ def test_budget_omits_whole_excerpt_without_losing_continuation(tmp_path):
     assert all(Tokens().count(json.dumps(page, ensure_ascii=False)) <= budget for page in (first, second))
     passage = service.store.passage(first["generation"], hit["passage_id"])
     assert passage.text == hit["excerpt"], "budgeting must preserve the source span"
+
+
+def _archive_coverage(index):
+    integrity = {"admitted": True, "verified_fraction": 1.0, "unverified_leaves": 0, "damaged_leaves": 0,
+                 "unrepairable_leaves": 0, "pending_reload_leaves": 0, "damaged_documents": 0,
+                 "lexical_withdrawn": False, "withdrawn": False, "withdrawn_reason": None,
+                 "last_full_pass": "2026-01-01T00:00:00Z", "network_sources_available": 1, "upstream": None,
+                 "manifest": "verified", "corpus_root": "c" * 64, "read_verification": "active"}
+    return {"generation": f"{index:064x}", "pack_id": f"archive-{index}", "precomputed_articles": 1000,
+            "precomputed_undecodable": 0, "integrity": integrity,
+            "lexical": "native full text within declared source selection", "reader": "complete articles",
+            "dense_representation": "title/lead only; not full article bodies", "dense_stage": "complete",
+            "indexed_articles": 1000, "entry_cursor": 1000, "entry_count": 1000,
+            "canonical_html_articles": 1000, "selection_policy": "canonical-html", "exclusions": {}}
+
+
+def test_archive_growth_leaves_evidence_room(tmp_path):
+    """Library-wide state grows with every installed archive; evidence must still fit the page."""
+    service, _, _ = setup(tmp_path, response_tokens=600, read_tokens=600)
+    real = service.store.coverage
+
+    def grown(*args, **kwargs):
+        return {**real(*args, **kwargs), "native_archives": [_archive_coverage(i) for i in range(40)]}
+    service.store.coverage = grown
+    assert Tokens().count(json.dumps(grown(), ensure_ascii=False)) > service.profile.response_tokens
+    found = asyncio.run(service.search(SearchRequest(query="ZX-42")))
+    assert found["hits"] and all(hit["excerpt"] and "text_omitted_budget" not in hit["flags"] for hit in found["hits"])
+    assert Tokens().count(json.dumps(found, ensure_ascii=False)) <= service.profile.response_tokens
+    assert not {"coverage", "generations"} & set(found), "library-wide state belongs to health, not to a search page"
+    hit = found["hits"][0]
+    read = asyncio.run(service.read(ReadRequest(document_id=hit["document_id"], passage_id=hit["passage_id"])))
+    assert read["passages"] and read["passages"][0]["excerpt"] and "coverage" not in read
+    assert service.health()["coverage"]["native_archives"], "health keeps the full per-archive block"

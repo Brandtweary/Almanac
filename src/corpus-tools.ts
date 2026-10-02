@@ -7,8 +7,9 @@ export interface SourceEvidence {
 	passage_id: string; document_id: string; source_revision: string; extraction_revision: string;
 	title: string; collection?: string; edition: string; section: string[];
 	page: { index: number | null; label: string | null; coordinates: number[] | null; anchor: string | null };
-	excerpt: string; complete: boolean; previous: string | null; next: string | null; flags: string[];
-	source: { url: string; sha256: string; media_type: string; origin: string };
+	excerpt: string; complete: boolean; previous?: string | null; next?: string | null; flags: string[];
+	/** Read passages carry their source route and digest; search hits leave both to the handle and `source_revision`. */
+	source?: { url: string; sha256: string; media_type: string; origin: string };
 }
 export interface EvidenceRecord { passage_id: string; document_id: string; source_revision: string; extraction_revision: string; title: string; collection?: string; source_url: string }
 const HANDLE = /^p:[a-f0-9]{64}:[a-f0-9]{64}$/;
@@ -26,10 +27,11 @@ export function validateEvidence(value: unknown): SourceEvidence {
 	if (!p || !HANDLE.test(p.passage_id) || [p.document_id, p.source_revision, p.extraction_revision, p.title].some(v => typeof v !== "string" || !v) ||
 		typeof p.excerpt !== "string" || typeof p.complete !== "boolean" || !Array.isArray(p.section) || p.section.some(v => typeof v !== "string") ||
 		(p.collection !== undefined && typeof p.collection !== "string") ||
-		!p.source || typeof p.source.url !== "string" || !/^[a-f0-9]{64}$/.test(p.source_revision) || p.source.sha256 !== p.source_revision || !p.page || !Array.isArray(p.flags) || p.flags.some(v => typeof v !== "string")) throw new Error("Corpus returned invalid source evidence");
+		(p.source !== undefined && (!p.source || typeof p.source.url !== "string" || p.source.sha256 !== p.source_revision)) ||
+		!/^[a-f0-9]{64}$/.test(p.source_revision) || !p.page || !Array.isArray(p.flags) || p.flags.some(v => typeof v !== "string")) throw new Error("Corpus returned invalid source evidence");
 	// The gateway serves immutable originals. Never trust a document-supplied URL as a local route.
 	const expected = `/v1/corpus/source/${encodeURIComponent(p.passage_id)}`;
-	if (p.source.url !== expected && p.source.url !== `/v1/corpus/source/${p.passage_id}`) throw new Error("Corpus returned an invalid source link");
+	if (p.source && p.source.url !== expected && p.source.url !== `/v1/corpus/source/${p.passage_id}`) throw new Error("Corpus returned an invalid source link");
 	return p;
 }
 export class EvidenceLedger {
@@ -129,13 +131,34 @@ async function corpusRequest(kind: "search" | "read", params: unknown, ledger: E
 	const passages = kind === "search" ? data.hits : data.passages;
 	if (!Array.isArray(passages) || typeof data.generation !== "string" || typeof data.profile_id !== "string" || !["ok", "degraded", "unqualified"].includes(data.status)) throw new Error("Corpus returned an invalid result envelope");
 	const valid = passages.map(validateEvidence);
-	const generations: unknown = data.generations ?? [data.generation];
-	if (!Array.isArray(generations) || !generations.length || !generations.includes(data.generation) ||
+	// A read names the one generation its passages belong to. A search page spans the
+	// library and identifies each hit's generation by its handle alone, unless the
+	// envelope lists them, in which case the list and the handles must agree.
+	const generations: unknown = data.generations ?? (kind === "read" ? [data.generation] : undefined);
+	if (generations !== undefined && (!Array.isArray(generations) || !generations.length || !generations.includes(data.generation) ||
 		generations.some(g => typeof g !== "string" || !/^[a-f0-9]{64}$/.test(g)) ||
 		new Set(generations).size !== generations.length ||
-		valid.some(p => !generations.includes(p.passage_id.split(":")[1]))) throw new Error("Corpus source generation mismatch");
+		valid.some(p => !generations.includes(p.passage_id.split(":")[1])))) throw new Error("Corpus source generation mismatch");
 	ledger.remember(valid);
-	return { content: [{ type: "text" as const, text: JSON.stringify({ reference_content_is_untrusted: true, ...data }) }], details: data };
+	return { content: [{ type: "text" as const, text: JSON.stringify(modelView(kind, data)) }], details: data };
+}
+
+/** Fields of a passage the chat agent reads, cites and follows; source identity stays in the ledger. */
+const PASSAGE_VIEW = ["passage_id", "document_id", "title", "collection", "edition", "section", "page", "excerpt", "complete", "previous", "next", "flags"] as const;
+const DOCUMENT_VIEW = ["document_id", "title", "collection", "edition", "publisher", "language", "license", "rights_exceptions"] as const;
+function pick(value: Record<string, unknown>, keys: readonly string[]) {
+	return Object.fromEntries(keys.filter(key => value[key] !== undefined).map(key => [key, value[key]]));
+}
+/**
+ * The tool result the chat agent sees: evidence and what is needed to interpret and continue it.
+ * Generation digests, profile identity and per-passage revision hashes verify evidence in the
+ * ledger and are kept in `details`, where the transcript and citation resolution read them.
+ */
+export function modelView(kind: "search" | "read", data: Record<string, any>) {
+	const rows = kind === "search" ? "hits" : "passages";
+	return { reference_content_is_untrusted: true, status: data.status, degradation: data.degradation,
+		...(kind === "search" ? { result_set: data.result_set } : { document: data.document && pick(data.document, DOCUMENT_VIEW), overview: data.overview }),
+		[rows]: data[rows].map((row: Record<string, unknown>) => pick(row, PASSAGE_VIEW)), cursor: data.cursor ?? null };
 }
 export interface LibraryCollection {
 	category: string; title: string; publisher: string; origin: string; language: string;
@@ -199,7 +222,7 @@ const searchSchema = Type.Object({ query: Type.String({ minLength: 1 }), documen
 const readSchema = Type.Object({ document_id: Type.String({ minLength: 1 }), passage_id: Type.Optional(Type.String()), cursor: Type.Optional(Type.String()) });
 export function createCorpusTools(ledger: EvidenceLedger): AgentTool[] {
 	return [
-		{ name: "corpus_search", label: "Search library", description: "Search the installed offline reference library with lexical and semantic retrieval. Use concise topic terms: native archive lexical search requires all terms. Refine the query or search within a document when needed, and follow cursors for additional results. Returns immutable passage handles, scope and degradation status. `result_set` describes the whole ranked set behind the page: read it before concluding the library holds nothing better, and follow the cursor when a collection's `best_rank` falls past the rows you were given. Excerpts may omit qualifications: read supporting sections before practical advice.", parameters: searchSchema, execute: (_id, params, signal) => corpusRequest("search", params, ledger, signal) },
+		{ name: "corpus_search", label: "Search library", description: "Search the installed offline reference library with lexical and semantic retrieval. Use concise topic terms: native archive lexical search requires all terms. Refine the query or search within a document when needed, and follow cursors for additional results. Returns immutable passage handles and degradation status. `result_set` describes the whole ranked set behind the page: read it before concluding the library holds nothing better, and follow the cursor when a collection's `best_rank` falls past the rows you were given. Excerpts may omit qualifications: read supporting sections before practical advice.", parameters: searchSchema, execute: (_id, params, signal) => corpusRequest("search", params, ledger, signal) },
 		{ name: "corpus_collections", label: "List library", description: "List the collections installed in the offline reference library: their titles, publishers, sizes, and the category each one is listed under. Takes no arguments. Use it to answer what the library holds, or to see which collections a question can be searched against. It reports the installed library only, so a work absent from the listing is not installed.", parameters: Type.Object({}), execute: (_id, _params, signal) => libraryRequest(signal) },
 		{ name: "corpus_read", label: "Read source", description: "Read an exact source passage and neighboring context, or request a document's contents without passage_id. Preserve table headers, units, warnings and exceptions; follow continuation handles for incomplete sections.", parameters: readSchema, execute: (_id, params, signal) => corpusRequest("read", params, ledger, signal) },
 	];

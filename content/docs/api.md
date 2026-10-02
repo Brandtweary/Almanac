@@ -13,8 +13,11 @@ or filesystem-management endpoint is public. FastAPI `/openapi.json` exposes req
 | `GET /v1/corpus/source/{handle}` | URL-encoded returned passage handle | Immutable original bytes; ZIM article text |
 
 Common envelope: `generation`, `profile_id`, `status` (`ok`, `unqualified`, `degraded`),
-`degradation` (stage codes), `coverage`. Coverage identifies `active_packs`, `pending_packs`,
-`content_only`, `exclusions`. A successful empty hit array differs from any failed stage.
+`degradation` (stage codes). A successful empty hit array differs from any failed stage.
+Library-wide state, which grows with every installed archive, is reported by `/health` as
+`coverage` (`active_packs`, `pending_packs`, `content_only`, `exclusions`, `native_archives`)
+and never spends an evidence page's budget; an archive state that bears on a result reaches
+it as a `degradation` code.
 A search also carries `result_set`, describing the ranked set the returned page is a slice of:
 `total` hits behind it, the page's `offset` into them, and per `collections` entry the
 `collection` a hit set belongs to, how many `hits` are its own, and the `best_rank` it reached.
@@ -43,6 +46,11 @@ Each hit or read passage contains:
 - `excerpt`, `complete`, `kind`, `flags`, `previous`, `next`.
 - `source`: same-origin `url`, `sha256`, `media_type`, upstream `origin`, and
   `representation` (`original` or `article_text` for the text-only ZIM article route).
+
+A search hit omits `source`, `kind`, `previous` and `next`, and a search page omits the
+`generations` it spans: the source route is derived from `passage_id`, its digest is
+`source_revision`, neighbours are reached by reading from the handle, and each handle names
+its own generation. The search budget is spent on evidence alone.
 
 The source route names its response after the document's own title with the served type's extension, and marks a browser-renderable type `inline` under the route's sandbox policy; every other type is an `attachment`.
 
@@ -74,7 +82,7 @@ leaves of a document re-hashed before it is read, and a document whose bytes are
 is refused with `source_damaged` (503), including through a handle into it, which was
 valid and is not reported as unknown ([integrity](integrity.md)). An archive not admitted
 is checked only against its receipt's size and modification time, which does not read
-its bytes; its coverage entry says it is not admitted.
+its bytes; its health coverage entry says it is not admitted.
 
 Integrity damage costs what it touches. Search drops hits on damaged documents and adds
 `integrity:<pack>` to `degradation`; `integrity:<pack>:lexical` means that archive's

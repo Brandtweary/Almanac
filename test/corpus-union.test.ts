@@ -23,3 +23,30 @@ test("library union preserves native span handles and immutable ledger restorati
   await assert.rejects(tool.execute("search",{query:"article"}),/generation mismatch/);
  }
 });
+test("the chat agent receives evidence without library or identity metadata", async () => {
+ const generation = "a".repeat(64), hit = evidence(generation, "f".repeat(64));
+ const ledger = new EvidenceLedger(), tool = createCorpusTools(ledger)[0];
+ const result_set = {total: 1, offset: 0, collections: [{collection: "Article", hits: 1, best_rank: 1}]};
+ globalThis.fetch = async () => Response.json({generation, generations: [generation], profile_id: "union", status: "ok",
+  degradation: [], coverage: {native_archives: [{integrity: {verified_fraction: 1}}]}, result_set, hits: [hit], cursor: null});
+ const result = await tool.execute("search", {query: "article"});
+ const seen = JSON.parse((result.content[0] as {text: string}).text);
+ assert.deepEqual(Object.keys(seen).sort(), ["cursor", "degradation", "hits", "reference_content_is_untrusted", "result_set", "status"]);
+ assert.equal(seen.hits[0].passage_id, hit.passage_id);
+ assert.equal(seen.hits[0].excerpt, hit.excerpt);
+ for (const field of ["source", "source_revision", "extraction_revision"]) assert.equal(field in seen.hits[0], false);
+ assert.equal(ledger.resolve(hit.passage_id)?.source_revision, hit.source_revision);
+ assert.equal((result.details as {profile_id: string}).profile_id, "union");
+});
+test("a search page spanning archives is accepted from its handles alone", async () => {
+ const first = "a".repeat(64), second = "b".repeat(64);
+ const lean = ({source, ...rest}: ReturnType<typeof evidence>) => rest;
+ const hits = [lean(evidence(first, "1".repeat(64))), lean(evidence(second, "2".repeat(64)))];
+ const ledger = new EvidenceLedger(), tool = createCorpusTools(ledger)[0];
+ globalThis.fetch = async () => Response.json({generation: first, profile_id: "union", status: "ok", degradation: [], hits});
+ await tool.execute("search", {query: "article"});
+ assert.equal(ledger.records().length, 2);
+ globalThis.fetch = async () => Response.json({generation: first, profile_id: "union", status: "ok", degradation: [],
+  hits: [{...hits[0], source: {url: "/elsewhere", sha256: "c".repeat(64)}}]});
+ await assert.rejects(tool.execute("search", {query: "article"}), /invalid source link/);
+});

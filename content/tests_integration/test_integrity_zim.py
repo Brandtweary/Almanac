@@ -324,7 +324,7 @@ def test_i18_one_damaged_archive_leaves_the_library_ready(tmp_path):
     assert health["ready"] is True and health["qualified"] is True
     assert "integrity:first:withdrawn" in health["degradation"]
     found = asyncio.run(item.service.search(SearchRequest(query="topic7x")))
-    assert found["hits"] and {hit["source"]["sha256"] for hit in found["hits"]} == {second.sha}
+    assert found["hits"] and {hit["source_revision"] for hit in found["hits"]} == {second.sha}
     assert "integrity:first:withdrawn" in found["degradation"]
     with pytest.raises(ContentError) as refused:
         asyncio.run(item.service.read(ReadRequest(document_id=f"z_{first.sha}_1")))
@@ -357,7 +357,7 @@ def test_i18_a_missing_original_costs_only_itself(tmp_path, reader_open):
     health = item.service.health()
     assert health["ready"] is True and "archive_unavailable:first" in health["degradation"]
     found = asyncio.run(item.service.search(SearchRequest(query="paraphrase")))
-    assert found["hits"] and {hit["source"]["sha256"] for hit in found["hits"]} == {second.sha}
+    assert found["hits"] and {hit["source_revision"] for hit in found["hits"]} == {second.sha}
     assert "archive_unavailable:first" in found["degradation"]
     scoped = asyncio.run(item.service.search(SearchRequest(query="paraphrase", document_id=kept)))
     assert scoped["hits"] and {hit["document_id"] for hit in scoped["hits"]} == {kept}

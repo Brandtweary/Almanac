@@ -8,6 +8,8 @@ Researched answers include a sources footer reconstructed from original conversa
 
 Queue status and cancellation use transient request handles, context compaction preserves an explicit source ledger and marks omitted evidence for rereading, and personal-memory failure pauses its durable queue with a visible retry control while reference chat remains usable.
 
+A corpus tool result shows the model its evidence, status, degradation, ranked-set summary and cursor; generation digests, profile identity and per-passage revision hashes verify that evidence in the source ledger and stay in the result's `details`.
+
 Automatic compaction runs before new input and within long research turns, preserving the current request and complete tool-call/result groups under the profile's measured budgets. Full citation metadata remains stored for validation while its model-facing representation is a fixed notice; summaries retain source handles and document identities, and original evidence remains available through history and corpus reads.
 
 Original completed conversation messages are saved independently of compacted model context, with stable record handles accessible through the current-conversation `conversation_history` search/read tool; personal-memory consent does not control ordinary chat retention. Chats can export/import complete conversation files, legacy archives explicitly mark unavailable earlier history, deletion removes both context and originals, and storage conflicts or quota failures are visible rather than permitting destructive compaction.

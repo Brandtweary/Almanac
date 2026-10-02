@@ -219,8 +219,8 @@ def test_native_full_reader_and_independent_search_without_duplicate_catalog(tmp
     hit = next(hit for hit in result["hits"] if "ZX42" in hit["excerpt"])
     read = asyncio.run(service.read(ReadRequest(document_id=hit["document_id"], passage_id=hit["passage_id"])))
     assert any("ZX42" in row["excerpt"] for row in read["passages"])
-    assert result["coverage"]["native_archives"][0]["dense_stage"] == "complete"
-    assert "title/lead" in result["coverage"]["native_archives"][0]["dense_representation"]
+    archive = service.health()["coverage"]["native_archives"][0]
+    assert archive["dense_stage"] == "complete" and "title/lead" in archive["dense_representation"]
     bad = hit["passage_id"][:-1] + ("0" if hit["passage_id"][-1] != "0" else "1")
     with pytest.raises(ContentError):
         store.passage(generation, bad)
@@ -258,7 +258,7 @@ def test_library_union_retains_both_archives_and_document_scope(tmp_path):
     assert set(store.active_generations()) == {one, two}
     service = Service(store, p, dense, TokenCounter(str(token_path), p.encoder_tokenizer_sha256), ZimLexical())
     result = asyncio.run(service.search(SearchRequest(query="ZX42")))
-    assert set(result["coverage"]["active_packs"]) == {"first", "second"}
+    assert set(service.health()["coverage"]["active_packs"]) == {"first", "second"}
     assert {hit["source_revision"] for hit in result["hits"]} == {first.sha256, second.sha256}
     hit = next(row for row in result["hits"] if row["source_revision"] == first.sha256)
     scoped = asyncio.run(service.search(SearchRequest(query="ZX42", document_id=hit["document_id"])))
@@ -292,7 +292,7 @@ def test_archive_activation_retains_existing_practical_catalog(tmp_path):
     service = Service(store, p, dense, TokenCounter(str(token_path), p.encoder_tokenizer_sha256), ZimLexical())
     result = asyncio.run(service.search(SearchRequest(query="paraphrase")))
     assert {hit["source_revision"] for hit in result["hits"]} == {manual.sha256, native_doc.sha256}
-    assert set(result["coverage"]["active_packs"]) == {"fixture", "first"}
+    assert set(service.health()["coverage"]["active_packs"]) == {"fixture", "first"}
 
 
 def test_new_math_extraction_does_not_retarget_historical_native_handles(tmp_path):

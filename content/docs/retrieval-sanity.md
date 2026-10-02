@@ -40,8 +40,7 @@ the failure is mechanical. This manual integration check is separate from the
 unit suite and requires the installed services; it is not scheduled or claimed
 as completed by offline tests.
 
-The open question about a roughly 4,000-token response budget remains a profile
-choice. Retrieval's `response_tokens` limits serialized evidence including its
+The response budget is a profile choice sized to the chat role's context. Retrieval's `response_tokens` limits serialized evidence including its
 metadata; the chat role's `maxOutputTokens` separately limits generated answers.
 The sanity fixture exercises paging; `test_content.py` separately forces whole
 excerpt omission and checks continued access to the immutable source. These

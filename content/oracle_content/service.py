@@ -145,6 +145,13 @@ ARCHIVE_LOSS = frozenset({"unavailable_version", "source_damaged"})
 # A listing names the works a staged pack carries. Past this many the remainder is counted
 # instead, so a pack acquired as thousands of separate documents stays a readable entry.
 COLLECTION_WORKS_LIMIT = 64
+# A search page carries evidence and what interprets it. The per-hit source link,
+# digest copy, media details and neighbour handles serve reading, which a passage
+# handle reaches on its own, and the searched generations are named by each hit's
+# handle: none of it is spent from the search budget, which only evidence should
+# fill as the library grows.
+SEARCH_HIT_OMIT = ("source", "previous", "next", "kind")
+SEARCH_ENVELOPE_OMIT = ("generations",)
 
 
 class Service:
@@ -306,10 +313,18 @@ class Service:
         return {**self.base(self.store.active()), "collections": entries}
 
     def base(self, generation, degradation=None):
+        """The common envelope of every evidence response.
+
+        It carries what a caller needs to interpret the evidence beside it and no
+        library-wide state: the inventory and each archive's index and integrity
+        telemetry grow with every installed archive and are reported by health,
+        while an archive state that bears on a result reaches the caller as a code
+        in `degradation`.
+        """
         degradation = degradation or []
         return {"generation": generation, "profile_id": self.profile.profile_id,
                 "status": "degraded" if degradation else "ok" if self.profile.qualified else "unqualified",
-                "degradation": degradation, "coverage": self.store.coverage(generation)}
+                "degradation": degradation}
 
     def active(self):
         generation = self.store.active()
@@ -770,7 +785,10 @@ class Service:
         rows = snapshot[field]
         if offset > len(rows):
             raise ContentError("invalid_cursor", "Continuation offset exceeds result set", 400)
-        result = {k: v for k, v in snapshot.items() if k != field}
+        omit = SEARCH_ENVELOPE_OMIT if field == "hits" else ()
+        result = {k: v for k, v in snapshot.items() if k != field and k not in omit}
+        if field == "hits":
+            rows = [{k: v for k, v in row.items() if k not in SEARCH_HIT_OMIT} for row in rows]
         if "result_set" in result:
             result["result_set"] = {**result["result_set"], "offset": offset}
         selected = []
