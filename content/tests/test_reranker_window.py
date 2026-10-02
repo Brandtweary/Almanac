@@ -16,10 +16,11 @@ class Ranker:
 
     def __init__(self, profile):
         self.profile, self.calls = profile, []
+        self.tokenizer = Tokens()
 
     async def rank(self, query, passages):
         self.calls.append([p.passage_id for p in passages])
-        if any(Tokens().pair_count(query, p.embedding_text) > self.profile.reranker_max_tokens
+        if any(self.tokenizer.pair_count(query, p.embedding_text) > self.profile.reranker_max_tokens
                for p in passages):
             raise ValueError("reranker pair exceeds qualified window")
         return {p.passage_id: 1.0 for p in passages}
@@ -72,4 +73,34 @@ def test_an_unscorable_pair_fails_a_required_qualified_request(tmp_path):
     service = _service(tmp_path, reranker_max_tokens=2, query_max_chars=4000)
     with pytest.raises(ContentError, match="qualified"):
         asyncio.run(service.search(SearchRequest(query="paraphrase stopcock", require_qualified=True)))
+    assert failure_rows(service) == []
+
+
+def test_reranking_retains_candidates_beyond_its_depth(tmp_path):
+    service = _service(tmp_path, reranker_max_tokens=10000, reranker_depth=1, page_size=1)
+    query = "ZX-42"
+    pool = asyncio.run(service.candidates(query))
+    expected = [row["passage_id"] for row in pool["rows"]]
+    assert len(expected) > service.profile.reranker_depth
+    result = asyncio.run(service.search(SearchRequest(query=query)))
+    assert result["result_set"]["total"] == len(expected)
+    seen = [hit["passage_id"] for hit in result["hits"]]
+    while result["cursor"]:
+        result = asyncio.run(service.search(SearchRequest(query=query, cursor=result["cursor"])))
+        seen.extend(hit["passage_id"] for hit in result["hits"])
+    assert seen == expected
+    assert service.reranker.calls == [expected[:1]]
+
+
+@pytest.mark.parametrize("pair_tokens,expected_calls", [(1, True), (10001, False)])
+def test_reranker_preflight_uses_its_own_tokenizer(tmp_path, pair_tokens, expected_calls):
+    from types import SimpleNamespace
+    service = _service(tmp_path, reranker_max_tokens=10000)
+    service.reranker.tokenizer = SimpleNamespace(pair_count=lambda query, text: pair_tokens)
+    # Deliberately make the chat counter disagree in both directions.
+    service.tokenizer = SimpleNamespace(count=Tokens().count,
+        pair_count=lambda query, text: 10001 if expected_calls else 1)
+    result = asyncio.run(service.search(SearchRequest(query="ZX-42")))
+    assert bool(service.reranker.calls) is expected_calls
+    assert result["degradation"] == ([] if expected_calls else ["reranker_window_exceeded"])
     assert failure_rows(service) == []

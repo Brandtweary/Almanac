@@ -46,7 +46,7 @@ def test_exact_title_is_discoverable_when_fulltext_buries_article(query):
     def by_title(title):
         if title != "Water":
             raise KeyError(title)
-        return SimpleNamespace(path="Water")
+        return SimpleNamespace(path="Water", get_item=lambda: SimpleNamespace(path="Water"))
     reader.archive = SimpleNamespace(get_entry_by_title=by_title)
     reader._localize = lambda paths, *args: paths
     class Search:
@@ -60,8 +60,38 @@ def test_exact_title_is_discoverable_when_fulltext_buries_article(query):
 
 
 def test_exact_title_merge_preserves_depth_and_deduplicates():
-    archive = SimpleNamespace(get_entry_by_title=lambda title: SimpleNamespace(path="Water"))
+    archive = SimpleNamespace(get_entry_by_title=lambda title: SimpleNamespace(
+        path="Water", get_item=lambda: SimpleNamespace(path="Water")))
     assert ZimLexical._with_exact_title(archive, "Water", ["Other", "Water", "Third"], 3) == ["Water", "Other", "Third"]
+
+
+def test_exact_redirect_title_deduplicates_the_canonical_article_before_depth_limit():
+    archive = SimpleNamespace(get_entry_by_title=lambda title: SimpleNamespace(
+        path="Stopcock", get_item=lambda: SimpleNamespace(path="Valve")))
+    assert ZimLexical._with_exact_title(archive, "Stopcock", ["Valve", "Pressure"], 2) == [
+        "Valve", "Pressure",
+    ]
+
+
+def test_native_localization_does_not_spend_passage_depth_on_redirect_duplicates():
+    reader = NativeReader.__new__(NativeReader)
+    reader.profile = SimpleNamespace(rrf_k=60)
+    reader.template = SimpleNamespace(sha256="a" * 64)
+    target = SimpleNamespace(is_redirect=False, _index=0)
+    entries = {"Stopcock": SimpleNamespace(is_redirect=True, get_redirect_entry=lambda: target),
+               "Valve": target, "Pressure": SimpleNamespace(is_redirect=False, _index=1)}
+    reader.archive = SimpleNamespace(get_entry_by_path=entries.__getitem__)
+    reader.document = lambda document_id: SimpleNamespace(document_id=document_id)
+    visited = []
+    def passages(document_id):
+        visited.append(document_id)
+        return [SimpleNamespace(passage_id=document_id, lexical_text="valve pressure")]
+    reader.passages = passages
+
+    rows = reader._localize(["Stopcock", "Valve", "Pressure"], "valve", 2, None)
+
+    assert [pid for pid, _score in rows] == [reader.document_id(0), reader.document_id(1)]
+    assert visited == [reader.document_id(0), reader.document_id(1)]
 
 
 @pytest.mark.parametrize('base,path,expected', [

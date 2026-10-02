@@ -135,7 +135,7 @@ def configured_service(client):
     if profile.ranking == "reranker":
         reranker = Reranker(client, os.environ["CONTENT_RERANK_URL"], profile,
             TokenCounter(artifact(profile.reranker_tokenizer), profile.reranker_tokenizer_sha256))
-    return Service(Store(root), profile, dense, chat, ZimLexical(), reranker,
+    return Service(Store(root), profile, dense, chat, ZimLexical(), reranker, encoder_tokenizer=encoder,
         snapshot_ttl=float(os.environ.get("CONTENT_SNAPSHOT_TTL_SECONDS", SNAPSHOT_TTL_SECONDS)),
         snapshot_max_bytes=int(os.environ.get("CONTENT_SNAPSHOT_MAX_BYTES", SNAPSHOT_MAX_BYTES)),
         failure_log_max_bytes=int(os.environ.get("CONTENT_FAILURE_LOG_MAX_BYTES", FAILURE_LOG_MAX_BYTES)),

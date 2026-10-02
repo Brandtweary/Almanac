@@ -560,12 +560,17 @@ class NativeReader:
             documents = [self.document(document_id)]
         else:
             documents = []
+            seen = set()
             for path in paths:
                 entry = self.archive.get_entry_by_path(path)
                 if entry.is_redirect:
                     entry = entry.get_redirect_entry()
+                resolved_id = self.document_id(entry._index)
+                if resolved_id in seen:
+                    continue
+                seen.add(resolved_id)
                 try:
-                    documents.append(self.document(self.document_id(entry._index)))
+                    documents.append(self.document(resolved_id))
                 except ContentError as error:
                     if error.code == "source_damaged":
                         damaged += 1

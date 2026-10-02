@@ -29,7 +29,9 @@ The [native archive setup](docs/native-install.md) gives the complete invocation
 identity/revision/dimensions/tokenizer digest/window, chat tokenizer digest, candidate depths, fusion
 weights/constant, token budgets, batching and timeouts. `qualified` remains false until evaluation
 receipts exist. No chat/embedding/reranking model or measured winning configuration is shipped by
-this package. Mechanical tests do not qualify extraction or answer quality.
+this package. Mechanical tests do not qualify extraction or answer quality. The
+[retrieval sanity check](docs/retrieval-sanity.md) adds a small offline collection/arm
+regression corpus and a reproducible historical-bug mutation check to that suite.
 
 The owner-only Python API `oracle_content.ingest.build` accepts a stream of verified `Document` manifests,
 extraction-inspection receipts, the profile and adapters. It publishes immutable original bytes,

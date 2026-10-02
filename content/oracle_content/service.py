@@ -151,10 +151,14 @@ class Service:
     lexical_concurrency = LEXICAL_CONCURRENCY
 
     def __init__(self, store: Store, profile: Profile, dense, tokenizer, zim=None, reranker=None, *,
+                 encoder_tokenizer=None,
                  snapshot_ttl=SNAPSHOT_TTL_SECONDS, snapshot_max_bytes=SNAPSHOT_MAX_BYTES,
                  failure_log_max_bytes=FAILURE_LOG_MAX_BYTES,
                  lexical_concurrency=LEXICAL_CONCURRENCY):
         self.store, self.profile, self.dense, self.tokenizer = store, profile, dense, tokenizer
+        # Callers using one tokenizer for both roles may omit the encoder counter.
+        # Production supplies the encoder artifact independently of the chat budget.
+        self.encoder_tokenizer = encoder_tokenizer if encoder_tokenizer is not None else tokenizer
         self.zim, self.reranker = zim, reranker
         self.snapshot_ttl, self.snapshot_max_bytes = snapshot_ttl, snapshot_max_bytes
         self.snapshot_pruned_at, self.snapshot_bytes_written = None, 0
@@ -329,12 +333,12 @@ class Service:
         prefix and query tokenize together.
         """
         prefixed, window = self.profile.query_prefix + query, self.profile.encoder_max_tokens
-        if self.tokenizer.count(prefixed) <= window:
+        if self.encoder_tokenizer.count(prefixed) <= window:
             return query, False
         low, high = 0, len(query)
         while high - low > 1:
             middle = (low + high) // 2
-            if self.tokenizer.count(self.profile.query_prefix + query[:middle]) <= window:
+            if self.encoder_tokenizer.count(self.profile.query_prefix + query[:middle]) <= window:
                 low = middle
             else:
                 high = middle
@@ -785,7 +789,11 @@ class Service:
                 end = offset + 1
                 break
             selected.append(row)
-        return {**result, field: selected, "cursor": self.cursor(key, end) if end < len(rows) else None}
+        result = {**result, field: selected, "cursor": self.cursor(key, end) if end < len(rows) else None}
+        # Empty pages still carry metadata and must obey the same wire budget.
+        if self.tokenizer.count(json.dumps(result, ensure_ascii=False)) > budget:
+            raise ContentError("profile_budget_invalid", "Evidence metadata exceeds configured token budget")
+        return result
 
     async def search(self, request: SearchRequest):
         query = request.query.strip()
@@ -809,18 +817,19 @@ class Service:
                 # keep their fusion rank. Recording this as a service fault
                 # would fill the bounded diagnostic store with non-faults and
                 # fail a require_qualified request over a long question.
-                scorable = [r for r in candidates
-                            if self.tokenizer.pair_count(query, pool["passages"][r["passage_id"]].embedding_text)
-                            <= self.profile.reranker_max_tokens]
-                if len(scorable) != len(candidates):
-                    degradation.append("reranker_window_exceeded")
                 try:
                     if self.reranker is None:
                         raise ValueError("reranker unavailable")
+                    scorable = [r for r in candidates
+                                if self.reranker.tokenizer.pair_count(query, pool["passages"][r["passage_id"]].embedding_text)
+                                <= self.profile.reranker_max_tokens]
+                    if len(scorable) != len(candidates):
+                        degradation.append("reranker_window_exceeded")
                     if scorable:
                         scores = await self.reranker.rank(query, [pool["passages"][r["passage_id"]] for r in scorable])
                         omitted = [r for r in candidates if r["passage_id"] not in scores]
-                        rows = sorted(scorable, key=lambda row: (-scores[row["passage_id"]], -row["score"], row["passage_id"])) + omitted
+                        rows = (sorted(scorable, key=lambda row: (-scores[row["passage_id"]], -row["score"], row["passage_id"]))
+                                + omitted + rows[self.profile.reranker_depth:])
                 except Exception as exc:
                     self.record_failure("reranker", generation, exc)
                     degradation.append("reranker_unavailable")

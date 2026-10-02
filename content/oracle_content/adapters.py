@@ -222,7 +222,11 @@ class ZimLexical:
                 entry = archive.get_entry_by_title(candidate)
             except KeyError:
                 continue
-            return [entry.path, *(path for path in paths if path != entry.path)][:limit]
+            # Full-text hits already use the item's canonical path. A title
+            # redirect must use that identity too, or its alias and target spend
+            # two slots on the same article before localization can deduplicate.
+            path = entry.get_item().path
+            return [path, *(other for other in paths if other != path)][:limit]
         return paths
 
     async def search(self, path, query, limit, *, title_query=None):

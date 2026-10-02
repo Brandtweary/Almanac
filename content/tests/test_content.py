@@ -751,3 +751,33 @@ def test_a_page_reports_the_ranked_set_it_is_a_slice_of(tmp_path):
     second = asyncio.run(service.search(SearchRequest(query="ZX-42 paraphrase stopcock", cursor=first["cursor"])))
     assert second["result_set"]["offset"] == len(first["hits"])
     assert second["result_set"]["total"] == reported["total"]
+
+
+def test_empty_search_still_enforces_metadata_budget(tmp_path):
+    service, _, _ = setup(tmp_path, response_tokens=1)
+    async def empty(*args):
+        return []
+    service.dense.search = empty
+    with pytest.raises(ContentError) as error:
+        asyncio.run(service.search(SearchRequest(query="nonexistent")))
+    assert error.value.code == "profile_budget_invalid"
+
+
+def test_budget_omits_whole_excerpt_without_losing_continuation(tmp_path):
+    service, _, _ = setup(tmp_path, page_size=1)
+    query = "ZX-42"
+    original = asyncio.run(service.search(SearchRequest(query=query)))
+    hit = original["hits"][0]
+    omitted = {**hit, "excerpt": "", "complete": False,
+               "flags": hit["flags"] + ["text_omitted_budget"]}
+    budget = Tokens().count(json.dumps({**original, "hits": [omitted]}, ensure_ascii=False))
+    service.profile = service.profile.model_copy(update={"response_tokens": budget})
+    first = asyncio.run(service.search(SearchRequest(query=query)))
+    assert first["hits"] == [omitted]
+    assert first["cursor"] and first["result_set"]["total"] == 2
+    second = asyncio.run(service.search(SearchRequest(query=query, cursor=first["cursor"])))
+    assert second["hits"][0]["passage_id"] != hit["passage_id"]
+    assert second["cursor"] is None
+    assert all(Tokens().count(json.dumps(page, ensure_ascii=False)) <= budget for page in (first, second))
+    passage = service.store.passage(first["generation"], hit["passage_id"])
+    assert passage.text == hit["excerpt"], "budgeting must preserve the source span"
