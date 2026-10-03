@@ -62,6 +62,10 @@ refuses any article whose reconstruction is not identical field for field. The a
 optimization and never a definition — an article it does not cover, an interrupted build and an
 artifact bound to another generation all leave the original query-time path in place, and
 `coverage.native_archives[].precomputed_articles` reports how much of an archive it covers.
+A dense hit and a selection policy's license read only the stored representative and license, never
+the article's blocks, and lexical localization ranks every stored passage by its handle and lexical
+text but builds in full only the passages it keeps, so an article that is a whole book costs a search
+its decompression and in-article ranking rather than the construction of every passage in it.
 Retrieval-stage failures record their stage and traceback to `failures.jsonl` under a fixed disk
 allotment: `CONTENT_FAILURE_LOG_MAX_BYTES` (64 MiB) covers the live file and one rotated predecessor
 together, so ordinary request traffic cannot grow the store without limit. A repeating identical

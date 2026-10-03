@@ -23,7 +23,7 @@ from bs4 import BeautifulSoup
 
 from .extract import TokenCounter, html_blocks, segment, decode_zim_html, inline_content
 from .models import ContentError, Document, Passage, Profile, digest
-from .precompute import ArticleSpans, binding as spans_binding, rebuild as rebuild_passages
+from .precompute import ArticleSpans, StoredPassages, binding as spans_binding, rebuild as rebuild_passages
 from .store import atomic_json, HANDLE
 
 # An archive's own `M/Counter` names each mimetype it holds and how many entries carry
@@ -245,8 +245,12 @@ def selection(html, policy, path=None):
 
 
 def span_handle(generation, entry_index, passage):
-    coords = struct.pack(">IIII", entry_index, passage.block_index, passage.start, passage.end)
-    check = hashlib.sha256(coords + passage.text.encode("utf-8")).digest()[:16]
+    return handle(generation, entry_index, passage.block_index, passage.start, passage.end, passage.text)
+
+
+def handle(generation, entry_index, block_index, start, end, text):
+    coords = struct.pack(">IIII", entry_index, block_index, start, end)
+    check = hashlib.sha256(coords + text.encode("utf-8")).digest()[:16]
     return f"p:{generation}:{(coords + check).hex()}"
 
 
@@ -400,9 +404,9 @@ class NativeReader:
             # was admitted by this same policy under this same binding when they
             # were built, and carries the license that admission resolved.
             spans = self.usable_spans()
-            stored = spans.raw(index) if spans is not None else None
-            if stored is not None and stored[3] is not None:
-                license = stored[3]
+            stored = spans.lead(index) if spans is not None else None
+            if stored is not None and stored[1] is not None:
+                license = stored[1]
             else:
                 allowed, _, explicit = selection(lambda: decode_zim_html(entry.get_item()), self.policy, entry.path)
                 if not allowed:
@@ -457,7 +461,13 @@ class NativeReader:
         else:
             rows = rebuild_passages(document, self.generation, index, stored[0], stored[1],
                                     self.profile, self.tokenizer)
-        size = sum(len(row.model_dump_json().encode()) for row in rows)
+        # Counting stops past the per-entry ceiling: a whole book is never cached, and
+        # serializing every one of its passages only to learn that costs seconds.
+        size = 0
+        for row in rows:
+            size += len(row.model_dump_json().encode())
+            if size > PASSAGE_CACHE_ENTRY_BYTES:
+                break
         if size <= PASSAGE_CACHE_ENTRY_BYTES:
             while self.cache and (len(self.cache) >= PASSAGE_CACHE_DOCUMENTS
                                   or self.cache_bytes + size > PASSAGE_CACHE_BYTES):
@@ -466,6 +476,29 @@ class NativeReader:
             self.cache[document_id] = (rows, size)
             self.cache_bytes += size
         return rows
+
+    def localizable(self, document_id):
+        """An article's passages as localization ranks them: every handle and lexical text, in order.
+
+        A precomputed article is read without building the passages localization
+        discards; anything else is the article's built passages, from the cache or
+        from segmentation, exactly as `passages` returns them.
+        """
+        with self.cache_lock:
+            self.verify_original()
+            match = re.fullmatch(r"z_([a-f0-9]{64})_([0-9]+)", document_id)
+            if match and match[1] == self.template.sha256:
+                self.admit_entry(int(match[2]))
+            if document_id in self.cache:
+                self.cache.move_to_end(document_id)
+                return BuiltPassages(self.cache[document_id][0])
+            document = self.document(document_id)
+            index = int(document_id.rsplit("_", 1)[1])
+            spans = self.usable_spans()
+            stored = spans.stored(index) if spans is not None else None
+            if stored is not None:
+                return StoredPassages(document, self.generation, index, *stored, self.profile, self.tokenizer)
+            return BuiltPassages(self._passages(document_id))
 
     def passage(self, handle):
         self.verify_original()
@@ -495,9 +528,9 @@ class NativeReader:
         self.admit_entry(index)
         spans = self.usable_spans() if stored else None
         if spans is not None:
-            precomputed = spans.raw(index)
+            precomputed = spans.lead(index)
             if precomputed is not None:
-                return precomputed[2]
+                return precomputed[0]
         document = self.document(self.document_id(index))
         if self.representation == "title-lead-v1":
             blocks = self.blocks(index) if blocks is None else blocks
@@ -589,21 +622,32 @@ class NativeReader:
                 cutoff = sorted((score for _, score in ranked), reverse=True)[limit - 1]
                 if upper_bound < cutoff:
                     break
-            rows = self.passages(document.document_id)
+            article = self.localizable(document.document_id)
             db = sqlite3.connect(":memory:")
             try:
                 db.execute("CREATE VIRTUAL TABLE article USING fts5(id UNINDEXED,text,tokenize='porter unicode61')")
-                db.executemany("INSERT INTO article VALUES(?,?)", [(row.passage_id, row.lexical_text) for row in rows])
+                db.executemany("INSERT INTO article VALUES(?,?)", article.rows)
                 localized = db.execute("SELECT id FROM article WHERE article MATCH ? ORDER BY bm25(article),id LIMIT ?", (expression, limit)).fetchall() if expression else []
             finally:
                 db.close()
-            candidates = [row[0] for row in localized] or [row.passage_id for row in rows[:limit]]
-            wanted = set(candidates)
-            localized_passages.update({row.passage_id: row for row in rows if row.passage_id in wanted})
+            candidates = [row[0] for row in localized] or [passage_id for passage_id, _text in article.rows[:limit]]
+            localized_passages.update(article.passages(candidates))
             for rank, pid in enumerate(candidates, 1):
                 ranked.append((pid, 1 / ((self.profile.rrf_k + article_rank) * (self.profile.rrf_k + rank))))
         selected = sorted(ranked, key=lambda row: (-row[1], row[0]))[:limit]
         return NativeLexicalHits(selected, {pid: localized_passages[pid] for pid, _score in selected}, damaged)
+
+
+class BuiltPassages:
+    """Built passages behind the interface `StoredPassages` gives localization."""
+
+    def __init__(self, rows):
+        self.built = rows
+        self.rows = [(row.passage_id, row.lexical_text) for row in rows]
+
+    def passages(self, handles):
+        wanted = set(handles)
+        return {row.passage_id: row for row in self.built if row.passage_id in wanted}
 
 
 def serving_generations(store):

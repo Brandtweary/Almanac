@@ -166,3 +166,222 @@ def test_a_damaged_row_reads_as_absent_and_is_counted(tmp_path):
     assert spans.raw(7) is not None
     assert [spans.raw(index) for index in (8, 9, 10)] == [None, None, None]
     assert spans.undecodable == 3
+
+
+def whole_book(paragraphs=2000):
+    """An article shaped like a scanned book: thousands of blocks behind one stored lead."""
+    return [Block(text=f"Paragraph {n} of the book.", kind="paragraph", section=["Chapter"]) for n in range(paragraphs)]
+
+
+def native_reader(spans, policy="canonical-html"):
+    """The parts of a reader that a dense hit and a document identity reach."""
+    from types import SimpleNamespace
+    from oracle_content.native import NativeReader
+    reader = NativeReader.__new__(NativeReader)
+    reader.spans = spans
+    reader.policy = policy
+    reader.generation = "e" * 64
+    reader.rights_exclusions = {}
+    reader.archive_edition = ""
+    reader.template = document().model_copy(update={"sha256": "c" * 64, "edition": "",
+                                                     "source_url": "https://example.org/book"})
+    reader.admit_entry = lambda index: None
+    reader.usable_spans = lambda: reader.spans
+    reader.entry = lambda index: SimpleNamespace(path="A/Solar_Cooker", title="Solar Cooker")
+    return reader
+
+
+class Unbuilt:
+    """Stands in for `Block` where nothing may materialize one."""
+
+    def __init__(self, **_fields):
+        raise AssertionError("a block was materialized to read the stored representative")
+
+
+def test_a_dense_hit_resolves_without_materializing_the_article(tmp_path, monkeypatch):
+    """A search resolves every dense candidate to its article's representative, which
+    is stored whole beside the article's blocks. Building the blocks to reach it made
+    each whole-book hit cost the parse of the book, tens of seconds per search over a
+    library of books; the representative and a selection policy's license must be
+    read without them."""
+    doc, _structure, settings, tokens, _passages, generation = prepared()
+    structure = whole_book()
+    passages = segment(doc, structure, settings, tokens, generation)
+    lead = lead_row(doc, generation)
+    expected = {"schema": SCHEMA, "generation": generation}
+    write_artifact(tmp_path, expected, {7: encode(structure, passages, lead, "CC0-1.0")})
+    spans = ArticleSpans.open(tmp_path, expected)
+    monkeypatch.setattr("oracle_content.precompute.Block", Unbuilt)
+
+    assert native_reader(spans).representative(7).model_dump() == lead.model_dump()
+    selected = native_reader(spans, policy="gutenberg-books-v1")
+    assert selected._document(selected.document_id(7)).license == "CC0-1.0"
+    assert spans.undecodable == 0
+
+
+@pytest.mark.parametrize("license", [None, "CC-BY-SA-4.0", 'odd ,{"passage_id": "x"} ]'])
+def test_the_stored_representative_reads_identically_alone(license):
+    """Reading the representative alone must agree with the full decode for every
+    stored form, including article and license text that quotes the very bytes it
+    is located by."""
+    from oracle_content.precompute import decode_lead
+    doc, _structure, settings, tokens, _passages, generation = prepared()
+    structure = [Block(text='he wrote ,{"passage_id":"forged"} and {"passage_id": 1}', section=["A"]),
+                 *whole_book(20)]
+    passages = segment(doc, structure, settings, tokens, generation)
+    lead = lead_row(doc, generation)
+    lead.text = lead.embedding_text = '"quoted" ,{"passage_id":"inner"} \\ end'
+    blob = encode(structure, passages, lead, license)
+    _blocks, _spans, full_lead, full_license = decode(blob)
+    assert decode_lead(blob) == (full_lead, full_license)
+    assert decode_lead(blob)[0].model_dump() == lead.model_dump()
+
+
+def test_a_row_not_shaped_as_encoded_falls_back_to_the_full_decode(tmp_path):
+    """The representative is located by the shape `encode` writes. Any other shape is
+    judged by the full decode, so a lead read accepts and refuses exactly what a full
+    read does, and counts a refusal the same way."""
+    from oracle_content.precompute import decode_lead
+    doc, structure, _settings, _tokens, passages, generation = prepared()
+    lead = lead_row(doc, generation).model_dump()
+    # Spaced separators are valid JSON that `encode` never writes; the fallback reads them.
+    spaced = zlib.compress(json.dumps([[], [], lead, "MIT"]).encode())
+    assert decode_lead(spaced)[1] == "MIT"
+    expected = {"schema": SCHEMA, "generation": generation}
+    good = encode(structure, passages, lead_row(doc, generation), None)
+    trailing = zlib.compress(json.dumps([[], [], lead, None, "extra"], separators=(",", ":")).encode())
+    misseparated = zlib.compress(b"[[],[]," + json.dumps(lead, separators=(",", ":")).encode() + b';"MIT"]')
+    write_artifact(tmp_path, expected, {7: good, 8: good[:len(good) // 2], 9: zlib.compress(b"{not json"),
+                                        10: zlib.compress(b"[[]]"), 11: trailing, 12: misseparated})
+    spans = ArticleSpans.open(tmp_path, expected)
+    assert spans.lead(7) is not None
+    assert spans.lead(11) == (Passage.model_validate(lead), None)
+    assert [spans.lead(index) for index in (8, 9, 10, 12)] == [None, None, None, None]
+    assert spans.undecodable == 4
+
+
+def test_a_whole_book_is_not_serialized_whole_to_decide_it_is_uncacheable(monkeypatch):
+    """Passages too large for the cache are recognised from their first rows; measuring
+    every passage of a book to learn that was seconds of each lexical search."""
+    from types import SimpleNamespace
+    from oracle_content import native
+    from oracle_content.native import NativeReader
+    doc, _structure, settings, tokens, _passages, generation = prepared()
+    structure = whole_book(400)
+    passages = segment(doc, structure, settings, tokens, generation)
+    rows = [SimpleNamespace(passage_id=row.passage_id, measured=0) for row in passages]
+    def dump(row):
+        row.measured += 1
+        return "x" * 1024
+    for row in rows:
+        row.model_dump_json = lambda row=row: dump(row)
+    monkeypatch.setattr(native, "PASSAGE_CACHE_ENTRY_BYTES", 16 * 1024)
+    reader = NativeReader.__new__(NativeReader)
+    reader.cache, reader.cache_bytes = native.OrderedDict(), 0
+    reader.generation = generation
+    reader.template = SimpleNamespace(sha256="c" * 64)
+    reader.verify_original = lambda: None
+    reader.admit_entry = lambda index: None
+    reader.document = lambda document_id: doc
+    reader.usable_spans = lambda: None
+    reader.segment_article = lambda document, index: rows
+    assert reader._passages("z_" + "c" * 64 + "_7") is rows
+    assert not reader.cache
+    assert sum(row.measured for row in rows) <= 17
+
+
+def edge_case_blocks():
+    """Every way a passage's lexical text departs from its own text, plus shared sections."""
+    return [*blocks(),
+            Block(text="Formula follows.", kind="paragraph", section=["Data"],
+                  flags=["math_requires_original_inspection", "text_omitted"]),
+            Block(text="Another note under the same section.", kind="paragraph", section=["Data"])]
+
+
+def stored_passages(doc, structure, generation, settings, tokens):
+    from oracle_content.precompute import StoredPassages, decode_stored
+    passages = segment(doc, structure, settings, tokens, generation)
+    blob = encode(structure, passages, lead_row(doc, generation), None)
+    built = rebuild(doc, generation, 7, *decode(blob)[:2], settings, tokens)
+    return StoredPassages(doc, generation, 7, *decode_stored(blob), settings, tokens), built
+
+
+@pytest.mark.parametrize("title", ["Solar Cooker", " ".join(f"title{n}" for n in range(60))])
+def test_stored_passages_agree_with_the_rebuilt_article(title):
+    """Localization ranks stored passages by handle and lexical text and builds only the
+    ones it keeps; both must be exactly what rebuilding the whole article yields, or a
+    lexical hit cites a passage the article does not contain."""
+    doc, _structure, settings, tokens, _passages, generation = prepared()
+    doc = doc.model_copy(update={"title": title})
+    view, built = stored_passages(doc, edge_case_blocks(), generation, settings, tokens)
+    flags = {flag for row in built for flag in row.flags}
+    assert {"text_omitted", "table_exceeds_encoder_window", "continued_source_block"} <= flags
+    assert ("embedding_metadata_abbreviated" in flags) == (title != "Solar Cooker")
+    assert view.rows == [(row.passage_id, row.lexical_text) for row in built]
+    rows = view.passages([row.passage_id for row in reversed(built)])
+    assert {pid: row.model_dump() for pid, row in rows.items()} == {row.passage_id: row.model_dump() for row in built}
+
+
+def localizing_reader(tmp_path, structure, precomputed):
+    """A canonical-HTML reader over one article, precomputed or segmented at query time."""
+    import threading
+    from oracle_content.native import NativeReader, OrderedDict
+    tmp_path.mkdir()
+    doc, _structure, settings, tokens, _passages, generation = prepared()
+    passages = segment(doc, structure, settings, tokens, generation)
+    expected = {"schema": SCHEMA, "generation": generation}
+    write_artifact(tmp_path, expected, {7: encode(structure, passages, lead_row(doc, generation), None)})
+    reader = native_reader(ArticleSpans.open(tmp_path, expected) if precomputed else None)
+    reader.generation, reader.profile, reader.tokenizer = generation, settings, tokens
+    reader.template = reader.template.model_copy(update={"title": doc.title})
+    reader.cache, reader.cache_bytes, reader.document_cache = OrderedDict(), 0, OrderedDict()
+    reader.cache_lock = threading.RLock()
+    reader.verify_original = lambda: None
+    reader.segment_article = lambda document, index: NativeReader.segment_article(reader, document, index, structure)
+    return reader
+
+
+def test_localizing_a_precomputed_book_builds_only_the_passages_it_keeps(tmp_path, monkeypatch):
+    """Lexical localization ranks every passage of each article it reaches and keeps a
+    page of them. Building every passage of a book to rank it cost whole seconds per
+    book per search; the ranking and the kept passages must equal the built article's
+    while only the kept ones are built."""
+    from oracle_content import precompute
+    structure = whole_book(2000)
+    reference = localizing_reader(tmp_path / "segmented", structure, precomputed=False)
+    document_id = reference.document_id(7)
+    expected = reference._localize([], "paragraph 1500 book", 10, document_id)
+
+    built = []
+    original = precompute.rebuild_passage
+    def counted(*args, **kwargs):
+        built.append(args[3])
+        return original(*args, **kwargs)
+    monkeypatch.setattr(precompute, "rebuild_passage", counted)
+    reader = localizing_reader(tmp_path / "precomputed", structure, precomputed=True)
+    actual = reader._localize([], "paragraph 1500 book", 10, document_id)
+
+    assert list(actual) == list(expected) and len(expected) == 10
+    assert ({pid: row.model_dump() for pid, row in actual.passages.items()}
+            == {pid: row.model_dump() for pid, row in expected.passages.items()})
+    assert len(built) == 10
+
+
+def test_stored_rows_refuse_what_the_full_decode_refuses(tmp_path):
+    """Localization reads stored rows without building blocks, so their validation has to
+    refuse what `Block` refuses; a refused row falls back to segmenting the original."""
+    doc, structure, _settings, _tokens, passages, generation = prepared()
+    lead = lead_row(doc, generation).model_dump()
+    def row(blocks, spans):
+        return zlib.compress(json.dumps([blocks, spans, lead, None], separators=(",", ":")).encode())
+    expected = {"schema": SCHEMA, "generation": generation}
+    write_artifact(tmp_path, expected, {
+        7: encode(structure, passages, lead_row(doc, generation), None),
+        8: row([["t", "paragraph", [], None, None, [float("nan")], None, []]], [[0, 0, 1, []]]),
+        9: row([["t", "paragraph", [], "page", None, None, None, []]], [[0, 0, 1, []]]),
+        10: row([["t", "paragraph", [], None, None, None, None]], [[0, 0, 1, []]]),
+        11: row([["t", "paragraph", [], None, None, None, None, []]], [[0, "start", 1, []]])})
+    spans = ArticleSpans.open(tmp_path, expected)
+    assert spans.stored(7) is not None
+    assert [spans.raw(index) for index in (8, 9, 10)] == [None, None, None]
+    assert [spans.stored(index) for index in (8, 9, 10, 11)] == [None, None, None, None]

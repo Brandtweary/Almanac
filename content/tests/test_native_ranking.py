@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from oracle_content.native import NativeReader
+from oracle_content.native import BuiltPassages, NativeReader
 from oracle_content.adapters import ZimLexical
 
 
@@ -26,7 +26,7 @@ def test_lazy_native_localization_matches_exhaustive_ranking(counts, constant):
     def passages(document_id):
         visited.append(document_id)
         return records[document_id]
-    reader.passages = passages
+    reader.localizable = lambda document_id: BuiltPassages(passages(document_id))
     actual = reader._localize([str(index) for index in range(len(counts))], "pressure", 40, None)
     expected = sorted(exhaustive, key=lambda row: (-row[1], row[0]))[:40]
     assert list(actual) == expected
@@ -86,7 +86,7 @@ def test_native_localization_does_not_spend_passage_depth_on_redirect_duplicates
     def passages(document_id):
         visited.append(document_id)
         return [SimpleNamespace(passage_id=document_id, lexical_text="valve pressure")]
-    reader.passages = passages
+    reader.localizable = lambda document_id: BuiltPassages(passages(document_id))
 
     rows = reader._localize(["Stopcock", "Valve", "Pressure"], "valve", 2, None)
 

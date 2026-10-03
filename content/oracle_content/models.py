@@ -122,8 +122,15 @@ class Passage(Strict):
 
     @property
     def lexical_text(self):
-        # Oversized structured blocks remain searchable in full even when dense encoding is only a labeled reference.
-        return self.embedding_text + ("\n" + self.text if "text_omitted" in self.flags else "")
+        return lexical_text(self.embedding_text, self.text, self.flags)
+
+
+def lexical_text(embedding_text: str, text: str, flags: list[str]) -> str:
+    """What lexical search indexes for a passage.
+
+    Oversized structured blocks remain searchable in full even when dense encoding is only a labeled reference.
+    """
+    return embedding_text + ("\n" + text if "text_omitted" in flags else "")
 
 
 class SearchRequest(Strict):

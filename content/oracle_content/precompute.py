@@ -29,7 +29,9 @@ import threading
 import zlib
 from pathlib import Path
 
-from .models import Block, Passage
+from pydantic import ConfigDict, TypeAdapter
+
+from .models import Block, Passage, lexical_text
 
 SCHEMA = "native-article-spans-v1"
 CODEC = "zlib-6"
@@ -90,36 +92,93 @@ def encode(blocks: list[Block], passages: list[Passage], lead: Passage, license:
 
 
 def decode(blob: bytes):
-    raw = json.loads(zlib.decompress(blob))
+    return _materialize(json.loads(zlib.decompress(blob)))
+
+
+def _materialize(raw):
     blocks = [Block(text=text, kind=kind, section=section, page_index=page_index, page_label=page_label,
                     coordinates=coordinates, anchor=anchor, flags=flags)
               for text, kind, section, page_index, page_label, coordinates, anchor, flags in raw[0]]
     return blocks, raw[1], Passage.model_validate(raw[2]), raw[3]
 
 
-def rebuild_passage(document, generation, index, ordinal, blocks, span, profile, tokenizer) -> Passage:
-    """Reconstruct one passage exactly as `segment()` produced it.
+# `encode` writes compact JSON whose last two elements are the representative —
+# a `Passage` dump, so an object opening on its first field — and the license, a
+# string or null. A quotation mark inside any JSON string is escaped, so this byte
+# sequence occurs unescaped only where an object opens on that key, and nothing
+# after the representative can hold one: the last occurrence is where it begins.
+LEAD_START = b',{"passage_id":'
+_JSON = json.JSONDecoder()
 
-    The encoder prefix is rebuilt the same way, including the abbreviation
-    `segment()` applies when section metadata alone fills the encoder window —
-    the flag it records is what says the abbreviation happened. A structured
-    block too large for the window carries its labelled reference as embedding
-    text rather than its own, and that too is recorded in its flags.
+
+def decode_lead(blob: bytes):
+    """The stored representative and license, without materializing the article's blocks.
+
+    A dense hit resolves to its article's representative, and a selection policy's
+    document reads its license; neither needs the blocks. Parsing and validating
+    those is nearly all of a full decode, and a whole-book article holds tens of
+    thousands of them, while the representative sits at the end of the row. The
+    row is still decompressed whole, so its checksum is still verified. Anything
+    not shaped as `encode` writes it is handed to the full decode, which accepts or
+    refuses the row exactly as it always has.
     """
-    from .native import span_handle
-    block_index, start, end, extra = span
-    block = blocks[block_index]
-    flags = list(block.flags) + list(extra)
-    text = block.text[start:end]
-    prefix = profile.document_prefix + document.title + "\n" + " / ".join(block.section) + "\n"
-    if "embedding_metadata_abbreviated" in flags:
+    data = zlib.decompress(blob)
+    at = data.rfind(LEAD_START)
+    if at >= 0:
+        try:
+            tail = data[at + 1:].decode()
+            fields, end = _JSON.raw_decode(tail)
+            if isinstance(fields, dict) and tail[end:end + 1] == "," and tail.endswith("]"):
+                license = json.loads(tail[end + 1:-1])
+                if license is None or isinstance(license, str):
+                    return Passage.model_validate(fields), license
+        except ValueError:
+            pass
+    _blocks, _spans, lead, license = _materialize(json.loads(data))
+    return lead, license
+
+
+def abbreviated(block_flags, extra) -> bool:
+    """Whether `segment()` abbreviated the passage's encoder prefix.
+
+    It abbreviates when section metadata alone fills the encoder window, and the
+    flag it records is what says the abbreviation happened.
+    """
+    return "embedding_metadata_abbreviated" in block_flags or "embedding_metadata_abbreviated" in extra
+
+
+def encoder_prefix(title, section, shortened, profile, tokenizer) -> str:
+    """The encoder prefix `segment()` gave a passage; `shortened` is `abbreviated()`."""
+    prefix = profile.document_prefix + title + "\n" + " / ".join(section) + "\n"
+    if shortened:
         while prefix and tokenizer.count(prefix) >= max(2, profile.encoder_max_tokens // 2):
             prefix = prefix[:len(prefix) // 2]
+    return prefix
+
+
+def span_text(block_text, block_flags, span, prefix):
+    """A stored span's flags, text and embedding text, exactly as `segment()` produced them.
+
+    A structured block too large for the window carries its labelled reference as
+    embedding text rather than its own, and that too is recorded in its flags.
+    """
+    _block_index, start, end, extra = span
+    flags = list(block_flags) + list(extra)
+    text = block_text[start:end]
     encoded = TABLE_REFERENCE if "table_exceeds_encoder_window" in flags else text
+    return flags, text, prefix + encoded
+
+
+def rebuild_passage(document, generation, index, ordinal, block, span, profile, tokenizer) -> Passage:
+    """Reconstruct one passage exactly as `segment()` produced it."""
+    from .native import span_handle
+    block_index, start, end, extra = span
+    prefix = encoder_prefix(document.title, block.section, abbreviated(block.flags, extra), profile, tokenizer)
+    flags, text, embedding_text = span_text(block.text, block.flags, span, prefix)
     row = Passage(passage_id="", document_id=document.document_id, source_revision=document.sha256,
                   extraction_revision=document.extraction_revision, ordinal=ordinal,
                   block_index=block_index, start=start, end=end, text=text,
-                  embedding_text=prefix + encoded, section=block.section, kind=block.kind,
+                  embedding_text=embedding_text, section=block.section, kind=block.kind,
                   page={"index": block.page_index, "label": block.page_label,
                         "coordinates": block.coordinates, "anchor": block.anchor}, flags=flags)
     row.passage_id = span_handle(generation, index, row)
@@ -127,12 +186,74 @@ def rebuild_passage(document, generation, index, ordinal, blocks, span, profile,
 
 
 def rebuild(document, generation, index, blocks, spans, profile, tokenizer) -> list[Passage]:
-    rows = [rebuild_passage(document, generation, index, ordinal, blocks, span, profile, tokenizer)
+    rows = [rebuild_passage(document, generation, index, ordinal, blocks[span[0]], span, profile, tokenizer)
             for ordinal, span in enumerate(spans)]
     for ordinal, row in enumerate(rows):
         row.previous = rows[ordinal - 1].passage_id if ordinal else None
         row.next = rows[ordinal + 1].passage_id if ordinal + 1 < len(rows) else None
     return rows
+
+
+# A stored article's blocks and spans, validated as rows in one pass. The block row
+# is `Block`'s fields in order under its own types and configuration, so it accepts,
+# coerces and refuses exactly what constructing each `Block` would.
+BLOCK_FIELDS = ("text", "kind", "section", "page_index", "page_label", "coordinates", "anchor", "flags")
+_STORED = TypeAdapter(tuple[list[tuple[str, str, list[str], int | None, str | None, list[float] | None,
+                                       str | None, list[str]]],
+                            list[tuple[int, int, int, list[str]]]],
+                      config=ConfigDict(allow_inf_nan=False))
+
+
+def decode_stored(blob: bytes):
+    """One article's stored block rows and spans, validated but not built into passages."""
+    raw = json.loads(zlib.decompress(blob))
+    return _STORED.validate_python((raw[0], raw[1]))
+
+
+class StoredPassages:
+    """An article's stored passages as localization reads them.
+
+    Localization ranks every passage of an article by its lexical text and keeps at
+    most a page of them, and an article that is a whole book stores hundreds of
+    thousands. Building each one as a validated `Passage` cost most of a search over
+    a library of books. This holds every passage's handle and lexical text, computed
+    exactly as `rebuild` computes them, and builds in full only the passages asked for.
+    """
+
+    def __init__(self, document, generation, index, blocks, spans, profile, tokenizer):
+        from .native import handle
+        self.document, self.generation, self.index = document, generation, index
+        self.blocks, self.spans = blocks, spans
+        self.profile, self.tokenizer = profile, tokenizer
+        prefixes = {}
+        self.rows = []
+        for span in spans:
+            block_index, start, end, extra = span
+            block_text, _kind, section, *_page, block_flags = blocks[block_index]
+            key = (tuple(section), abbreviated(block_flags, extra))
+            prefix = prefixes.get(key)
+            if prefix is None:
+                prefix = prefixes[key] = encoder_prefix(document.title, section, key[1], profile, tokenizer)
+            flags, text, embedding_text = span_text(block_text, block_flags, span, prefix)
+            self.rows.append((handle(generation, index, block_index, start, end, text),
+                              lexical_text(embedding_text, text, flags)))
+        self.ordinals = None
+
+    def passages(self, handles):
+        """The named passages, built in full and keyed by handle."""
+        if self.ordinals is None:
+            self.ordinals = {passage_id: ordinal for ordinal, (passage_id, _text) in enumerate(self.rows)}
+        found = {}
+        for passage_id in handles:
+            ordinal = self.ordinals[passage_id]
+            span = self.spans[ordinal]
+            block = Block(**dict(zip(BLOCK_FIELDS, self.blocks[span[0]])))
+            row = rebuild_passage(self.document, self.generation, self.index, ordinal, block, span,
+                                  self.profile, self.tokenizer)
+            row.previous = self.rows[ordinal - 1][0] if ordinal else None
+            row.next = self.rows[ordinal + 1][0] if ordinal + 1 < len(self.rows) else None
+            found[passage_id] = row
+        return found
 
 
 class ArticleSpans:
@@ -186,6 +307,21 @@ class ArticleSpans:
         counted in `undecodable`, which coverage reports, so a damaged artifact is never
         mistaken for a partial one.
         """
+        return self._read(index, decode)
+
+    def lead(self, index: int):
+        """One article's stored representative and license, or None as `raw` would return it.
+
+        This is what a dense hit and a document's license need, read without
+        materializing the article's blocks.
+        """
+        return self._read(index, decode_lead)
+
+    def stored(self, index: int):
+        """One article's validated block rows and spans for `StoredPassages`, or None as `raw` would return it."""
+        return self._read(index, decode_stored)
+
+    def _read(self, index, decoder):
         try:
             row = self.connect().execute("SELECT payload FROM articles WHERE entry_index=?", (index,)).fetchone()
         except sqlite3.Error:
@@ -193,7 +329,7 @@ class ArticleSpans:
         if not row:
             return None
         try:
-            return decode(row[0])
+            return decoder(row[0])
         except (zlib.error, ValueError, TypeError, KeyError, IndexError):
             # ValueError covers malformed JSON and UTF-8 and a stored row the models reject.
             self.undecodable += 1
