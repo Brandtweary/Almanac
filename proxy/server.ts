@@ -74,10 +74,16 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
   // of reading it reports the poller's liveness rather than the gateway's, and
   // a serving process is then indistinguishable from a wedged one — so the
   // probes below route around `served` deliberately.
+  //
+  // The stamp measures how long work in flight has waited on a backend, so a
+  // busy period that begins after an idle one starts that clock at its own
+  // start: the last answer before the idle stretch says nothing about the
+  // request now waiting, and reporting it would read hours of idleness as a
+  // stall.
   let lastProgressTs = Date.now() / 1000;
   let servedInflight = 0;
   const served = async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]): Promise<Response> => {
-    servedInflight++;
+    if (servedInflight++ === 0) lastProgressTs = Date.now() / 1000;
     try {
       // A backend answering at all is the progress being measured; its status
       // code is the caller's problem, not evidence about this process.

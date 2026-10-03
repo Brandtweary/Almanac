@@ -145,6 +145,29 @@ test("health publishes a state and a progress stamp that only served work moves"
  expect((await(await app.request("/health")).json()).last_progress_ts).toBeGreaterThan(idle.last_progress_ts);
 });
 
+test("a request arriving after idleness is not reported as stalled since the last answer",async()=>{
+ const base=mock();let release=()=>{};
+ const held=new Promise<void>(resolve=>{release=resolve;});
+ const fetcher=(async(url:any,init:any)=>{
+  if(String(url).endsWith("/v1/corpus/search")){await held;return Response.json({results:[]});}
+  return base(url,init);}) as typeof fetch;
+ const {app}=createGateway(cfg,fetcher,profile);
+ const idle=await(await app.request("/health")).json();
+ await Bun.sleep(50);
+ const started=Date.now()/1000;
+ const pending=app.request("/v1/corpus/search",{method:"POST",body:JSON.stringify({query:"compost"})});
+ await Bun.sleep(5);
+ const busy=await(await app.request("/health")).json();
+ expect(busy.state).toBe("serving");
+ // The clock a supervisor reads starts with the busy period, not the idle one.
+ expect(busy.last_progress_ts).toBeGreaterThanOrEqual(started-0.001);
+ expect(busy.last_progress_ts).toBeGreaterThan(idle.last_progress_ts+0.04);
+ // A request that keeps waiting does not move it: that is a real stall.
+ await Bun.sleep(20);
+ expect((await(await app.request("/health")).json()).last_progress_ts).toBe(busy.last_progress_ts);
+ release();expect((await pending).status).toBe(200);
+});
+
 test("health fails while the model behind the gateway cannot answer",async()=>{
  const base=mock();let probes=0;
  const fetcher=(async(url:any,init:any)=>{
