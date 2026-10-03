@@ -588,6 +588,13 @@ class NativeReader:
         return await asyncio.to_thread(self._localize, paths, query, limit, document_id)
 
     def _localize(self, paths, query, limit, document_id):
+        # Ranks passages inside each matched article with a per-query in-memory
+        # FTS5 index over every passage of that article, so a whole-book article
+        # (a dictionary, a long manual) dominates long-query latency at ~15 s.
+        # Scores depend on every passage, so only a change to within-article
+        # ranking shrinks it; running archives in parallel does not (the
+        # per-passage work holds the GIL). TODO: revisit within-article ranking
+        # if long-query latency matters again.
         damaged = 0
         if document_id:
             documents = [self.document(document_id)]
