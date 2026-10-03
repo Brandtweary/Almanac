@@ -10,7 +10,7 @@ PYTHONPATH=. python tools/configure_profile.py \
   --encoder-tokenizer /srv/almanac/encoder/tokenizer.json \
   --chat-tokenizer /srv/almanac/chat/tokenizer.json \
   --embed-url http://127.0.0.1:8899 \
-  --response-tokens 8000 --read-tokens 8000 --vector-datatype float16
+  --response-tokens 6000 --read-tokens 8000 --vector-datatype float16
 ```
 
 The generator reads the embedding backend's immutable revision and measures its output dimension with one fixed probe, hashes both supplied tokenizer artifacts, and writes portable relative paths. `--encoder-id` supplies the portable model identity if the backend reports a local model directory. The response/read budgets are explicit operating choices; select them to fit the installed chat role and evaluate source retention. A generated profile is unqualified. Its presence does not establish retrieval quality or offline readiness.

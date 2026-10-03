@@ -60,7 +60,7 @@ export CHAT_TOKENIZER="$ALMANAC_DATA/models/chat/tokenizer.json"
   --output "$ALMANAC_DATA/content-profile.json" --id local-candidate \
   --encoder-tokenizer "$ENCODER_TOKENIZER" --chat-tokenizer "$CHAT_TOKENIZER" \
   --embed-url "$CONTENT_EMBED_URL" --encoder-id sentence-transformers/all-MiniLM-L6-v2 \
-  --response-tokens 8000 --read-tokens 8000 \
+  --response-tokens 6000 --read-tokens 8000 \
   --vector-datatype float16
 ```
 
