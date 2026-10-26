@@ -31,6 +31,9 @@ export const config = {
 export type GatewayConfig = typeof config;
 export interface ReleaseProfile {
   id: string; qualified: boolean; receipts: string[];
+  // One operator-set line (≤ 240 chars) clients surface as a maintenance or
+  // alternate-model banner; absent on an ordinary qualified release.
+  notice?: string;
   roles: Record<string, {maxInputTokens: number; maxOutputTokens: number; maxStageOutputTokens?: number; thinkingLevel?: string}>;
   model: {id: string; name: string; contextWindow: number; maxTokens: number; reasoning: boolean; input: ("text" | "image")[];
     excludeToolsWhenNone?: boolean; artifactDigest: string; tokenizerDigest: string; templateDigest: string; parser: string; quantization: string;
@@ -50,6 +53,8 @@ export function validateProfile(value: unknown, allowCandidate = false): Release
   for (const n of [p.model.contextWindow, p.model.maxTokens, ...["queueCapacity", "queueTimeoutMs", "executionTimeoutMs", "maxRequestBytes", "backgroundMaxTokens", "speechConcurrency", "speechTimeoutMs", "speechMaxBytes"].map(k => p.limits?.[k as keyof ReleaseProfile["limits"]])])
     if (!Number.isSafeInteger(n) || n < 1) throw new Error("invalid qualified resource limit");
   if (p.model.maxTokens >= p.model.contextWindow || p.limits.backgroundMaxTokens > p.model.maxTokens) throw new Error("inconsistent token budgets");
+
+  if (p.notice !== undefined && (typeof p.notice !== "string" || !p.notice.trim() || p.notice.length > 240)) throw new Error("invalid profile notice");
   const sampling = p.model.sampling;
   if (sampling !== undefined && (!sampling || typeof sampling !== "object" || Array.isArray(sampling) ||
     !Number.isFinite(sampling.temperature) || sampling.temperature < 0 || sampling.temperature > 2 ||

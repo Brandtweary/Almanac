@@ -1987,18 +1987,45 @@ async function initApp() {
 		await createAgent();
 	}
 
-	updateBodyVisibility();
+updateBodyVisibility();
 	await chatPanel.updateComplete;
 	await chatPanel.agentInterface?.updateComplete;
 	await chatPanel.agentInterface?.querySelector<MessageEditor>("message-editor")?.updateComplete;
+	// The release profile can carry one operator-set line (alternate model,
+	// maintenance); a visitor is told what is different, not more.
+	const runtimeNotice = releaseProfile().notice?.trim();
+	if (runtimeNotice) showRuntimeNotice(runtimeNotice);
 	quickStartTour = new QuickStartTour();
 	renderHeader();
 	quickStartTour.startIfNew();
 }
 
+// One operator-set status line at the top of the app: an alternate model
+// serving or maintenance, from the release profile or a boot failure. Mounted
+// once outside every re-rendered host, like the request-state line.
+function showRuntimeNotice(text: string): void {
+	let notice = document.getElementById("runtime-notice");
+	if (!notice) {
+		notice = document.createElement("div");
+		notice.id = "runtime-notice";
+		notice.setAttribute("role", "status");
+		notice.className = "shrink-0 text-sm px-4 py-2 text-center border-b border-border text-muted-foreground";
+		const app = document.getElementById("app");
+		(app ?? document.body).prepend(notice);
+	}
+	notice.textContent = text;
+}
+
 initApp().catch((error) => {
 	dbgError("Application initialization failed", error);
+	const message = error instanceof Error ? error.message : String(error);
+	// A local-runtime failure at boot is a serving fact, not an application
+	// bug: the model behind the gateway is being swapped or is still loading.
+	if (/local (oracle|runtime)/i.test(message)) {
+		showRuntimeNotice("The assistant is temporarily unavailable while its model is being changed or started; please check back shortly.");
+		return;
+	}
 	const notice = document.createElement("div"); notice.setAttribute("role", "alert");
-	notice.className = "p-4"; notice.textContent = error instanceof Error ? error.message : String(error);
+	notice.className = "p-4"; notice.textContent = message;
 	document.body.appendChild(notice);
 });

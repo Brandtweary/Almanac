@@ -11,6 +11,9 @@ export interface ReleaseProfile {
 	model: { id: string; name: string; contextWindow: number; maxTokens: number; reasoning: boolean; input: ("text" | "image")[]; reasoningEffort?: string; sampling?: { temperature: number; top_p: number; top_k: number } };
 	roles: Record<OracleRole, RoleBudget>;
 	limits: { queueTimeoutMs: number; executionTimeoutMs: number; speechTimeoutMs?: number };
+	// One operator-set line (≤ 240 chars) shown as a banner: an alternate model
+	// serving or maintenance. Absent on an ordinary qualified release.
+	notice?: string;
 }
 let profile: ReleaseProfile | undefined;
 export let qualificationMode = false;
@@ -40,6 +43,7 @@ export function validateProfile(value: unknown): ReleaseProfile {
 		!Number.isFinite(sampling.temperature) || sampling.temperature < 0 || sampling.temperature > 2 ||
 		!Number.isFinite(sampling.top_p) || sampling.top_p <= 0 || sampling.top_p > 1 ||
 		!Number.isSafeInteger(sampling.top_k) || (sampling.top_k !== -1 && sampling.top_k < 1))) throw new Error("Invalid candidate sampling policy");
+	if (p.notice !== undefined && (typeof p.notice !== "string" || !p.notice.trim() || p.notice.length > 240)) throw new Error("Invalid release profile notice");
 	for (const role of ["chat", "audit", "memory", "summary", "compaction"] as const) {
 		const b = p.roles?.[role];
 		if (["audit", "memory", "summary"].includes(role) && !positive(b?.maxStageOutputTokens)) throw new Error(`Invalid ${role} cumulative stage output budget`);
