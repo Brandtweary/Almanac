@@ -106,15 +106,16 @@ test("memory stage output budgets are mandatory profile data",async()=>{
  const {app}=createGateway(cfg,mock(),{...profile,roles});
  const state=await(await app.request("/v1/profile")).json();expect(state.status).toBe("release_profile_invalid");expect(state.profile).toBeNull();
 });
-test("a profile notice must be one bounded line and rides /v1/profile",async()=>{
- const bad=createGateway(cfg,mock(),{...profile,notice:7 as unknown as string});
- expect((await(await bad.app.request("/v1/profile")).json()).status).toBe("release_profile_invalid");
- const long="x".repeat(241);
- const tooLong=createGateway(cfg,mock(),{...profile,notice:long});
- expect((await(await tooLong.app.request("/v1/profile")).json()).status).toBe("release_profile_invalid");
- const good=createGateway(cfg,mock(),{...profile,notice:"The assistant is running an alternate local model."});
- const state=await(await good.app.request("/v1/profile")).json();
- expect(state.status).toBe("ready"); expect(state.profile.notice).toBe("The assistant is running an alternate local model.");
+test("a profile serves no notice by default; a set notice must be one bounded line",async()=>{
+ const state=await(await(await createGateway(cfg,mock(),profile).app.request("/v1/profile")).json());
+ expect(state.status).toBe("ready"); expect(state.profile.notice).toBeUndefined();
+ for (const bad of [7 as unknown as string,"   ","x".repeat(241)]) {
+  const invalid=createGateway(cfg,mock(),{...profile,notice:bad});
+  expect((await(await invalid.app.request("/v1/profile")).json()).status).toBe("release_profile_invalid");
+ }
+ const good=createGateway(cfg,mock(),{...profile,notice:"Scheduled corpus maintenance tonight."});
+ const carrying=await(await good.app.request("/v1/profile")).json();
+ expect(carrying.status).toBe("ready"); expect(carrying.profile.notice).toBe("Scheduled corpus maintenance tonight.");
 });
 test("untrusted source downloads retain a sandbox policy through gateway middleware", async()=>{
  const fetcher = (async()=>new Response('<script>window.injected=true</script>',{headers:{'Content-Type':'text/html'}})) as unknown as typeof fetch;
