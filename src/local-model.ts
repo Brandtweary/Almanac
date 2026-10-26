@@ -8,7 +8,7 @@ export type OracleRole = "chat" | "audit" | "memory" | "summary" | "compaction";
 export interface RoleBudget { maxInputTokens: number; maxOutputTokens: number; maxStageOutputTokens?: number; thinkingLevel?: ThinkingLevel }
 export interface ReleaseProfile {
 	id: string;
-	model: { id: string; name: string; contextWindow: number; maxTokens: number; reasoning: boolean; input: ("text" | "image")[]; reasoningEffort?: string; sampling?: { temperature: number; top_p: number; top_k: number } };
+	model: { id: string; name: string; contextWindow: number; maxTokens: number; reasoning: boolean; input: ("text" | "image")[]; reasoningEffort?: string; sampling?: { temperature: number; top_p: number; top_k: number }; thinkingLevelMap?: Record<string, string | null> };
 	roles: Record<OracleRole, RoleBudget>;
 	limits: { queueTimeoutMs: number; executionTimeoutMs: number; speechTimeoutMs?: number };
 	// One operator-set line (≤ 240 chars) shown as a banner: an alternate model
