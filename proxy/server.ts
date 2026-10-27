@@ -300,7 +300,7 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
     try {
       const tokens = await countTokens(body, requestSignal);
       if (tokens > budgets.maxInputTokens || tokens + Number(max) > profile.model.contextWindow) throw new AdmissionError("context_budget_exceeded", 413);
-      const upstreamHeaders = {"Content-Type": "application/json", "Connection": "close", "X-Request-Priority": "almanac", "X-Request-Id": id};
+      const upstreamHeaders = {"Content-Type": "application/json", "Connection": "close", "X-Request-Priority": priority === "background" ? "background" : "almanac", "X-Request-Id": id};
       let upstream: Response | undefined;
       let retries = 0;
       while (true) {
