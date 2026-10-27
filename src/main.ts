@@ -192,6 +192,13 @@ const openSettings = async () => {
 	})]);
 };
 
+function reportBrowserDiagnostic(stage: string, kind: string, reason: string): void {
+	void fetch(`${import.meta.env.VITE_PROXY_BASE ?? ""}/v1/diagnostic`, {
+		method: "POST", headers: {"Content-Type": "application/json"},
+		body: JSON.stringify({stage, kind, reason: reason.slice(0, 200)}), keepalive: true,
+	}).catch(() => {});
+}
+
 
 let midstreamPreemptionRetries = 0;
 let midstreamRetryPending = false;
@@ -919,7 +926,11 @@ const createAgent = async (initialState?: Partial<AgentState>, savedHistory?: Co
 	sessionRevisions.set(owner, savedRevision);
 	let preparation: AbortController | undefined;
 	const abort = owner.abort.bind(owner);
-	owner.abort = () => { preparation?.abort(); abort(); };
+	owner.abort = () => {
+		const callsite = new Error().stack?.split("\n").slice(2, 5).join(" ") ?? "unknown";
+		reportBrowserDiagnostic("agent", "abort", callsite);
+		preparation?.abort(); abort();
+	};
 	sessionAgents.set(sessionKey, { agent: owner, title: currentTitle });
 	const isCurrent = () => owner === agent && creation === agentCreation;
 	sessionRecall = new RecallSession({
@@ -2005,12 +2016,7 @@ async function initApp() {
 		foregroundActive: () => runInFlight,
 		// Stage failures beacon class and reason (never conversation content) to the
 		// gateway journal, so a browser-side failure is diagnosable server-side.
-		reportStageFailure: (stage, kind, reason) => {
-			void fetch(`${import.meta.env.VITE_PROXY_BASE ?? ""}/v1/diagnostic`, {
-				method: "POST", headers: {"Content-Type": "application/json"},
-				body: JSON.stringify({stage, kind, reason}), keepalive: true,
-			}).catch(() => {});
-		},
+		reportStageFailure: reportBrowserDiagnostic,
 	});
 	try {
 		if (!memorySnapshot) throw new Error("Saved memory snapshot unavailable");

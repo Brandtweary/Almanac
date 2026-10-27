@@ -34,7 +34,11 @@ export function makeCompletion(opts: CompletionOpts): CompletionFn {
 	return async (messages, signal) => {
 		const role = opts.role ?? "summary";
 		const profile = releaseProfile();
-		const thinking = profile.roles[role].thinkingLevel;
+		const thinkingLevel = profile.roles[role].thinkingLevel;
+		const thinking = thinkingLevel === undefined ? undefined :
+			Object.prototype.hasOwnProperty.call(profile.model.thinkingLevelMap ?? {}, thinkingLevel)
+				? profile.model.thinkingLevelMap![thinkingLevel] ?? undefined
+				: thinkingLevel;
 		const payload = await admitPayload({ model: profile.model.id, messages, stream: false,
 			...(profile.model.reasoning && thinking ? { reasoning_effort: thinking } : {}),
 		}, role, signal);

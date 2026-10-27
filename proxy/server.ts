@@ -58,7 +58,7 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
   const log = (event: object) => {
     try {
       const fields = event as Record<string, unknown>;
-      const fingerprint = JSON.stringify([fields.stage, fields.status, fields.route, fields.code, fields.error]);
+      const fingerprint = JSON.stringify([fields.id, fields.stage, fields.status, fields.route, fields.code, fields.error]);
       if (logOccurrences.size >= GATEWAY_LOG_FINGERPRINTS_MAX) logOccurrences.clear();
       const occurrence = (logOccurrences.get(fingerprint) ?? 0) + 1;
       logOccurrences.set(fingerprint, occurrence);
@@ -292,7 +292,9 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
     const abortFromClient = () => controller.abort(c.req.raw.signal.reason);
     c.req.raw.signal.addEventListener("abort", abortFromClient, {once: true});
     const requestState = {state: "preparing", controller, updated: Date.now()};
+    const startedAt = Date.now();
     requests.set(id, requestState);
+    log({id, conversation, tier: priority, stage: "completion", status: "started"});
     for (const [key, value] of requests) if (Date.now() - value.updated > 60_000 && !["preparing", "submitting", "waiting", "executing"].includes(value.state)) requests.delete(key);
     const requestSignal = controller.signal;
     try {
@@ -306,8 +308,11 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
         upstream = await served(`${cfg.llmBase}/v1/chat/completions`, {method: "POST", headers: upstreamHeaders, body: JSON.stringify(body), signal: requestSignal});
         requestState.state = "executing"; requestState.updated = Date.now();
         if (!upstream.ok) {
-          const data = await upstream.json().catch(() => ({})) as {error?: {code?: string}};
+          const errorBody = await upstream.text().catch(() => "");
+          let data: {error?: {code?: string}} = {};
+          try { data = JSON.parse(errorBody); } catch { /* Preserve the bounded raw body in the log. */ }
           const code = data.error?.code ?? "inference_failed";
+          log({id, tier: priority, stage: "completion", status: "upstream_failed", upstreamStatus: upstream.status, code, error: errorBody.slice(0, 1000)});
           if (code === "preempted" && retries < 3) { retries++; requestState.state = "submitting"; continue; }
           if (code === "preempted" && body.stream) {
             upstream = Response.json({error: {code: "preempted"}}, {status: 503});
@@ -322,7 +327,9 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
       if (!body.stream) {
         const data = await upstream.json();
         if (!Array.isArray(data.choices) || !data.choices.length || data.choices.some((x: any) => !x.message || !["stop", "tool_calls", "length"].includes(x.finish_reason))) throw new AdmissionError("invalid_completion_response", 502);
-        requestState.state = "completed"; requestState.updated = Date.now(); return c.json(data);
+        requestState.state = "completed"; requestState.updated = Date.now();
+        log({id, tier: priority, stage: "completion", status: "completed", durationMs: Date.now() - startedAt});
+        return c.json(data);
       }
       const controller = new AbortController();
       const stream = new ReadableStream<Uint8Array>({
@@ -333,8 +340,11 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
             const encoder = new TextEncoder();
             while (true) {
               if (!response.ok) {
-                const error = await response.json().catch(() => ({})) as {error?: {code?: string}};
+                const errorBody = await response.text().catch(() => "");
+                let error: {error?: {code?: string}} = {};
+                try { error = JSON.parse(errorBody); } catch { /* Preserve the bounded raw body in the log. */ }
                 const code = error.error?.code ?? "inference_failed";
+                log({id, tier: priority, stage: "completion", status: "upstream_failed", upstreamStatus: response.status, code, error: errorBody.slice(0, 1000)});
                 if (code === "preempted" && retryCount < 3) {
                   retryCount++;
                   requestState.state = "submitting"; requestState.updated = Date.now();
@@ -344,6 +354,7 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
                 }
                 requestState.state = code === "queue_timeout" ? "queue_timeout" : code === "preempted" ? "preempted" : "failed";
                 requestState.updated = Date.now();
+                log({id, tier: priority, stage: "completion", status: requestState.state, code, durationMs: Date.now() - startedAt});
                 streamController.enqueue(completionErrorFrames(code === "queue_timeout" ? "queue_timeout" : code === "preempted" ? "preempted" : "network_error"));
                 streamController.close();
                 return;
@@ -376,6 +387,7 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
                   if (retry) break;
                   if (complete) {
                     requestState.state = "completed"; requestState.updated = Date.now();
+                    log({id, tier: priority, stage: "completion", status: "completed", durationMs: Date.now() - startedAt});
                     streamController.close();
                     return;
                   }
@@ -405,12 +417,14 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
               return;
             }
           })().catch(error => {
-            requestState.state = "failed"; requestState.updated = Date.now();
+            requestState.state = requestSignal.aborted ? "interrupted" : "failed"; requestState.updated = Date.now();
+            log({id, tier: priority, stage: "completion", status: requestSignal.aborted ? "interrupted" : "failed", durationMs: Date.now() - startedAt, error: error instanceof Error ? `${error.name}: ${error.message}${error.cause ? ` (cause: ${String(error.cause)})` : ""}`.slice(0, 1000) : String(error).slice(0, 1000)});
             try { streamController.error(error); } catch { /* stream already closed */ }
           });
         },
         async cancel(reason) {
           requestState.state = "interrupted"; requestState.updated = Date.now();
+          log({id, tier: priority, stage: "completion", status: "interrupted", durationMs: Date.now() - startedAt, error: String(reason ?? "client cancelled").slice(0, 1000)});
           controller.abort(reason);
         },
       });
@@ -419,7 +433,7 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
       requestState.state = error instanceof AdmissionError && error.code === "queue_timeout" ? "queue_timeout" : "failed";
       requestState.updated = Date.now();
       const err = error instanceof AdmissionError ? error : new AdmissionError("inference_failed", 502);
-      log({id, stage: "completion", status: "failed", code: err.code});
+      log({id, tier: priority, stage: "completion", status: "failed", code: err.code, durationMs: Date.now() - startedAt, error: error instanceof Error ? `${error.name}: ${error.message}${error.cause ? ` (cause: ${String(error.cause)})` : ""}`.slice(0, 1000) : String(error).slice(0, 1000)});
       return c.json({error: {code: err.code, message: err.code}, request_id: id}, err.status as 400 | 409 | 413 | 429 | 502 | 503 | 504);
     } finally { c.req.raw.signal.removeEventListener("abort", abortFromClient); }
   });
