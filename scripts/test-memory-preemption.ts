@@ -7,6 +7,7 @@ import { IndexedDBStorageBackend } from "../src/pi-web-ui/storage/backends/index
 import { Graph } from "../src/kg/graph.js";
 import type { GraphAsset } from "../src/kg/types.js";
 import { isPreemptedCompletionError } from "../src/oracle-runtime.js";
+import { MemoryBudgetError } from "../src/memory-handoffs.js";
 
 // Regression: a foreground chat must preempt a running memory tick mid-round.
 // The gateway aborts the background request and answers with code "preempted";
@@ -67,6 +68,33 @@ test("preemption detection matches both gateway renderings and rejects other fai
   assert.equal(isPreemptedCompletionError("Connection error."), false);
   assert.equal(isPreemptedCompletionError("Request was aborted"), false);
   assert.equal(isPreemptedCompletionError(undefined), false);
+});
+
+test("a budget-exhausted stage retries at a degraded effort and completes", async () => {
+  let auditCalls = 0;
+  const h = await fixture({ loop: async (_messages, context) => {
+    if (isAudit(context) && auditCalls++ === 0) throw new MemoryBudgetError("allowance exhausted");
+    return completed();
+  } });
+  h.runtime.onTurnEnd(() => messages, false);
+  await h.runtime.whenIdle();
+  assert.equal(auditCalls, 2);
+  assert.deepEqual(h.runtime.snapshot().jobs![0]!.stages, { audit: "complete", memory: "complete", summary: "complete" });
+  assert.equal(h.runtime.hasFailedWork, false);
+});
+
+test("a later successful retry clears the failed-work badge", async () => {
+  let fail = true;
+  const h = await fixture({ loop: async (_messages, context) => {
+    if (isAudit(context) && fail) { fail = false; throw new Error("temporary stage failure"); }
+    return completed();
+  } });
+  h.runtime.onTurnEnd(() => messages, false);
+  await h.runtime.whenIdle();
+  assert.equal(h.runtime.hasFailedWork, true);
+  h.runtime.retryPending();
+  await h.runtime.whenIdle();
+  assert.equal(h.runtime.hasFailedWork, false);
 });
 
 test("an abort-shaped preemption (frame lost to teardown) parks like a preemption, never fails the stage", async () => {

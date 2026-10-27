@@ -1,4 +1,5 @@
 import type { StreamFn } from "@earendil-works/pi-agent-core";
+import type { ThinkingLevel } from "@earendil-works/pi-ai";
 import { streamSimple } from "./pi-ai-slim-compat.js";
 import { LOCAL_MODEL, GATEWAY_BASE, releaseProfile, type OracleRole } from "./local-model.js";
 
@@ -59,7 +60,7 @@ export function beginRequest(role: OracleRole, conversationId: string, signal?: 
 		finish(state: string) { stopped = true; clearTimeout(timer); signal?.removeEventListener("abort", cancel); emit({ id, role, state }); },
 	};
 }
-export function createLocalStreamFn(role: OracleRole, getConversationId: () => string, getRemainingOutputTokens?: () => number, onAdmitted?: (requestId: string) => void | Promise<void>): StreamFn {
+export function createLocalStreamFn(role: OracleRole, getConversationId: () => string, getRemainingOutputTokens?: () => number, onAdmitted?: (requestId: string) => void | Promise<void>, getThinkingLevel?: () => ThinkingLevel | null | undefined): StreamFn {
 	return async (model, context, options) => {
 		const p = releaseProfile();
 		const remaining = getRemainingOutputTokens?.() ?? p.roles[role].maxOutputTokens;
@@ -68,7 +69,7 @@ export function createLocalStreamFn(role: OracleRole, getConversationId: () => s
 		const request = beginRequest(role, getConversationId(), options?.signal);
 		let failure = "failed";
 		try {
-			const stream = streamSimple(model, context, { ...options, apiKey: "local", reasoning: p.roles[role].thinkingLevel, headers: { ...options?.headers, ...request.headers, Authorization: null }, maxTokens: outputBudget,
+			const stream = streamSimple(model, context, { ...options, apiKey: "local", reasoning: getThinkingLevel ? getThinkingLevel() ?? undefined : p.roles[role].thinkingLevel, headers: { ...options?.headers, ...request.headers, Authorization: null }, maxTokens: outputBudget,
 			onResponse: async (response, m) => { if (response.status === 504) failure = "queue_timeout"; else if (response.status === 429 || response.status === 503) failure = "busy"; if (response.status >= 200 && response.status < 300) await onAdmitted?.(request.headers["X-Request-Id"]); await options?.onResponse?.(response, m); },
 			maxRetries: 0, timeoutMs: 300_000 + p.limits.executionTimeoutMs,
 				onPayload: async (payload, m) => admitPayload(await options?.onPayload?.(payload, m) ?? payload, role, options?.signal),

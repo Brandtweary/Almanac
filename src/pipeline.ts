@@ -18,7 +18,7 @@ import { Graph } from "./kg/graph.js";
 import type { GraphAsset } from "./kg/types.js";
 import type { EmbedFn } from "./kg/embed.js";
 import type { makeCompletion } from "./kg/ingest.js";
-import { releaseProfile } from "./local-model.js";
+import { loadReleaseProfile, releaseProfile } from "./local-model.js";
 import { createLocalStreamFn, serializeModelRequest, countRequestTokens, isPreemptedCompletionError } from "./oracle-runtime.js";
 import { createPipelineTools, type ReviewFlag } from "./pipeline-tools.js";
 import type { PhonemizeFn } from "./stt-phonemize.js";
@@ -121,6 +121,15 @@ interface TickInput {
 const BUFFER_MAX_ENTRIES = 30; // per agent, rolling
 const RUNNING_CONTEXT_MAX_WORDS = 8000; // rolling cap across entries
 const ACTIVITY_MAX_ITEMS = 100; // in-memory feed cap
+
+function stageThinkingLevels(configured: string | undefined): Array<string | null | undefined> {
+	if (configured === undefined) return [undefined, "medium", "low", null];
+	const lower = configured === "high" || configured === "xhigh" || configured === "max"
+		? ["medium", "low", null]
+		: configured === "medium" ? ["low", null]
+			: configured === "low" ? [null] : [];
+	return [configured, ...lower];
+}
 
 // One IndexedDB store, keyed slots.
 export const PIPELINE_STORE = "pipeline";
@@ -718,6 +727,7 @@ export class PipelineRuntime {
 		name: PipelineAgentName,
 		instructions: string,
 		input: TickInput,
+		thinkingLevel?: string | null,
 	): Promise<{ maintenance: MaintenanceState; maintenanceEvidence: unknown[]; graph: Graph; baseline: GraphAsset; merges: Map<string, string>; stt: SttLexicon; flags: ReviewFlag[]; actions: string[]; note: string; findings: AuditFinding[]; outcome: StageOutcome }> {
 		if (!this.active(input)) throw new Error("Memory operation cancelled");
 		const baseline = structuredClone(this.deps.getGraph().serialize());
@@ -847,7 +857,12 @@ export class PipelineRuntime {
 			const record = this.archiveRecord(input, name, kind, payload, "transient");
 			await this.ordered(() => this.deps.appendArchive!([record], assertActive));
 		};
-		const stream = createLocalStreamFn(name, () => input.sessionKey, () => outputBudget! - usage.output);
+		const stream = createLocalStreamFn(name, () => input.sessionKey, () => outputBudget! - usage.output, undefined, () => {
+			const p = releaseProfile();
+			const level = thinkingLevel === undefined ? p.roles[name].thinkingLevel : thinkingLevel;
+			return level != null && Object.prototype.hasOwnProperty.call(p.model.thinkingLevelMap ?? {}, level)
+				? p.model.thinkingLevelMap![level] as import("@earendil-works/pi-ai").ThinkingLevel | null : level as import("@earendil-works/pi-ai").ThinkingLevel | undefined;
+		});
 		const account = (message: AgentMessage) => {
 			if (message.role !== "assistant" || accounted.has(message)) return;
 			const generated = message.content.some(block => block.type === "toolCall" || block.type === "text" && block.text.length > 0 || block.type === "thinking" && block.thinking.length > 0);
@@ -959,8 +974,10 @@ export class PipelineRuntime {
 		// commits only atomically at its end, so the aborted round published nothing:
 		// park it and re-run from the stage start, never half-applying a draft.
 		let preemptions = 0;
+		let degradation = 0;
 		for (;;) {
 		try {
+			if (!this.deps.runLoop && !this.deps.completion) await loadReleaseProfile();
 			await this.ordered(async () => {
 				if (!this.active(input)) throw new Error("Memory operation cancelled");
 				const next = this.snapshot();
@@ -975,9 +992,12 @@ export class PipelineRuntime {
 			// leads regardless of any model's choice to call a tool. Recomputed per
 			// attempt so a re-run stage reads fresh lexicon and graph state.
 			const phoneticReport = name === "audit" ? await this.auditPhoneticReport(input) : "";
+			let configuredThinking: string | undefined;
+			try { configuredThinking = releaseProfile().roles[name].thinkingLevel; } catch { /* Offline injected runtime. */ }
+			const levels = stageThinkingLevels(configuredThinking);
 			const result = name === "summary" ? null : await this.runTooledAgent(name,
 				name === "audit" ? buildAuditInstructions({ bufferBlock: "Read memory_inspect(actions,id=committed) for prior actions; draft actions are actions/draft.", isVoiceTurn: input.isVoiceTurn, voiceEvidence: undefined, phoneticReport }) :
-				buildMemoryManagerInstructions({ bufferBlock: "Read memory_inspect(actions,id=committed) for prior actions; draft actions are actions/draft.", isVoiceTurn: input.isVoiceTurn }), input);
+				buildMemoryManagerInstructions({ bufferBlock: "Read memory_inspect(actions,id=committed) for prior actions; draft actions are actions/draft.", isVoiceTurn: input.isVoiceTurn }), input, levels[Math.min(degradation, levels.length - 1)] as string | null);
 			const summary = name === "summary" ? await this.runSummaryAgent(input) : null;
 			if (job.history) await this.resolveHistory(job.history);
 			await this.ordered(async () => {
@@ -1034,6 +1054,12 @@ export class PipelineRuntime {
 			});
 			return;
 		} catch (error) {
+			if (error instanceof MemoryBudgetError && degradation < 3) {
+				let configured: string | undefined;
+				try { configured = releaseProfile().roles[name].thinkingLevel; } catch { /* Offline injected runtime. */ }
+				const levels = stageThinkingLevels(configured);
+				if (degradation + 1 < levels.length) { degradation++; continue; }
+			}
 			// A round interrupted before finishing is a preemption in one of three
 			// renderings: the SSE error frame (MemoryPreemptedError), a plain abort
 			// whose frame lost the race to connection teardown (MemoryTransientError:
