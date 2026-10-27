@@ -49,7 +49,7 @@ export function beginRequest(role: OracleRole, conversationId: string, signal?: 
 		} catch { /* Completion transport owns terminal failure reporting. */ }
 		if (!stopped) timer = setTimeout(poll, 750);
 	};
-	emit({ id, role, state: "waiting" });
+	emit({ id, role, state: "preparing" });
 	signal?.addEventListener("abort", cancel, { once: true });
 	timer = setTimeout(poll, 250);
 	return {
@@ -67,11 +67,11 @@ export function createLocalStreamFn(role: OracleRole, getConversationId: () => s
 		let failure = "failed";
 		try {
 			const stream = streamSimple(model, context, { ...options, apiKey: "local", reasoning: p.roles[role].thinkingLevel, headers: { ...options?.headers, ...request.headers, Authorization: null }, maxTokens: outputBudget,
-				onResponse: async (response, m) => { if (response.status === 429 || response.status === 503) failure = "busy"; if (response.status >= 200 && response.status < 300) await onAdmitted?.(request.headers["X-Request-Id"]); await options?.onResponse?.(response, m); },
-				maxRetries: 0, timeoutMs: p.limits.queueTimeoutMs + p.limits.executionTimeoutMs,
+			onResponse: async (response, m) => { if (response.status === 504) failure = "queue_timeout"; else if (response.status === 429 || response.status === 503) failure = "busy"; if (response.status >= 200 && response.status < 300) await onAdmitted?.(request.headers["X-Request-Id"]); await options?.onResponse?.(response, m); },
+			maxRetries: 0, timeoutMs: 300_000 + p.limits.executionTimeoutMs,
 				onPayload: async (payload, m) => admitPayload(await options?.onPayload?.(payload, m) ?? payload, role, options?.signal),
 			});
-			void stream.result().then(result => request.finish(result.stopReason === "error" ? failure : result.stopReason === "aborted" ? "interrupted" : result.stopReason === "length" ? "incomplete" : "complete"), () => request.finish("failed"));
+			void stream.result().then(result => request.finish(result.stopReason === "error" ? failure : result.stopReason === "aborted" ? "interrupted" : result.stopReason === "length" ? "incomplete" : "complete"), () => request.finish(failure));
 			return stream;
 		} catch (error) { request.finish("failed"); throw error; }
 	};

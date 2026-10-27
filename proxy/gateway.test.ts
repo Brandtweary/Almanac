@@ -15,10 +15,10 @@ test("missing profile and mandatory corpus fail closed", async()=>{
  const missing=createGateway(cfg,mock(false),profile);
  expect((await missing.app.request("/v1/chat/completions",{method:"POST",body:JSON.stringify({model:"fixture",messages:[{role:"user",content:"hi"}]})})).status).toBe(503);
 });
-test("completion retains slot until full body consumed and removed routes are absent",async()=>{
- const {app,queue}=createGateway(cfg,mock(),profile);
+test("completion request status remains available after response consumption and removed routes are absent",async()=>{
+ const {app}=createGateway(cfg,mock(),profile);
  const r=await app.request("/v1/chat/completions",{method:"POST",headers:{"X-Request-Id":"request-00000001"},body:JSON.stringify({model:"fixture",messages:[{role:"user",content:"hello"}]})});
- expect(r.status).toBe(200); await r.text(); expect(queue?.status("request-00000001")?.state).toBe("completed");
+ expect(r.status).toBe(200); await r.text(); expect((await (await app.request("/v1/requests/request-00000001")).json()).state).toBe("completed");
  expect((await app.request("/anon-init",{method:"POST"})).status).toBe(404);
  expect((await app.request("/redeem",{method:"POST"})).status).toBe(404);
 });
@@ -33,46 +33,50 @@ test("candidate mode remains visibly unready and refuses external binding", asyn
  expect((await app.request("/ready")).status).toBe(503);
  const state=await (await app.request("/v1/profile")).json(); expect(state.qualificationMode).toBe(true); expect(state.status).toBe("qualification_only");
 });
-test("truncated stream fails and frees the inference slot",async()=>{
+test("truncated stream fails explicitly",async()=>{
  const base=mock(); const fetcher=(async (url:any, init:any)=>String(url).endsWith("/v1/chat/completions") ? new Response('data: {"choices":[]}\n\n') : base(url,init)) as typeof fetch;
- const {app,queue}=createGateway(cfg,fetcher,profile);
+ const {app}=createGateway(cfg,fetcher,profile);
  const r=await app.request("/v1/chat/completions",{method:"POST",headers:{"X-Request-Id":"truncated-0000001"},body:JSON.stringify({model:"fixture",messages:[{role:"user",content:"hi"}],stream:true})});
- await expect(r.text()).rejects.toThrow("incomplete_generation"); expect(queue?.status("truncated-0000001")?.state).toBe("failed");
+ await expect(r.text()).rejects.toThrow("incomplete_generation"); expect((await (await app.request("/v1/requests/truncated-0000001")).json()).state).toBe("failed");
 });
-test("a foreground send preempts a streaming background round with an explicit error frame, and the freed slot serves the foreground",async()=>{
- const encoder=new TextEncoder(); const base=mock(); let upstream:AbortSignal|undefined; let seen=false;
- const fetcher=(async(url:any,init:any)=>{if(String(url).endsWith("/v1/chat/completions")&&!seen){
-  seen=true; upstream=init.signal;
-  // A background round that keeps generating (no [DONE]) until the gateway aborts it.
-  return new Response(new ReadableStream({start(c){c.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"tick"}}]}\n\n'));}}),{headers:{"Content-Type":"text/event-stream"}});
- } return base(url,init);}) as typeof fetch;
- const {app,queue}=createGateway(cfg,fetcher,profile);
- const bg=await app.request("/v1/chat/completions",{method:"POST",headers:{"X-Request-Id":"background-000001","X-Conversation-Id":"tick","X-Request-Priority":"background","X-Request-Role":"memory"},body:JSON.stringify({model:"fixture",messages:[{role:"user",content:"tick"}],stream:true})});
- expect(bg.status).toBe(200);
- const fg=await app.request("/v1/chat/completions",{method:"POST",headers:{"X-Request-Id":"foreground-000001","X-Request-Priority":"foreground","X-Request-Role":"chat"},body:JSON.stringify({model:"fixture",messages:[{role:"user",content:"hello"}]})});
- expect(fg.status).toBe(200);
- const text=await bg.text();
- expect(text).toContain('"code":"preempted"'); // the visitor still connected learns this round was parked, not failed
- expect(upstream?.aborted).toBe(true); // the model server saw the disconnect and frees the GPU
- expect(queue?.status("background-000001")?.state).toBe("preempted");
- expect(queue?.status("foreground-000001")?.state).toBe("completed");
+test("generation uses the almanac tier and transparently retries a preempted round",async()=>{
+ const base=mock(); let tries=0; const priorities:string[]=[];
+ const fetcher=(async(url:any,init:any)=>{
+  if(String(url).endsWith("/v1/chat/completions")) {
+   priorities.push(new Headers(init.headers).get("X-Request-Priority") ?? "");
+   tries++;
+   if(tries===1) return new Response('data: {"error":{"code":"preempted","message":"preempted"}}\n\n',{headers:{"Content-Type":"text/event-stream"}});
+   return new Response('data: {"choices":[{"delta":{"content":"ok"}}]}\n\ndata: [DONE]\n\n',{headers:{"Content-Type":"text/event-stream"}});
+  }
+  return base(url,init);
+ }) as typeof fetch;
+ const {app}=createGateway(cfg,fetcher,profile);
+ const r=await app.request("/v1/chat/completions",{method:"POST",headers:{"X-Request-Id":"retry-request-0001"},body:JSON.stringify({model:"fixture",messages:[{role:"user",content:"hello"}],stream:true})});
+ expect(r.status).toBe(200); expect(await r.text()).toContain("[DONE]"); expect(tries).toBe(2); expect(priorities).toEqual(["almanac","almanac"]);
+ expect((await (await app.request("/v1/requests/retry-request-0001")).json()).state).toBe("completed");
 });
-test("a preemption landing during admission answers with its own code instead of inference_failed",async()=>{
- const base=mock(); let upstream:AbortSignal|undefined; let seen=false;
- // The upstream generation never answers on its own — only the gateway's abort
- // ends it, which is the preemption path a real model server takes.
- const fetcher=(async(url:any,init:any)=>{const path=String(url);if(path.endsWith("/v1/chat/completions")&&!seen){seen=true;upstream=init.signal;
-  return new Promise<Response>((_,reject)=>init.signal.addEventListener("abort",()=>reject(new DOMException("aborted","AbortError"))));
- }return base(url,init);}) as typeof fetch;
- const {app,queue}=createGateway(cfg,fetcher,profile);
- const bg=app.request("/v1/chat/completions",{method:"POST",headers:{"X-Request-Id":"background-000002","X-Request-Priority":"background","X-Request-Role":"memory"},body:JSON.stringify({model:"fixture",messages:[{role:"user",content:"tick"}],stream:true})});
- // Let the background reach admission counting, then fire the foreground.
- await new Promise(resolve=>setTimeout(resolve,10));
- const fg=await app.request("/v1/chat/completions",{method:"POST",headers:{"X-Request-Id":"foreground-000002","X-Request-Priority":"foreground"},body:JSON.stringify({model:"fixture",messages:[{role:"user",content:"hi"}]})});
- expect(fg.status).toBe(200);
- const bgResponse=await bg; expect(bgResponse.status).toBe(503); expect(await bgResponse.json()).toEqual({error:{code:"preempted",message:"preempted"},request_id:"background-000002"});
- expect(upstream?.aborted).toBe(true);
- expect(queue?.status("background-000002")?.state).toBe("preempted");
+test("queue timeout remains an explicit retryable response",async()=>{
+ const base=mock();
+ const fetcher=(async(url:any)=>String(url).endsWith("/v1/chat/completions") ? Response.json({error:{code:"queue_timeout"}},{status:504}) : base(url)) as typeof fetch;
+ const {app}=createGateway(cfg,fetcher,profile);
+ const r=await app.request("/v1/chat/completions",{method:"POST",headers:{"X-Request-Id":"timeout-request-0001"},body:JSON.stringify({model:"fixture",messages:[{role:"user",content:"hello"}]})});
+ expect(r.status).toBe(504); expect((await r.json()).error.code).toBe("queue_timeout");
+ expect((await (await app.request("/v1/requests/timeout-request-0001")).json()).state).toBe("queue_timeout");
+});
+test("request status reflects the bm-queue waiting position",async()=>{
+ const base=mock(); let release!:()=>void; let entered!:()=>void;
+ const enteredQueue=new Promise<void>(resolve=>entered=resolve);
+ const fetcher=(async(url:any,init:any)=>{
+  if(String(url).endsWith("/health")) return Response.json({queue:{active_request_id:"foreground-00000001",waiting_requests:[{id:"waiting-request-0001",priority:"almanac"}]}});
+  if(String(url).endsWith("/v1/chat/completions")) { entered(); return new Promise<Response>(resolve=>release=()=>resolve(Response.json({choices:[{message:{role:"assistant",content:"ok"},finish_reason:"stop"}]}))); }
+  return base(url,init);
+ }) as typeof fetch;
+ const {app}=createGateway(cfg,fetcher,profile);
+ const result=app.request("/v1/chat/completions",{method:"POST",headers:{"X-Request-Id":"waiting-request-0001"},body:JSON.stringify({model:"fixture",messages:[{role:"user",content:"hello"}]})});
+ await enteredQueue;
+ const state=await(await app.request("/v1/requests/waiting-request-0001")).json();
+ expect(state).toMatchObject({state:"waiting",position:1});
+ release(); expect((await result).status).toBe(200);
 });
 test("isolated container qualification requires an exact deployment declaration",async()=>{
  const candidate = {...profile,qualified:false,receipts:[]};

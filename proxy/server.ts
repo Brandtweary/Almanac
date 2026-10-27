@@ -6,7 +6,7 @@ import { bodyLimit } from "hono/body-limit";
 import { appendFileSync, readFileSync, realpathSync, renameSync, statSync } from "node:fs";
 import { resolve, sep } from "node:path";
 import { config, validateProfile, type GatewayConfig, type ReleaseProfile } from "./config";
-import { AdmissionError, CompletionQueue } from "./queue";
+import { AdmissionError } from "./errors";
 import { VoiceBroker, registerVoiceRoutes } from "./voice-broker";
 import { clientIp, createLimiters, rateLimitKey, WINDOW_MS, type RouteName } from "./rate-limit";
 import { Subscribers } from "./subscribers";
@@ -55,7 +55,7 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
   catch (error) { profileError = "release_profile_invalid"; log({stage: "profile", status: "failed", error: String(error)}); }
   const app = new Hono();
   app.use("*", async (c, next) => { await next(); const policy = c.res.headers.get("Content-Security-Policy"); c.header("Content-Security-Policy", `${policy ? policy + "; " : ""}frame-ancestors 'none'`); });
-  const queue = profile ? new CompletionQueue(profile.limits, log) : null;
+  const requests = new Map<string, {state: string; controller: AbortController; updated: number}>();
   // Every route below is reachable without authentication; the window is the
   // only thing standing between one visitor and a shared local backend.
   const limiters = createLimiters();
@@ -138,8 +138,32 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
   });
   app.get("/v1/profile", async c => c.json(await readiness(c.req.raw.signal)));
   app.get("/ready", async c => { const r = await readiness(c.req.raw.signal); return c.json(r, r.ready ? 200 : 503); });
-  app.get("/v1/requests/:id", c => { const status = queue?.status(c.req.param("id")); return status ? c.json(status) : c.json({error: {code: "request_unknown"}}, 404); });
-  app.delete("/v1/requests/:id", c => queue?.cancel(c.req.param("id")) ? c.json({state: "interrupted"}) : c.json({error: {code: "request_unknown"}}, 404));
+  app.get("/v1/requests/:id", async c => {
+    const id = c.req.param("id"), request = requests.get(id);
+    if (!request) return c.json({error: {code: "request_unknown"}}, 404);
+    let position = 0;
+    if (["preparing", "submitting", "waiting", "executing"].includes(request.state)) {
+      try {
+        const response = await fetcher(`${cfg.llmBase}/health`, {signal: AbortSignal.timeout(2000)});
+        const status = await response.json() as {queue?: {active_request_id?: string; waiting_requests?: Array<{id: string; priority: string}>}};
+        if (status.queue?.active_request_id === id) request.state = "executing";
+        else if (status.queue?.waiting_requests?.some(item => item.id === id)) {
+          request.state = "waiting";
+          const ordered = status.queue.waiting_requests.map((item, index) => ({item, index}))
+            .sort((a, b) => ["foreground", "almanac", "background", "triage"].indexOf(a.item.priority) - ["foreground", "almanac", "background", "triage"].indexOf(b.item.priority) || a.index - b.index);
+          position = ordered.findIndex(entry => entry.item.id === id) + 1;
+        }
+      } catch { /* The generation transport reports an unavailable queue. */ }
+      request.updated = Date.now();
+    }
+    return c.json({id, state: request.state, position: position > 0 ? position : 0});
+  });
+  app.delete("/v1/requests/:id", c => {
+    const request = requests.get(c.req.param("id"));
+    if (!request || !["preparing", "submitting", "waiting", "executing"].includes(request.state)) return c.json({error: {code: "request_unknown"}}, 404);
+    request.state = "interrupted"; request.updated = Date.now(); request.controller.abort(new AdmissionError("interrupted", 499));
+    return c.json({state: "interrupted"});
+  });
   // A deadline, a caller that left and an absent service are three different
   // answers: reported as one, a slow search reaches the model as a library
   // that is not installed, which is a fact about the deployment rather than
@@ -217,7 +241,7 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
     catch (error) { log({stage: "tokenize", status: "failed", error: error instanceof Error ? error.name : "unknown"}); return c.json({error: {code: error instanceof AdmissionError ? error.code : "tokenizer_failed"}}, 502); }
   });
   app.post("/v1/chat/completions", limit("completions"), async c => {
-    if (!profile || !queue || !cfg.llmBase) return c.json({error: {code: "runtime_unconfigured"}}, 503);
+    if (!profile || !cfg.llmBase) return c.json({error: {code: "runtime_unconfigured"}}, 503);
     const raw = await c.req.text();
     if (new TextEncoder().encode(raw).length > profile.limits.maxRequestBytes) return c.json({error: {code: "body_too_large"}}, 413);
     let parsed: Record<string, unknown>; try { parsed = JSON.parse(raw); } catch { return c.json({error: {code: "invalid_json"}}, 400); }
@@ -238,69 +262,77 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
     Object.assign(body, profile.model.sampling ?? {});
     const content = await corpus(c.req.raw.signal);
     if (!content.ready || (!content.qualified && !cfg.qualificationMode)) return c.json({error: {code: "corpus_unavailable"}}, 503);
-    let lease;
+    if (requests.has(id)) return c.json({error: {code: "duplicate_request"}}, 409);
+    const controller = new AbortController();
+    const abortFromClient = () => controller.abort(c.req.raw.signal.reason);
+    c.req.raw.signal.addEventListener("abort", abortFromClient, {once: true});
+    const requestState = {state: "preparing", controller, updated: Date.now()};
+    requests.set(id, requestState);
+    for (const [key, value] of requests) if (Date.now() - value.updated > 60_000 && !["preparing", "submitting", "waiting", "executing"].includes(value.state)) requests.delete(key);
+    const requestSignal = controller.signal;
     try {
-      lease = await queue.acquire(id, conversation, priority as "foreground" | "background", c.req.raw.signal);
-      const tokens = await countTokens(body, lease.signal);
+      const tokens = await countTokens(body, requestSignal);
       if (tokens > budgets.maxInputTokens || tokens + Number(max) > profile.model.contextWindow) throw new AdmissionError("context_budget_exceeded", 413);
-      const upstream = await served(`${cfg.llmBase}/v1/chat/completions`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body), signal: lease.signal});
-      if (!upstream.ok || !upstream.body) { await upstream.body?.cancel(); throw new AdmissionError("inference_failed", 502); }
+      const upstreamHeaders = {"Content-Type": "application/json", "X-Request-Priority": "almanac", "X-Request-Id": id};
+      let upstream: Response | undefined;
+      let bufferedStream: Uint8Array | undefined;
+      for (let attempt = 0; attempt < 4; attempt++) {
+        requestState.state = "submitting"; requestState.updated = Date.now();
+        upstream = await served(`${cfg.llmBase}/v1/chat/completions`, {method: "POST", headers: upstreamHeaders, body: JSON.stringify(body), signal: requestSignal});
+        requestState.state = "executing"; requestState.updated = Date.now();
+        if (!upstream.ok) {
+          const data = await upstream.json().catch(() => ({})) as {error?: {code?: string}};
+          const code = data.error?.code ?? "inference_failed";
+          if (code === "preempted" && attempt < 3) { requestState.state = "submitting"; continue; }
+          throw new AdmissionError(code, upstream.status);
+        }
+        if (!upstream.body) throw new AdmissionError("inference_failed", 502);
+        if (body.stream) {
+          const bytes = new Uint8Array(await upstream.arrayBuffer());
+          const responseText = new TextDecoder().decode(bytes);
+          if (responseText.includes('"code":"preempted"') || responseText.includes('"code": "preempted"')) {
+            if (attempt < 3) { requestState.state = "submitting"; continue; }
+            throw new AdmissionError("preempted", 503);
+          }
+          bufferedStream = bytes;
+        }
+        break;
+      }
+      if (!upstream) throw new AdmissionError("inference_failed", 502);
       if (!body.stream) {
         const data = await upstream.json();
         if (!Array.isArray(data.choices) || !data.choices.length || data.choices.some((x: any) => !x.message || !["stop", "tool_calls", "length"].includes(x.finish_reason))) throw new AdmissionError("invalid_completion_response", 502);
-        lease.finish(); return c.json(data);
+        requestState.state = "completed"; requestState.updated = Date.now(); return c.json(data);
       }
-      const reader = upstream.body.getReader(); const owned = lease;
+      const responseBytes = bufferedStream ?? new Uint8Array();
+      const reader = new ReadableStream<Uint8Array>({start(streamController) { streamController.enqueue(responseBytes); streamController.close(); }}).getReader();
       const decoder = new TextDecoder(); let tail = "", complete = false;
       let streamController: ReadableStreamDefaultController<Uint8Array>;
-      let preempted = false;
-      const onAbort = () => {
-        // A streaming round the foreground preempted: unlike the buffered path
-        // below, the abort would otherwise leave no server-side trace at all.
-        if ((owned.signal.reason as {code?: string} | undefined)?.code === "preempted")
-          log({id, stage: "completion", status: "failed", code: "preempted"});
-        // A foreground chat preempted this background round. The visitor is
-        // still connected, so the response ends with an explicit error frame
-        // the client can recognize as parking, instead of a bare cut that
-        // reads as a failed generation.
-        preempted ||= (owned.signal.reason as {code?: string} | undefined)?.code === "preempted";
-        void reader.cancel(owned.signal.reason).finally(() => owned.finish("failed"));
-        if (preempted) {
-          try { streamController.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({error: {code: "preempted", message: "preempted"}})}\n\n`)); streamController.close(); } catch { /* already closed */ }
-        } else {
-          try { streamController.error(owned.signal.reason); } catch { /* Stream is already closed. */ }
-        }
-      };
       const stream = new ReadableStream<Uint8Array>({
-        start(controller) { streamController = controller; owned.signal.addEventListener("abort", onAbort, {once: true}); if (owned.signal.aborted) onAbort(); },
+        start(controller) { streamController = controller; },
         async pull(controller) {
           try {
             const chunk = await reader.read();
             if (chunk.done) {
-              owned.signal.removeEventListener("abort", onAbort);
-              if (preempted) return; // the preemption frame already ended this response
               if (!complete) throw new AdmissionError("incomplete_generation", 502);
-              owned.finish(); controller.close();
+              requestState.state = "completed"; requestState.updated = Date.now(); controller.close();
             } else {
               const text = tail + decoder.decode(chunk.value, {stream: true});
               complete ||= /(?:^|\n)data: ?\[DONE\](?:\r?\n|$)/.test(text);
               tail = text.slice(-64); controller.enqueue(chunk.value);
             }
-          } catch (error) { owned.signal.removeEventListener("abort", onAbort); owned.finish("failed"); try { controller.error(error); } catch { /* already closed by a preemption frame */ } }
+          } catch (error) { requestState.state = "failed"; requestState.updated = Date.now(); try { controller.error(error); } catch { /* stream already closed */ } }
         },
-        async cancel(reason) { queue.cancel(id); try { await reader.cancel(reason); } finally { owned.signal.removeEventListener("abort", onAbort); owned.finish("failed"); } },
+        async cancel(reason) { requestState.state = "interrupted"; requestState.updated = Date.now(); controller.abort(reason); await reader.cancel(reason); },
       });
       return new Response(stream, {headers: {"Content-Type": "text/event-stream", "Cache-Control": "no-store", "X-Request-Id": id}});
     } catch (error) {
-      lease?.finish("failed");
-      // A preemption that landed during admission (before any bytes were
-      // streamed) still identifies itself by code, so a non-streaming caller
-      // can tell parking from failure too.
-      const preempted = lease?.signal.aborted && (lease.signal.reason as {code?: string} | undefined)?.code === "preempted";
-      const err = preempted ? new AdmissionError("preempted", 503) : error instanceof AdmissionError ? error : new AdmissionError("inference_failed", 502);
+      requestState.state = error instanceof AdmissionError && error.code === "queue_timeout" ? "queue_timeout" : "failed";
+      requestState.updated = Date.now();
+      const err = error instanceof AdmissionError ? error : new AdmissionError("inference_failed", 502);
       log({id, stage: "completion", status: "failed", code: err.code});
-      return c.json({error: {code: err.code, message: err.code}, request_id: id}, err.status as 503);
-    }
+      return c.json({error: {code: err.code, message: err.code}, request_id: id}, err.status as 400 | 409 | 413 | 429 | 502 | 503 | 504);
+    } finally { c.req.raw.signal.removeEventListener("abort", abortFromClient); }
   });
   // An address left on the About page. The shape check bounds what is stored and
   // rejects obvious nonsense; deliverability is not established here and no mail
@@ -445,7 +477,7 @@ app.post("/v1/embed", limit("embed"), async (c) => {
     } catch { return c.notFound(); }
     return new Response(Bun.file(filePath), {headers: {"X-Content-Type-Options": "nosniff"}});
   });
-  return {app, queue, profile, log};
+  return {app, requests, profile, log};
 }
 const {app, profile} = createGateway();
 const speech = speechBridge(config.ttsBase, profile?.limits.speechConcurrency ?? 0, profile?.limits.speechTimeoutMs ?? 1000, profile?.limits.speechMaxBytes ?? 1024);

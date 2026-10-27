@@ -197,9 +197,10 @@ subscribeRequests((request) => {
 	if (request.role !== "chat" && request.role !== "compaction") return;
 	let notice = document.getElementById("oracle-request-state");
 	if (!notice) { notice = document.createElement("div"); notice.id = "oracle-request-state"; notice.setAttribute("role", "status"); notice.className = "text-sm p-2"; document.body.appendChild(notice); }
-	const labels: Record<string, string> = { waiting: "Waiting for the local model…", queued: "Waiting for the local model…", executing: "Researching…", running: "Researching…", failed: "Request failed. Any partial answer is incomplete; retry when ready.", interrupted: "Request interrupted. Any partial answer is incomplete.", incomplete: "Answer reached its limit and is incomplete.", busy: "The local model is busy or unavailable. Please retry shortly.", complete: "" };
-	notice.textContent = (labels[request.state] ?? request.state) + (request.position ? ` Queue position: ${request.position}.` : "");
-	if (["waiting", "queued", "executing", "running"].includes(request.state)) { const cancel = document.createElement("button"); cancel.textContent = "Cancel"; cancel.className = "ml-3 underline"; cancel.onclick = () => agent?.abort(); notice.appendChild(cancel); }
+	const labels: Record<string, string> = { preparing: "Preparing your request…", submitting: "Sending your request…", waiting: "The engine is busy — you’re in line.", queued: "The engine is busy — you’re in line.", executing: "Researching…", running: "Researching…", failed: "Request failed. Any partial answer is incomplete; retry when ready.", interrupted: "Request interrupted. Any partial answer is incomplete.", incomplete: "Answer reached its limit and is incomplete.", busy: "The local model is busy or unavailable. Please retry shortly.", queue_timeout: "The engine has been busy for a while. Try again.", complete: "" };
+	notice.replaceChildren(document.createTextNode((labels[request.state] ?? request.state) + (request.position ? ` Queue position: ${request.position}.` : "")));
+	if (["preparing", "submitting", "waiting", "queued", "executing", "running"].includes(request.state)) { const cancel = document.createElement("button"); cancel.textContent = "Cancel"; cancel.className = "ml-3 underline"; cancel.onclick = () => agent?.abort(); notice.appendChild(cancel); }
+	if (request.state === "queue_timeout") { const retry = document.createElement("button"); retry.textContent = "Retry"; retry.className = "ml-3 underline"; retry.onclick = () => { void agent?.continue().catch(error => dbgError("Retry after queue timeout failed", error)); }; notice.appendChild(retry); }
 });
 
 let currentSessionId: string | undefined;
