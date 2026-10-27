@@ -963,9 +963,11 @@ const createAgent = async (initialState?: Partial<AgentState>, savedHistory?: Co
 			if (!isCurrent() || epoch !== memoryEpoch || signal?.aborted) return;
 			if (messages !== context.messages) { owner.state.messages = messages; repaintChatAfterExternalEdit(); return { context: { ...context, messages } }; }
 		} catch (error) {
+			// A failed compaction must not abort a running turn: the next
+			// request proceeds with the uncompacted context, and the gateway's
+			// own budget check admits or rejects it as a normal error.
 			dbgError("Research context could not be prepared", error);
-			owner.abort();
-			if (isCurrent()) { const notice = document.getElementById("oracle-request-state"); if (notice) notice.textContent = `Research interrupted: ${error instanceof Error ? error.message : String(error)}`; }
+			if (isCurrent()) { const notice = document.getElementById("oracle-request-state"); if (notice) notice.textContent = "Context could not be re-prepared; continuing uncompacted."; }
 		}
 	};
 	if (memoryConsent !== "granted") invalidateMemoryContext();
