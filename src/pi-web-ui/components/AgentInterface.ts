@@ -282,6 +282,7 @@ export class AgentInterface extends LitElement {
 		this._sendError = "";
 		const editor = this._messageEditor;
 		const isCurrent = () => this.session === session && !session.state.isStreaming && !this.sendDisabled;
+		let sent = false;
 		try {
 			const provider = session.state.model.provider;
 			const apiKey = await getAppStorage().providerKeys.get(provider);
@@ -315,13 +316,19 @@ export class AgentInterface extends LitElement {
 				: { role: "user", content: input, timestamp: Date.now() };
 			this._autoScroll = true;
 			await sendWithAdmission(session, message, clearSubmittedDraft);
+			sent = true;
 		} catch (error) {
 			if (this.session === session && !this.sendDisabled) this._sendError = `Message could not be sent: ${error instanceof Error ? error.message : String(error)}`;
 			throw error;
 		} finally {
 			this._sendingSessions.delete(session);
-			// A send held during this one's preparation or run fires now that the
-			// session is idle; flushHeldSend re-checks every busy condition.
+			const held = this._heldSend;
+			if (sent && held?.input === input && held.attachments.length === submittedAttachments.length &&
+				held.attachments.every((attachment, i) => attachment === submittedAttachments[i])) {
+				// The submitted message already represents this identical held draft.
+				this._heldSend = null;
+			}
+			// Flush any distinct send held during preparation or the run.
 			this._flushHeldSend();
 			this.requestUpdate();
 		}
