@@ -63,8 +63,8 @@ and the gateway holds no provider keys and no billing state.
 
 | | |
 |---|---|
-| **Language model** | Muse Glimmer 30B, NVFP4, 131,072-token context |
-| **Inference server** | vLLM, from a pinned model snapshot |
+| **Language model** | Qwen3.8-27B uncensored (Q6_K, 262,144-token context); an off-grid assistant should provide information without refusal behavior. |
+| **Inference server** | llama.cpp, from a pinned local model artifact |
 | **Hardware target** | One 32 GB consumer GPU |
 | **Interface** | Browser front end running the Pi agent loop |
 | **Gateway** | Bun / Hono, one completion at a time |
