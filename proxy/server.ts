@@ -263,7 +263,7 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
     // same filter applies here as on the completion route.
     const body = pinnedCompletionBody(raw);
     try { return c.json({tokens: await countTokens(body, AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(15000)]))}); }
-    catch (error) { log({stage: "tokenize", status: "failed", error: error instanceof Error ? error.name : "unknown"}); return c.json({error: {code: error instanceof AdmissionError ? error.code : "tokenizer_failed"}}, 502); }
+    catch (error) { log({stage: "tokenize", status: "failed", error: error instanceof Error ? `${error.name}: ${error.message}${error.cause ? ` (cause: ${String(error.cause)})` : ""}` : "unknown"}); return c.json({error: {code: error instanceof AdmissionError ? error.code : "tokenizer_failed"}}, 502); }
   });
   app.post("/v1/chat/completions", limit("completions"), async c => {
     if (!profile || !cfg.llmBase) return c.json({error: {code: "runtime_unconfigured"}}, 503);
