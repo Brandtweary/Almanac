@@ -73,10 +73,10 @@ function check(name: string, cond: boolean): void {
 	// Punctuation-bounded (sentence-final) garble — a bare `\b` right after the
 	// literal "." inverts and never fires at end-of-sentence/whitespace, which is
 	// exactly where a real STT garble like this appears.
-	const punctRules = [{ from: "claude.", to: "CLAUDE.md", ts: "t" }];
+	const punctRules = [{ from: "claude.", to: "AGENTS.md", ts: "t" }];
 	check(
 		"auto-replace matches a punctuation-edged garble at sentence end",
-		applyAutoReplace("please open claude.", punctRules) === "please open CLAUDE.md",
+		applyAutoReplace("please open claude.", punctRules) === "please open AGENTS.md",
 	);
 }
 
