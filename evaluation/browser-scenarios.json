@@ -142,47 +142,6 @@
       ]
     },
     {
-      "id": "browser-cancel-waiting",
-      "split": "development",
-      "track": "browser",
-      "family": "queued-cancellation",
-      "description": "A declared queue blocker makes waiting visible; UI cancellation releases the pending request without inference.",
-      "steps": [
-        {
-          "action": "fault",
-          "kind": "hold-waiting"
-        },
-        {
-          "action": "send",
-          "text": "Wait for my reference question."
-        },
-        {
-          "action": "consent",
-          "enabled": false
-        },
-        {
-          "action": "wait",
-          "condition": "waiting"
-        },
-        {
-          "action": "cancel"
-        }
-      ],
-      "assertions": [
-        {
-          "id": "queue-interrupted",
-          "kind": "request-state",
-          "critical": true
-        },
-        {
-          "id": "no-inference-after-cancel",
-          "kind": "forbidden-request",
-          "critical": true
-        }
-      ],
-      "rubric": []
-    },
-    {
       "id": "browser-cancel-executing",
       "split": "development",
       "track": "browser",

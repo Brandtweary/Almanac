@@ -35,7 +35,7 @@ export async function runBrowserSubset(options:{candidate:BrowserCandidate;outpu
  const browserEnv={...process.env};delete browserEnv.OPENROUTER_API_KEY;
  const browser=await chromium.launch({headless:true,env:browserEnv,args:["--use-fake-device-for-media-stream","--use-fake-ui-for-media-stream"]});const cases:any[]=[];
  const revision=execFileSync("git",["rev-parse","HEAD"],{cwd:root,encoding:"utf8"}).trim();
- const sourcePaths=[...new Set(execFileSync("git",["ls-files","-co","--exclude-standard","--","src","evaluation","proxy/queue.ts"],{cwd:root,encoding:"utf8"}).trim().split("\n"))].sort();
+ const sourcePaths=[...new Set(execFileSync("git",["ls-files","-co","--exclude-standard","--","src","evaluation"],{cwd:root,encoding:"utf8"}).trim().split("\n"))].sort();
  const sources=sourcePaths.filter(path=>existsSync(`${root}/${path}`)).map(path=>({path,digest:hash(readFileSync(`${root}/${path}`,"utf8"))}));
  const bundle=readdirSync(`${root}/dist`,{recursive:true,withFileTypes:true}).filter(entry=>entry.isFile()).map(entry=>({path:`${entry.parentPath}/${entry.name}`.slice(`${root}/dist/`.length),digest:createHash("sha256").update(readFileSync(`${entry.parentPath}/${entry.name}`)).digest("hex")})).sort((a,b)=>a.path.localeCompare(b.path));
  const report:any={schemaVersion:1,runId:new Date().toISOString(),suiteDigest:hash(suite),implementation:{revision,dirtyDigest:hash(sources),sources,bundleDigest:hash(bundle),bundle},profile:{...options.candidate,transport:options.scripted?"controlled-transport-contract":"openrouter-developer-only",tokenizer:"conservative-byte-bound-not-native",settings:{temperature:0,stream:true}},cases,reportedCostUSD:0};
@@ -80,14 +80,14 @@ export async function runBrowserSubset(options:{candidate:BrowserCandidate;outpu
      await page.getByTitle("Settings",{exact:true}).click();await page.getByRole("button",{name:"Turn memory off",exact:true}).click();await page.getByRole("button",{name:"Turn memory on",exact:true}).waitFor();await closeDialog(page);
      const off=await inspectBrowserState(page);snapshots.push(off);check("consent-ui-off",off["memory-consent"]?.includes("declined"),off["memory-consent"]);
     } else {
-     const waiting=fixture.id==="browser-cancel-waiting";await bridge.setFault(waiting?"hold-waiting":"hold-executing");
+     await bridge.setFault("hold-executing");
      await send(page,fixture.steps[1].text);await chooseConsent(page,false);
-     const request=await until(async()=>bridge.requests.slice(requestStart).at(-1),r=>Boolean(r&&r.state===(waiting?"waiting":"executing")),15000);
+     const request=await until(async()=>bridge.requests.slice(requestStart).at(-1),r=>Boolean(r&&r.state==="executing"),15000);
      await page.locator("#oracle-request-state").getByRole("button",{name:"Cancel",exact:true}).click();
      await until(async()=>bridge.requests.find(r=>r.id===request!.id),r=>r?.state==="interrupted",15000);
      const terminal=bridge.events.slice(eventStart).filter((event:any)=>event.id===request!.id&&event.state==="interrupted");
-     check(waiting?"queue-interrupted":"execution-interrupted",terminal.length===1,terminal);
-     check(waiting?"no-inference-after-cancel":"slot-released",request!.frames===undefined&&request!.costUSD===undefined,request!.state);
+     check("execution-interrupted",terminal.length===1,terminal);
+     check("request-cancelled",request!.frames===undefined&&request!.costUSD===undefined,request!.state);
      snapshots.push(await inspectBrowserState(page));
     }
     check("no-browser-exceptions",errors.length===0,errors);
@@ -95,7 +95,7 @@ export async function runBrowserSubset(options:{candidate:BrowserCandidate;outpu
    const requests=bridge.requests.slice(requestStart);const hasTransportFailure=requests.some(r=>r.response?.httpStatus>=400||String(r.response?.error??"").startsWith("provider_transport_"));
    const applicationFailure=snapshots.some(state=>state.sessions?.some((s:any)=>s.messages?.some((m:any)=>m.role==="assistant"&&(m.stopReason==="error"||m.errorMessage))));
    const status=failure?(hasTransportFailure?"transport_error":applicationFailure?"failed":"evaluator_error"):checks.some(c=>!c.passed)?"failed":fixture.rubric.length?"unadjudicated":"passed";
-   const artifact=`${fixture.id}.json`;writeFileSync(`${options.output}/${artifact}`,JSON.stringify({fixture,checks,failure,requests,queueEvents:bridge.events.slice(eventStart),sourceRequests:library.requests.slice(sourceStart),snapshots,answer:finalText,browserErrors:errors,consoleMessages,network},null,2));
+   const artifact=`${fixture.id}.json`;writeFileSync(`${options.output}/${artifact}`,JSON.stringify({fixture,checks,failure,requests,receiptEvents:bridge.events.slice(eventStart),sourceRequests:library.requests.slice(sourceStart),snapshots,answer:finalText,browserErrors:errors,consoleMessages,network},null,2));
    await page.screenshot({path:`${options.output}/${fixture.id}.png`,fullPage:true}).catch(()=>{});
    console.log(JSON.stringify({case:fixture.id,phase:"finished",status,failure}));
    cases.push({caseId:fixture.id,caseDigest:hash(fixture),status,failureCategory:failure?(hasTransportFailure?"provider_transport":applicationFailure?"application":"evaluator"):undefined,checks,metrics:{seconds:(performance.now()-started)/1000,inputTokens:requests.reduce((n,r)=>n+(r.inputTokens??0),0),outputTokens:requests.reduce((n,r)=>n+(r.outputTokens??0),0),costUSD:requests.reduce((n,r)=>n+(r.costUSD??0),0)},artifacts:[artifact,`${fixture.id}.png`]});persist();
@@ -107,7 +107,7 @@ export async function runBrowserSubset(options:{candidate:BrowserCandidate;outpu
 if(process.argv[1]&&resolvePath(process.argv[1])===fileURLToPath(import.meta.url)){
  const [profilePath,output,...flags]=process.argv.slice(2);if(!profilePath||!output)throw new Error("Usage: tsx evaluation/browser.ts PROFILE.json NEW_OUTPUT_DIRECTORY [--contracts-only]");
  const candidate=JSON.parse(readFileSync(profilePath,"utf8"));const casesArg=flags.find(flag=>flag.startsWith("--cases="));
- const only=flags.includes("--contracts-only")?["browser-cancel-waiting","browser-cancel-executing"]:casesArg?casesArg.slice(8).split(","):undefined;
+ const only=flags.includes("--contracts-only")?["browser-cancel-executing"]:casesArg?casesArg.slice(8).split(","):undefined;
  const priorArg=flags.find(flag=>flag.startsWith("--prior-budget="));
  const priorBudget=priorArg?JSON.parse(readFileSync(priorArg.slice(15),"utf8")):undefined;
  const result=await runBrowserSubset({candidate,output,priorBudget,apiKey:process.env.OPENROUTER_API_KEY,scripted:flags.includes("--contracts-only"),only});
