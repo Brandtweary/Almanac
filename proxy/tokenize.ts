@@ -1,4 +1,4 @@
-import { AdmissionError } from "./queue";
+import { AdmissionError } from "./errors";
 
 /** Request fields a client may set. Everything else is dropped before admission
  *  counting and before the backend sees the body.

@@ -9,7 +9,7 @@ import { buildOraclePrompt } from "./oracle-prompts.js";
 import { compactContext, COMPACTION_INSTRUCTIONS } from "./oracle-context.js";
 import { EvidenceLedger, createCorpusTools, resolveCorpusCitation } from "./corpus-tools.js";
 import { registerReferenceToolRenderers } from "./reference-tool-renderers.js";
-import { createLocalStreamFn, subscribeRequests, countRequestTokens, serializeModelRequest } from "./oracle-runtime.js";
+import { createLocalStreamFn, subscribeRequests, countRequestTokens, serializeModelRequest, isMidstreamPreemptedCompletionError } from "./oracle-runtime.js";
 import { voiceLeaseResponse, serviceError } from "./service-contracts.js";
 import { sendWithAdmission } from "./send-admission.js";
 import {
@@ -193,14 +193,19 @@ const openSettings = async () => {
 };
 
 
+let midstreamPreemptionRetries = 0;
+let midstreamRetryPending = false;
+let midstreamRetryActive = false;
 subscribeRequests((request) => {
 	if (request.role !== "chat" && request.role !== "compaction") return;
 	let notice = document.getElementById("oracle-request-state");
 	if (!notice) { notice = document.createElement("div"); notice.id = "oracle-request-state"; notice.setAttribute("role", "status"); notice.className = "text-sm p-2"; document.body.appendChild(notice); }
-	const labels: Record<string, string> = { preparing: "Preparing your request…", submitting: "Sending your request…", waiting: "The engine is busy — you’re in line.", queued: "The engine is busy — you’re in line.", executing: "Researching…", running: "Researching…", failed: "Request failed. Any partial answer is incomplete; retry when ready.", interrupted: "Request interrupted. Any partial answer is incomplete.", incomplete: "Answer reached its limit and is incomplete.", busy: "The local model is busy or unavailable. Please retry shortly.", queue_timeout: "The engine has been busy for a while. Try again.", complete: "" };
+	if (request.state === "complete") { midstreamRetryActive = false; midstreamPreemptionRetries = 0; }
+	const retrying = "The engine was needed for a higher-priority task — regenerating your answer";
+	const labels: Record<string, string> = { preparing: midstreamRetryActive ? `${retrying}…` : "Preparing your request…", submitting: midstreamRetryActive ? `${retrying}…` : "Sending your request…", waiting: midstreamRetryActive ? `${retrying}; you’re in line.` : "The engine is busy — you’re in line.", queued: midstreamRetryActive ? `${retrying}; you’re in line.` : "The engine is busy — you’re in line.", executing: midstreamRetryActive ? `${retrying}…` : "Researching…", running: "Researching…", preempted_midstream: `${retrying}…`, preempted: "The engine needed the slot several times. Your answer stopped; try again.", failed: "Request failed. Any partial answer is incomplete; retry when ready.", interrupted: "Request interrupted. Any partial answer is incomplete.", incomplete: "Answer reached its limit and is incomplete.", busy: "The local model is busy or unavailable. Please retry shortly.", queue_timeout: "The engine has been busy for a while. Try again.", complete: "" };
 	notice.replaceChildren(document.createTextNode((labels[request.state] ?? request.state) + (request.position ? ` Queue position: ${request.position}.` : "")));
 	if (["preparing", "submitting", "waiting", "queued", "executing", "running"].includes(request.state)) { const cancel = document.createElement("button"); cancel.textContent = "Cancel"; cancel.className = "ml-3 underline"; cancel.onclick = () => agent?.abort(); notice.appendChild(cancel); }
-	if (request.state === "queue_timeout") { const retry = document.createElement("button"); retry.textContent = "Retry"; retry.className = "ml-3 underline"; retry.onclick = () => { void agent?.continue().catch(error => dbgError("Retry after queue timeout failed", error)); }; notice.appendChild(retry); }
+	if (["queue_timeout", "preempted"].includes(request.state)) { const retry = document.createElement("button"); retry.textContent = "Retry"; retry.className = "ml-3 underline"; retry.onclick = () => { midstreamRetryActive = false; midstreamPreemptionRetries = 0; void agent?.continue().catch(error => dbgError("Retry after queue wait failed", error)); }; notice.appendChild(retry); }
 });
 
 let currentSessionId: string | undefined;
@@ -1021,7 +1026,39 @@ const createAgent = async (initialState?: Partial<AgentState>, savedHistory?: Co
 		// header shell.
 		try {
 			const type = event?.type;
-			if (type === "message_end" && event.message) history.capture(event.message);
+			let resumesAfterPreemption = false;
+			if (type === "message_end" && event.message) {
+				if (isMidstreamPreemptedCompletionError(event.message.errorMessage)) {
+					// Audio already played cannot be recalled. Cut any remaining partial
+					// speech and let the regenerated stream open a fresh speaker queue.
+					synth?.stop();
+					voiceQueue?.close();
+					voiceQueue = null;
+					const messagesWithoutPartial = [...agent.state.messages];
+					const partialIndex = messagesWithoutPartial.lastIndexOf(event.message);
+					if (partialIndex >= 0) {
+						messagesWithoutPartial.splice(partialIndex, 1);
+						agent.state.messages = messagesWithoutPartial;
+						repaintChatAfterExternalEdit();
+					}
+					if (midstreamPreemptionRetries < 3) {
+						midstreamPreemptionRetries++;
+						midstreamRetryActive = true;
+						midstreamRetryPending = true;
+						resumesAfterPreemption = true;
+					} else {
+						midstreamRetryActive = false;
+						let notice = document.getElementById("oracle-request-state");
+						if (!notice) { notice = document.createElement("div"); notice.id = "oracle-request-state"; notice.setAttribute("role", "status"); notice.className = "text-sm p-2"; document.body.appendChild(notice); }
+						notice.replaceChildren(document.createTextNode("The engine needed a higher-priority task. The partial answer was removed; retry to regenerate it."));
+						const retry = document.createElement("button"); retry.textContent = "Retry"; retry.className = "ml-3 underline";
+						retry.onclick = () => { midstreamPreemptionRetries = 0; midstreamRetryActive = true; void agent?.continue().catch(error => dbgError("Retry after preemption failed", error)); };
+						notice.appendChild(retry);
+					}
+				} else {
+					history.capture(event.message);
+				}
+			}
 			const isTerminal = type === "message_end" || type === "agent_end";
 			const messages = agent.state.messages;
 
@@ -1099,22 +1136,25 @@ const createAgent = async (initialState?: Partial<AgentState>, savedHistory?: Co
 			}
 			if (type === "agent_end") {
 				runInFlight = false; // this run is done — a barge-in send may now proceed
+				const resumeAfterPreemption = midstreamRetryPending;
+				midstreamRetryPending = false;
 				// The ending run carried a stamped voice-turn id (or null if it was typed).
 				// wasVoiceTurn drives the pipeline's STT functions; it must reflect THIS run,
 				// not the module global a barge-in may have since flipped.
 				const endingVoiceTurn = inFlightVoiceTurn;
 				inFlightVoiceTurn = null;
 				const wasVoiceTurn = endingVoiceTurn !== null;
+				if (resumeAfterPreemption) inFlightVoiceTurn = endingVoiceTurn;
 				// Retire the shared speak state ONLY if this ending run is still the current
 				// voice turn — a stale run (superseded by a later barge-in) must leave the newer
 				// turn's voiceTurnSpeaking / voiceQueue / voiceTurnCut untouched.
-				if (wasVoiceTurn && endingVoiceTurn === voiceTurnSeq) {
+				if (!resumeAfterPreemption && wasVoiceTurn && endingVoiceTurn === voiceTurnSeq) {
 					voiceTurnSpeaking = false; // turn truly done (no more tool calls) → retire the speak intent
 					voiceQueue?.close(); // close the turn's single speaker (drains remaining audio, then ends)
 					voiceQueue = null;
 					voiceTurnCut = false; // reset the barge-in guard for the next turn
 				}
-				refreshAnswerSpeechUntilSilent(); // the turn released the speaker; its tail is still draining
+				if (!resumeAfterPreemption) refreshAnswerSpeechUntilSilent(); // the turn released the speaker; its tail is still draining
 				// The turn is over → one memory admission (consent-gated;
 				// fire-and-forget; single-flight per conversation: this supersedes any
 				// tick still outstanding and its coverage reaches back to the last
@@ -1123,7 +1163,8 @@ const createAgent = async (initialState?: Partial<AgentState>, savedHistory?: Co
 				// for is exactly the “stop button ran the pipeline” experience. Its
 				// messages are not lost — the next turn's tick covers back to the last
 				// completed job's boundary, so coverage defers instead of skipping.
-				const aborted = ((event.messages ?? []) as AgentMessage[]).some((m) => (m as { stopReason?: string }).stopReason === "aborted");
+				const endedMessages = (event.messages ?? []) as AgentMessage[];
+				const aborted = endedMessages.some((m) => (m as { stopReason?: string }).stopReason === "aborted" || isMidstreamPreemptedCompletionError((m as {errorMessage?: string}).errorMessage));
 				if (memoryConsent === "granted" && !aborted) {
 					const captured = history.snapshot();
 					const voiceEvidence = inFlightVoiceEvidence;
@@ -1136,6 +1177,14 @@ const createAgent = async (initialState?: Partial<AgentState>, savedHistory?: Co
 						if (!saved?.rawHistory || !isCurrent() || epoch !== memoryEpoch || memoryConsent !== "granted") return;
 						await pipeline.onTurnEndHistory({ sessionKey, revision: saved.revision ?? 0, archive: captured }, wasVoiceTurn, voiceEvidence);
 					})().catch(reportMemoryFailure);
+				}
+				if (resumeAfterPreemption) {
+					setTimeout(() => {
+						if (isCurrent()) void agent.continue().catch(error => dbgError("Regeneration after preemption failed", error));
+					}, 0);
+				} else if (!aborted) {
+					midstreamPreemptionRetries = 0;
+					midstreamRetryActive = false;
 				}
 			}
 

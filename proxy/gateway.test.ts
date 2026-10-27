@@ -39,7 +39,7 @@ test("truncated stream fails explicitly",async()=>{
  const r=await app.request("/v1/chat/completions",{method:"POST",headers:{"X-Request-Id":"truncated-0000001"},body:JSON.stringify({model:"fixture",messages:[{role:"user",content:"hi"}],stream:true})});
  await expect(r.text()).rejects.toThrow("incomplete_generation"); expect((await (await app.request("/v1/requests/truncated-0000001")).json()).state).toBe("failed");
 });
-test("generation uses the almanac tier and transparently retries a preempted round",async()=>{
+test("generation uses the almanac tier and invisibly retries preemption before its first token",async()=>{
  const base=mock(); let tries=0; const priorities:string[]=[];
  const fetcher=(async(url:any,init:any)=>{
   if(String(url).endsWith("/v1/chat/completions")) {
@@ -54,6 +54,57 @@ test("generation uses the almanac tier and transparently retries a preempted rou
  const r=await app.request("/v1/chat/completions",{method:"POST",headers:{"X-Request-Id":"retry-request-0001"},body:JSON.stringify({model:"fixture",messages:[{role:"user",content:"hello"}],stream:true})});
  expect(r.status).toBe(200); expect(await r.text()).toContain("[DONE]"); expect(tries).toBe(2); expect(priorities).toEqual(["almanac","almanac"]);
  expect((await (await app.request("/v1/requests/retry-request-0001")).json()).state).toBe("completed");
+});
+test("pre-first-token retry exhaustion remains an explicit retryable stream error",async()=>{
+ const base=mock(); let tries=0;
+ const fetcher=(async(url:any)=>{
+  if(String(url).endsWith("/v1/chat/completions")) {
+   tries++;
+   return Response.json({error:{code:"preempted"}},{status:503});
+  }
+  return base(url);
+ }) as typeof fetch;
+ const {app}=createGateway(cfg,fetcher,profile);
+ const response=await app.request("/v1/chat/completions",{method:"POST",headers:{"X-Request-Id":"exhausted-request-0001"},body:JSON.stringify({model:"fixture",messages:[{role:"user",content:"hello"}],stream:true})});
+ expect(response.status).toBe(200); expect(await response.text()).toContain('"finish_reason":"preempted"'); expect(tries).toBe(4);
+ expect((await (await app.request("/v1/requests/exhausted-request-0001")).json()).state).toBe("preempted");
+});
+test("a successful SSE response streams its first token before generation finishes",async()=>{
+ const base=mock(); let finish!:()=>void;
+ const fetcher=(async(url:any)=>{
+  if(String(url).endsWith("/v1/chat/completions")) return new Response(new ReadableStream<Uint8Array>({start(controller){
+   controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"first token"}}]}\n\n'));
+   finish=()=>{controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));controller.close();};
+  }}),{headers:{"Content-Type":"text/event-stream"}});
+  return base(url);
+ }) as typeof fetch;
+ const {app}=createGateway(cfg,fetcher,profile);
+ const response=await app.request("/v1/chat/completions",{method:"POST",body:JSON.stringify({model:"fixture",messages:[{role:"user",content:"hello"}],stream:true})});
+ const reader=response.body!.getReader();
+ const first=await reader.read(); expect(new TextDecoder().decode(first.value)).toContain("first token");
+ finish(); const rest=await reader.read(); expect(new TextDecoder().decode(rest.value)).toContain("[DONE]");
+ expect((await reader.read()).done).toBe(true);
+});
+test("a mid-stream preemption reports that the partial answer must be regenerated",async()=>{
+ const base=mock(); let preempt!:()=>void; let generations=0;
+ const fetcher=(async(url:any)=>{
+  if(String(url).endsWith("/v1/chat/completions")) {
+   generations++;
+   return new Response(new ReadableStream<Uint8Array>({start(controller){
+    controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"partial"}}]}\n\n'));
+    preempt=()=>{controller.enqueue(new TextEncoder().encode('data: {"error":{"code":"preempted","message":"preempted"}}\n\n'));controller.close();};
+   }}),{headers:{"Content-Type":"text/event-stream"}});
+  }
+  return base(url);
+ }) as typeof fetch;
+ const {app}=createGateway(cfg,fetcher,profile);
+ const response=await app.request("/v1/chat/completions",{method:"POST",headers:{"X-Request-Id":"midstream-request-0001"},body:JSON.stringify({model:"fixture",messages:[{role:"user",content:"hello"}],stream:true})});
+ const reader=response.body!.getReader();
+ expect(new TextDecoder().decode((await reader.read()).value)).toContain("partial");
+ preempt(); const remainder=await reader.read();
+ expect(new TextDecoder().decode(remainder.value)).toContain('"finish_reason":"preempted_midstream"');
+ expect((await reader.read()).done).toBe(true); expect(generations).toBe(1);
+ expect((await (await app.request("/v1/requests/midstream-request-0001")).json()).state).toBe("preempted_midstream");
 });
 test("queue timeout remains an explicit retryable response",async()=>{
  const base=mock();

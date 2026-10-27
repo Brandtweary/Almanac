@@ -15,6 +15,30 @@ import { Subscribers } from "./subscribers";
 // an old fault rather than unbounded memory on a varied stream.
 const GATEWAY_LOG_FINGERPRINTS_MAX = 4096;
 
+function completionFrameError(frame: string): string | undefined {
+  const data = frame.split("\n").filter(line => line.startsWith("data:")).map(line => line.slice(5).trim()).join("\n");
+  if (!data || data === "[DONE]") return undefined;
+  try {
+    const value = JSON.parse(data) as {error?: {code?: unknown}};
+    return typeof value.error?.code === "string" ? value.error.code : undefined;
+  } catch { return undefined; }
+}
+
+function completionFrameHasToken(frame: string): boolean {
+  const data = frame.split("\n").filter(line => line.startsWith("data:")).map(line => line.slice(5).trim()).join("\n");
+  if (!data || data === "[DONE]") return false;
+  try {
+    const value = JSON.parse(data) as {choices?: Array<{delta?: Record<string, unknown>}>};
+    return value.choices?.some(choice => Object.entries(choice.delta ?? {}).some(([key, content]) =>
+      !["role", "index"].includes(key) && (typeof content === "string" ? content.length > 0 : content !== null && content !== undefined))) ?? false;
+  } catch { return false; }
+}
+
+function completionErrorFrames(code: string): Uint8Array {
+  const encoder = new TextEncoder();
+  return encoder.encode(`data: ${JSON.stringify({choices: [{delta: {}, finish_reason: code}]})}\n\ndata: [DONE]\n\n`);
+}
+
 export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch = fetch, providedProfile?: ReleaseProfile) {
   if (cfg.qualificationMode && cfg.qualificationBoundary && cfg.qualificationBoundary !== "isolated-container") throw new Error("invalid qualification boundary declaration");
   // The installer validates host publication and network isolation before supplying this declaration.
@@ -275,27 +299,22 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
       if (tokens > budgets.maxInputTokens || tokens + Number(max) > profile.model.contextWindow) throw new AdmissionError("context_budget_exceeded", 413);
       const upstreamHeaders = {"Content-Type": "application/json", "X-Request-Priority": "almanac", "X-Request-Id": id};
       let upstream: Response | undefined;
-      let bufferedStream: Uint8Array | undefined;
-      for (let attempt = 0; attempt < 4; attempt++) {
+      let retries = 0;
+      while (true) {
         requestState.state = "submitting"; requestState.updated = Date.now();
         upstream = await served(`${cfg.llmBase}/v1/chat/completions`, {method: "POST", headers: upstreamHeaders, body: JSON.stringify(body), signal: requestSignal});
         requestState.state = "executing"; requestState.updated = Date.now();
         if (!upstream.ok) {
           const data = await upstream.json().catch(() => ({})) as {error?: {code?: string}};
           const code = data.error?.code ?? "inference_failed";
-          if (code === "preempted" && attempt < 3) { requestState.state = "submitting"; continue; }
+          if (code === "preempted" && retries < 3) { retries++; requestState.state = "submitting"; continue; }
+          if (code === "preempted" && body.stream) {
+            upstream = Response.json({error: {code: "preempted"}}, {status: 503});
+            break;
+          }
           throw new AdmissionError(code, upstream.status);
         }
         if (!upstream.body) throw new AdmissionError("inference_failed", 502);
-        if (body.stream) {
-          const bytes = new Uint8Array(await upstream.arrayBuffer());
-          const responseText = new TextDecoder().decode(bytes);
-          if (responseText.includes('"code":"preempted"') || responseText.includes('"code": "preempted"')) {
-            if (attempt < 3) { requestState.state = "submitting"; continue; }
-            throw new AdmissionError("preempted", 503);
-          }
-          bufferedStream = bytes;
-        }
         break;
       }
       if (!upstream) throw new AdmissionError("inference_failed", 502);
@@ -304,26 +323,95 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
         if (!Array.isArray(data.choices) || !data.choices.length || data.choices.some((x: any) => !x.message || !["stop", "tool_calls", "length"].includes(x.finish_reason))) throw new AdmissionError("invalid_completion_response", 502);
         requestState.state = "completed"; requestState.updated = Date.now(); return c.json(data);
       }
-      const responseBytes = bufferedStream ?? new Uint8Array();
-      const reader = new ReadableStream<Uint8Array>({start(streamController) { streamController.enqueue(responseBytes); streamController.close(); }}).getReader();
-      const decoder = new TextDecoder(); let tail = "", complete = false;
-      let streamController: ReadableStreamDefaultController<Uint8Array>;
+      const controller = new AbortController();
       const stream = new ReadableStream<Uint8Array>({
-        start(controller) { streamController = controller; },
-        async pull(controller) {
-          try {
-            const chunk = await reader.read();
-            if (chunk.done) {
-              if (!complete) throw new AdmissionError("incomplete_generation", 502);
-              requestState.state = "completed"; requestState.updated = Date.now(); controller.close();
-            } else {
-              const text = tail + decoder.decode(chunk.value, {stream: true});
-              complete ||= /(?:^|\n)data: ?\[DONE\](?:\r?\n|$)/.test(text);
-              tail = text.slice(-64); controller.enqueue(chunk.value);
+        start(streamController) {
+          void (async () => {
+            let response = upstream!;
+            let retryCount = retries;
+            const encoder = new TextEncoder();
+            while (true) {
+              if (!response.ok) {
+                const error = await response.json().catch(() => ({})) as {error?: {code?: string}};
+                const code = error.error?.code ?? "inference_failed";
+                if (code === "preempted" && retryCount < 3) {
+                  retryCount++;
+                  requestState.state = "submitting"; requestState.updated = Date.now();
+                  response = await served(`${cfg.llmBase}/v1/chat/completions`, {method: "POST", headers: upstreamHeaders, body: JSON.stringify(body), signal: AbortSignal.any([requestSignal, controller.signal])});
+                  requestState.state = "executing"; requestState.updated = Date.now();
+                  continue;
+                }
+                requestState.state = code === "queue_timeout" ? "queue_timeout" : code === "preempted" ? "preempted" : "failed";
+                requestState.updated = Date.now();
+                streamController.enqueue(completionErrorFrames(code === "queue_timeout" ? "queue_timeout" : code === "preempted" ? "preempted" : "network_error"));
+                streamController.close();
+                return;
+              }
+              if (!response.body) throw new AdmissionError("inference_failed", 502);
+              const reader = response.body.getReader();
+              const decoder = new TextDecoder();
+              let carry = "", prefix = "", tokenSent = false, complete = false, retry = false;
+              const consumeFrame = (rawFrame: string) => {
+                const frame = rawFrame.replace(/\r\n/g, "\n").trimEnd();
+                if (!frame) return;
+                const preemptCode = completionFrameError(frame);
+                if (preemptCode === "preempted") { retry = true; return; }
+                const encodedFrame = encoder.encode(`${frame}\n\n`);
+                const isDone = frame.split("\n").some(line => line.trim() === "data: [DONE]");
+                if (!tokenSent) {
+                  prefix += `${frame}\n\n`;
+                  if (completionFrameHasToken(frame) || isDone) {
+                    streamController.enqueue(encoder.encode(prefix));
+                    prefix = "";
+                    tokenSent = completionFrameHasToken(frame);
+                  }
+                } else streamController.enqueue(encodedFrame);
+                complete ||= isDone;
+              };
+              while (true) {
+                const chunk = await reader.read();
+                if (chunk.done) {
+                  if (carry.trim()) consumeFrame(carry);
+                  if (retry) break;
+                  if (complete) {
+                    requestState.state = "completed"; requestState.updated = Date.now();
+                    streamController.close();
+                    return;
+                  }
+                  throw new AdmissionError("incomplete_generation", 502);
+                }
+                const input = carry + decoder.decode(chunk.value, {stream: true});
+                const frames = input.split(/\r?\n\r?\n/);
+                carry = frames.pop() ?? "";
+                for (const frame of frames) {
+                  consumeFrame(frame);
+                  if (retry) break;
+                }
+                if (retry) break;
+              }
+              await reader.cancel("preempted").catch(() => {});
+              if (!tokenSent && retryCount < 3) {
+                retryCount++;
+                requestState.state = "submitting"; requestState.updated = Date.now();
+                response = await served(`${cfg.llmBase}/v1/chat/completions`, {method: "POST", headers: upstreamHeaders, body: JSON.stringify(body), signal: AbortSignal.any([requestSignal, controller.signal])});
+                requestState.state = "executing"; requestState.updated = Date.now();
+                continue;
+              }
+              requestState.state = tokenSent ? "preempted_midstream" : "preempted";
+              requestState.updated = Date.now();
+              streamController.enqueue(completionErrorFrames(tokenSent ? "preempted_midstream" : "preempted"));
+              streamController.close();
+              return;
             }
-          } catch (error) { requestState.state = "failed"; requestState.updated = Date.now(); try { controller.error(error); } catch { /* stream already closed */ } }
+          })().catch(error => {
+            requestState.state = "failed"; requestState.updated = Date.now();
+            try { streamController.error(error); } catch { /* stream already closed */ }
+          });
         },
-        async cancel(reason) { requestState.state = "interrupted"; requestState.updated = Date.now(); controller.abort(reason); await reader.cancel(reason); },
+        async cancel(reason) {
+          requestState.state = "interrupted"; requestState.updated = Date.now();
+          controller.abort(reason);
+        },
       });
       return new Response(stream, {headers: {"Content-Type": "text/event-stream", "Cache-Control": "no-store", "X-Request-Id": id}});
     } catch (error) {

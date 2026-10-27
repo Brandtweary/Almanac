@@ -6,12 +6,14 @@ export interface RequestState { id: string; state: string; position?: number; ro
 const listeners = new Set<(state: RequestState) => void>();
 export function subscribeRequests(fn: (state: RequestState) => void): () => void { listeners.add(fn); return () => listeners.delete(fn); }
 function emit(state: RequestState): void { for (const fn of listeners) fn(state); }
-/** The gateway parks a preempted background round by ending it with an explicit
- * "preempted" code — an SSE error frame on the streaming path, or an HTTP error
- * body on the buffered path. Match the code, not message wording, so both
+/** The gateway represents a preemption as an explicit SSE finish reason or an
+ * HTTP error code. Match the code, not incidental provider wording, so both
  * renderings of the same gateway fact are recognized. */
 export function isPreemptedCompletionError(errorMessage: string | undefined): boolean {
-	return errorMessage === "preempted" || /"code"\s*:\s*"preempted"/.test(errorMessage ?? "");
+	return errorMessage === "preempted" || /preempted(?:_midstream)?/.test(errorMessage ?? "");
+}
+export function isMidstreamPreemptedCompletionError(errorMessage: string | undefined): boolean {
+	return /preempted_midstream/.test(errorMessage ?? "");
 }
 
 export async function countRequestTokens(payload: unknown, role: OracleRole, signal?: AbortSignal): Promise<number> {
@@ -71,7 +73,13 @@ export function createLocalStreamFn(role: OracleRole, getConversationId: () => s
 			maxRetries: 0, timeoutMs: 300_000 + p.limits.executionTimeoutMs,
 				onPayload: async (payload, m) => admitPayload(await options?.onPayload?.(payload, m) ?? payload, role, options?.signal),
 			});
-			void stream.result().then(result => request.finish(result.stopReason === "error" ? failure : result.stopReason === "aborted" ? "interrupted" : result.stopReason === "length" ? "incomplete" : "complete"), () => request.finish(failure));
+			void stream.result().then(result => {
+				const state = result.stopReason === "error"
+					? isMidstreamPreemptedCompletionError(result.errorMessage) ? "preempted_midstream"
+						: /queue_timeout/.test(result.errorMessage ?? "") ? "queue_timeout" : failure
+					: result.stopReason === "aborted" ? "interrupted" : result.stopReason === "length" ? "incomplete" : "complete";
+				request.finish(state);
+			}, () => request.finish(failure));
 			return stream;
 		} catch (error) { request.finish("failed"); throw error; }
 	};
