@@ -305,7 +305,19 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
       let retries = 0;
       while (true) {
         requestState.state = "submitting"; requestState.updated = Date.now();
-        upstream = await served(`${cfg.llmBase}/v1/chat/completions`, {method: "POST", headers: upstreamHeaders, body: JSON.stringify(body), signal: requestSignal});
+        try {
+          upstream = await served(`${cfg.llmBase}/v1/chat/completions`, {method: "POST", headers: upstreamHeaders, body: JSON.stringify(body), signal: requestSignal});
+        } catch (error) {
+          // The single-slot serve can drop an in-flight connection during
+          // preemption churn before the first token; with nothing yet sent to
+          // the browser, an upstream retry is invisible.
+          if (!requestSignal.aborted && retries < 3) {
+            retries++;
+            log({id, tier: priority, stage: "completion", status: "upstream_retry", durationMs: Date.now() - startedAt, error: error instanceof Error ? `${error.name}: ${error.message}`.slice(0, 300) : String(error).slice(0, 300)});
+            continue;
+          }
+          throw error;
+        }
         requestState.state = "executing"; requestState.updated = Date.now();
         if (!upstream.ok) {
           const errorBody = await upstream.text().catch(() => "");
