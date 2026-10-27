@@ -151,6 +151,25 @@ test("repeated preemption backs off and still completes; coverage is never marke
   assert.equal(h.errors.length, 0);
 });
 
+test("repeated preemption fails only after the bounded retry budget is exhausted", async () => {
+  let calls = 0; let chatBusy = false;
+  const h = await fixture({ foregroundActive: () => chatBusy, loop: async (_messages, context) => {
+    if (isAudit(context)) {
+      calls++;
+      chatBusy = true;
+      setTimeout(() => { chatBusy = false; }, 100);
+      return preempted();
+    }
+    return completed();
+  } });
+  h.runtime.onTurnEnd(() => messages, false);
+  await h.runtime.whenIdle();
+  assert.equal(calls, 4); // initial round plus three automatic retries
+  assert.equal(h.runtime.snapshot().jobs![0]!.stages.audit, "failed");
+  assert.equal(h.runtime.snapshot().jobs![0]!.stages.memory, "pending");
+  assert.equal(h.runtime.activity.filter(a => a.agent === "audit" && a.line.includes("paused")).length, 3);
+});
+
 test("consent revoked while parked ends the tick without a wedge or a false failure", async () => {
   const entered = deferred(); let calls = 0;
   const h = await fixture({ foregroundActive: () => true, loop: async (_messages, context) => {

@@ -1043,8 +1043,8 @@ export class PipelineRuntime {
 			// fetch wrapper. Known judgment classes (refusal, budget) still route to
 			// their own outcomes, and unknown errors park only a bounded number of
 			// times so a genuine client bug fails visibly instead of looping.
-			const parkable = error instanceof MemoryPreemptedError || error instanceof MemoryTransientError ||
-				(!(error instanceof MemoryRefusalError) && !(error instanceof MemoryBudgetError) && this.deps.foregroundActive?.() && preemptions < 3);
+			const parkable = preemptions < 3 && (error instanceof MemoryPreemptedError || error instanceof MemoryTransientError ||
+				(!(error instanceof MemoryRefusalError) && !(error instanceof MemoryBudgetError) && this.deps.foregroundActive?.()));
 			if (parkable && this.active(input) && await this.parkPreemptedStage(name, input, ++preemptions)) continue;
 			if (!this.active(input)) return;
 			if (error instanceof MemorySourceDeletedError) { await this.sourceDeleted(error.sessionKey); return; }
