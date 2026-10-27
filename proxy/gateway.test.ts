@@ -22,6 +22,18 @@ test("completion request status remains available after response consumption and
  expect((await app.request("/anon-init",{method:"POST"})).status).toBe(404);
  expect((await app.request("/redeem",{method:"POST"})).status).toBe(404);
 });
+test("all model calls tell bm-queue to close the HTTP connection", async()=>{
+ const calls:{url:string,connection:string|null}[]=[]; const base=mock();
+ const fetcher=(async(url:any,init:any)=>{
+  calls.push({url:String(url),connection:new Headers(init.headers).get("Connection")});
+  return base(url,init);
+ }) as typeof fetch;
+ const {app}=createGateway(cfg,fetcher,profile);
+ await app.request("/v1/tokenize",{method:"POST",body:JSON.stringify({model:"fixture",messages:[{role:"user",content:"hello"}]})});
+ await app.request("/v1/chat/completions",{method:"POST",headers:{"X-Request-Id":"connection-close-0001"},body:JSON.stringify({model:"fixture",messages:[{role:"user",content:"hello"}]})});
+ expect(calls.some(call=>call.url.endsWith("/apply-template"))).toBe(true);
+ expect(calls.filter(call=>call.url.endsWith("/apply-template")||call.url.endsWith("/tokenize")||call.url.endsWith("/v1/chat/completions")).every(call=>call.connection==="close")).toBe(true);
+});
 test("role output budgets reject invalid requests without backend completion",async()=>{
  const {app}=createGateway(cfg,mock(),profile);
  const r=await app.request("/v1/chat/completions",{method:"POST",body:JSON.stringify({model:"fixture",messages:[{}],max_tokens:1000})}); expect(r.status).toBe(400);

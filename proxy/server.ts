@@ -228,17 +228,18 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
     }
   });
   async function countTokens(body: Record<string, unknown>, signal: AbortSignal) {
+    const headers = {"Content-Type": "application/json", "Connection": "close"};
     if (profile?.model.parser === "vllm") {
-      const result = await served(`${cfg.llmBase}/tokenize`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(vllmTokenizePayload(body, profile.model.excludeToolsWhenNone)), signal});
+      const result = await served(`${cfg.llmBase}/tokenize`, {method: "POST", headers, body: JSON.stringify(vllmTokenizePayload(body, profile.model.excludeToolsWhenNone)), signal});
       const tokens = await result.json();
       if (!result.ok || !Array.isArray(tokens.tokens) || tokens.tokens.some((x: unknown) => !Number.isSafeInteger(x) || Number(x) < 0) || tokens.count !== tokens.tokens.length || !Number.isSafeInteger(tokens.max_model_len) || tokens.max_model_len < profile.model.contextWindow) throw new AdmissionError("tokenizer_failed", 502);
       return tokens.count;
     }
     if (!profile || profile.model.parser !== "llama.cpp") throw new AdmissionError("tokenizer_adapter_unavailable");
-    const template = await served(`${cfg.llmBase}/apply-template`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body), signal});
+    const template = await served(`${cfg.llmBase}/apply-template`, {method: "POST", headers, body: JSON.stringify(body), signal});
     const formatted = await template.json();
     if (!template.ok || typeof formatted.prompt !== "string") throw new AdmissionError("template_failed", 502);
-    const result = await served(`${cfg.llmBase}/tokenize`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({content: formatted.prompt, add_special: true, parse_special: true}), signal});
+    const result = await served(`${cfg.llmBase}/tokenize`, {method: "POST", headers, body: JSON.stringify({content: formatted.prompt, add_special: true, parse_special: true}), signal});
     const tokens = await result.json();
     if (!result.ok || !Array.isArray(tokens.tokens) || tokens.tokens.some((x: unknown) => !Number.isSafeInteger(x))) throw new AdmissionError("tokenizer_failed", 502);
     return tokens.tokens.length;
@@ -297,7 +298,7 @@ export function createGateway(cfg: GatewayConfig = config, fetcher: typeof fetch
     try {
       const tokens = await countTokens(body, requestSignal);
       if (tokens > budgets.maxInputTokens || tokens + Number(max) > profile.model.contextWindow) throw new AdmissionError("context_budget_exceeded", 413);
-      const upstreamHeaders = {"Content-Type": "application/json", "X-Request-Priority": "almanac", "X-Request-Id": id};
+      const upstreamHeaders = {"Content-Type": "application/json", "Connection": "close", "X-Request-Priority": "almanac", "X-Request-Id": id};
       let upstream: Response | undefined;
       let retries = 0;
       while (true) {
