@@ -13,6 +13,10 @@ The model and the library both run on a machine you control. Inference, speech, 
 installed collection keep working with the network unplugged; web search is available when
 you are online, and says so plainly when you are not.
 
+Almanac uses a refusal-free local model so its information remains available off-grid, when
+you cannot reach the internet. The assistant can answer any question from its own knowledge
+and the installed library without depending on an online service.
+
 ## Working with the library
 
 Ask a question in ordinary language. Almanac searches the installed collection, reads the
@@ -63,8 +67,8 @@ and the gateway holds no provider keys and no billing state.
 
 | | |
 |---|---|
-| **Language model** | Muse Glimmer 30B, NVFP4, 131,072-token context |
-| **Inference server** | vLLM, from a pinned model snapshot |
+| **Language model** | Qwen3.8-27B-Uncensored, Q6_K, 262,144-token context |
+| **Inference server** | llama.cpp, from a pinned local model artifact |
 | **Hardware target** | One 32 GB consumer GPU |
 | **Interface** | Browser front end running the Pi agent loop |
 | **Gateway** | Bun / Hono, one completion at a time |
