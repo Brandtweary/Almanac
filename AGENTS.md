@@ -2,8 +2,7 @@
 
 Browser-local voice/text agent with optional personal memory and a mandatory backend reference corpus.
 
-- When the operator reports a bug on the live site, read the service's persisted errors before any source-reading or endpoint probing. The operator does not paste error messages; the errors are always logged. The journal holds the content service's request log under its PID (`journalctl _PID=<pid>`), and `failures.jsonl` in the content state carries the traceback of every stage failure the service records.
-
+- When the operator reports a bug on the live site, read the service's persisted errors before any source-reading or endpoint probing — the operator does not paste error messages; the errors are always logged. The journal holds the content service's request log under its PID (`journalctl _PID=<pid>`), and `failures.jsonl` in the content state carries the traceback of every stage failure the service records.
 - The browser runs the Pi agent and controls conversation, recording, playback and consent; the gateway serves the application and routes local inference, corpus and speech requests.
 - Corpus knowledge and personal memory have independent stores and lifecycles: reference tools remain available when personal memory is off.
 - The whole local runtime uses a pinned release profile with measured model, tokenizer, tool-parser, context and resource settings; candidate qualification is explicitly labelled and never reports production readiness.
@@ -37,24 +36,12 @@ Browser-local voice/text agent with optional personal memory and a mandatory bac
 
 ## pi-web-ui workarounds (why the frontend looks weird)
 
-The vendored UI layer (`src/pi-web-ui/`) is broken as shipped; these patches live in `main.ts` and the
-vendored components, and are load-bearing, not cruft:
+The vendored UI layer (`src/pi-web-ui/`) is broken as shipped; these patches live in `main.ts` and the vendored components, and are load-bearing, not cruft:
 
-- **Vanishing messages** — pi-agent-core mutates `state.messages` in place, so the committed
-  `<message-list>` (identity-only reactivity) skips re-render. Fixed at the source: `AgentInterface`
-  keeps its own `_stableMessages` clone and re-takes it on every lifecycle event but per-token
-  `message_update` (message completion / turn boundaries), giving Lit a fresh identity to react to;
-  the send button reverts via a deferred update after `agent_end` (finishRun flips `isStreaming`
-  with no event). `main.ts` only pokes the view — `repaintChatAfterExternalEdit()` →
-  `agentInterface.refreshMessages()` — for edits the agent emits no event for (voice placeholder
-  bubbles, compaction rewrite). (The shipped example also listens for a phantom `state-update` event;
-  we bind the raw lifecycle events instead.)
+- **Vanishing messages** — pi-agent-core mutates `state.messages` in place, so the committed `<message-list>` (identity-only reactivity) skips re-render. Fixed at the source: `AgentInterface` keeps its own `_stableMessages` clone and re-takes it on every lifecycle event but per-token `message_update` (message completion / turn boundaries), giving Lit a fresh identity to react to; the send button reverts via a deferred update after `agent_end` (finishRun flips `isStreaming` with no event). `main.ts` only pokes the view — `repaintChatAfterExternalEdit()` → `agentInterface.refreshMessages()` — for edits the agent emits no event for (voice placeholder bubbles, compaction rewrite). (The shipped example listens for a phantom `state-update` event; we bind the raw lifecycle events instead.)
 - **Mount-once ChatPanel** — mount it once outside the reactive render root and never re-render it.
-- **Tools assigned after `setAgent`** — `toolsFactory` is passed empty and `agent.state.tools` is
-  overwritten with our own set (corpus tools, online search, and consent-gated personal-memory tools). One reassignment
-  covers newSession AND loadSession.
-- **Listener async-safety** — core awaits each listener; a throw or heavy work stalls the run. The
-  whole listener body is try/caught and only re-renders on meaningful events.
+- **Tools assigned after `setAgent`** — `toolsFactory` is passed empty and `agent.state.tools` is overwritten with our own set (corpus tools, online search, consent-gated personal-memory tools). One reassignment covers newSession AND loadSession.
+- **Listener async-safety** — core awaits each listener; a throw or heavy work stalls the run. The whole listener body is try/caught and only re-renders on meaningful events.
 - **Conversation markup** — `SafeMarkdown` sanitizes parsed markdown before DOM insertion while preserving code blocks, MathML and corpus citation handles; `sanitizeChatAnchors()` resolves those handles against the evidence ledger after each commit. Document previews sanitize detached parser output before attachment, and imported attachments share live-ingress resource limits.
 
 ## Development
@@ -67,16 +54,6 @@ vendored components, and are load-bearing, not cruft:
 
 ## Model serving facts
 
-- **Reasoning effort is a system-prompt line, not the API field** (vLLM 0.29):
-  `reasoning_effort` is inert on this vLLM + Muse Glimmer combination; the native control is a
-  `Reasoning strength: <value>` line the pipeline's prompts do not carry. Audit-prompt A/B:
-  no line 563 completion tokens, `high` 508, `low` 244 — a `low` line on background stages would
-  roughly halve tick cost (stays as-is: preemption is the fix, not dumber
-  background thinking).
-- **The checkpoint is the vendor's `nvidia/Muse-Glimmer-30B-NVFP4`, revision-pinned, never
-  re-quantized**: MIXED_PRECISION — attention layers FP8, MLP layers W4A16_NVFP4. 51 tok/s
-  sustained decode vs the uniform-W4A4 recipe's 68.8 on a single 5090; the calibrated mix is
-  the better checkpoint, throughput accepted.
-- **Gateway queue events are occurrence-folded** (one dedup fingerprint), so per-request queue
-  detail barely exists in `gateway.jsonl`; vLLM's docker logs are the per-request source, and
-  uvicorn's access line fires at response start — a generation arrival, not a completion.
+- **Reasoning effort is a system-prompt line, not the API field** (vLLM 0.29): `reasoning_effort` is inert on this vLLM + Muse Glimmer combination; the native control is a `Reasoning strength: <value>` line the pipeline's prompts do not carry. Measured completion tokens: no line 563, `high` 508, `low` 244 — a `low` line on background stages would roughly halve tick cost, and stays as-is: preemption is the fix, not dumber background thinking.
+- **The checkpoint is the vendor's `nvidia/Muse-Glimmer-30B-NVFP4`, revision-pinned, never re-quantized**: MIXED_PRECISION — attention layers FP8, MLP layers W4A16_NVFP4. 51 tok/s sustained decode vs the uniform-W4A4 recipe's 68.8 on a single 5090; the calibrated mix is the better checkpoint, throughput accepted.
+- **Gateway queue events are occurrence-folded** (one dedup fingerprint), so per-request queue detail barely exists in `gateway.jsonl`; vLLM's docker logs are the per-request source, and uvicorn's access line fires at response start — a generation arrival, not a completion.
