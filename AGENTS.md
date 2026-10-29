@@ -54,6 +54,5 @@ The vendored UI layer (`src/pi-web-ui/`) is broken as shipped; these patches liv
 
 ## Model serving facts
 
-- **Reasoning effort is a system-prompt line, not the API field** (vLLM 0.29): `reasoning_effort` is inert on this vLLM + Muse Glimmer combination; the native control is a `Reasoning strength: <value>` line the pipeline's prompts do not carry. Measured completion tokens: no line 563, `high` 508, `low` 244 — a `low` line on background stages would roughly halve tick cost, and stays as-is: preemption is the fix, not dumber background thinking.
-- **The checkpoint is the vendor's `nvidia/Muse-Glimmer-30B-NVFP4`, revision-pinned, never re-quantized**: MIXED_PRECISION — attention layers FP8, MLP layers W4A16_NVFP4. 51 tok/s sustained decode vs the uniform-W4A4 recipe's 68.8 on a single 5090; the calibrated mix is the better checkpoint, throughput accepted.
-- **Gateway queue events are occurrence-folded** (one dedup fingerprint), so per-request queue detail barely exists in `gateway.jsonl`; vLLM's docker logs are the per-request source, and uvicorn's access line fires at response start — a generation arrival, not a completion.
+- The serve is llama.cpp running the Qwen3.8-27B Q6_K artifact at a 262,144-token context, one completion slot behind the priority queue.
+- **Gateway queue events are occurrence-folded** (one dedup fingerprint), so per-request queue detail barely exists in `gateway.jsonl`; the model server's docker logs are the per-request source, and uvicorn's access line fires at response start — a generation arrival, not a completion.

@@ -32,7 +32,7 @@ The [collection guide](https://github.com/Brandtweary/Almanac/blob/main/docs/lib
 
 ## Local operation
 
-The reference setup runs Muse Glimmer with a 131,072-token context on a single RTX 5090 with 32 GB of VRAM. The setup requires one high-end consumer GPU, not a cluster of datacenter GPUs.
+The reference setup runs Qwen3.8-27B through llama.cpp with a 262,144-token context on a single RTX 5090 with 32 GB of VRAM. The setup requires one high-end consumer GPU, not a cluster of datacenter GPUs.
 
 Inference, speech, and the installed library work without an internet connection. Optional web search provides access to current information when you are online. Chats and personal memory are stored in your browser.
 
