@@ -98,7 +98,7 @@ subprocess.run([*args, descriptor["serving"]["image"], *configuration["command"]
 PY
 ```
 
-The descriptor records 262,144 context tokens, one decode slot, q8_0 KV (~32 KiB/token, an 8 GiB reservation at full window), flash attention, the stock Qwen chat template pinned by file, and the host-RAM prompt-cache budget (`--cache-ram 48000`, sized so a full-window session state fits in cache rather than silently re-prefilling every request). Its full-window configuration was measured with CPU speech and CUDA transcription on the target GPU. The [recorded local runtime measurements](../results/local-runtime.md) state the tested scope and limitations. Hardware-dependent admission and complete release certification remain separate; an allocation failure must stay visible rather than silently cutting context.
+The descriptor records 262,144 context tokens, one decode slot, q8_0 KV (measured states run ~65–88 KiB/token — 8.5–11.3 GiB at ~140k-token prefixes, ~23 GiB at the full window), flash attention, the stock Qwen chat template pinned by file, and the host-RAM prompt-cache budget (`--cache-ram 48000`, sized so a full-window session state fits in cache rather than silently re-prefilling every request). Its full-window configuration was measured with CPU speech and CUDA transcription on the target GPU. The [recorded local runtime measurements](../results/local-runtime.md) state the tested scope and limitations. Hardware-dependent admission and complete release certification remain separate; an allocation failure must stay visible rather than silently cutting context.
 
 Start the CPU encoder from the verified local snapshot and give Qdrant dedicated persistent storage:
 
