@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "status": "reference-llama-cpp-recipe-not-release",
+  "qualified": true,
+  "repo": "bartowski/orcarouter_Qwen3.8-27B-Uncensored-GGUF",
+  "revision": "main",
+  "model": "orcarouter/Qwen3.8-27B-Uncensored, Q6_K re-quant by bartowski (llama.cpp b10630)",
+  "provenance": "panel-verified abliteration of Qwen/Qwen3.8-27B; weights sha256 matches the challenger runtime admission receipt",
+  "files": [
+    {
+      "path": "orcarouter_Qwen3.8-27B-Uncensored-Q6_K.gguf",
+      "bytes": 23463131392,
+      "sha256": "969914ab240cd8f06bb5dc0f5437bc523d690fd1fb82fb081fa39484532036eb",
+      "url": "https://huggingface.co/bartowski/orcarouter_Qwen3.8-27B-Uncensored-GGUF/resolve/main/orcarouter_Qwen3.8-27B-Uncensored-Q6_K.gguf"
+    },
+    {
+      "path": "chat_template.jinja",
+      "bytes": 8952,
+      "sha256": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+      "url": "https://huggingface.co/Qwen/Qwen3.8-27B/resolve/main/chat_template.jinja"
+    }
+  ],
+  "serving": {
+    "image": "ghcr.io/ggml-org/llama.cpp:server-cuda@sha256:334ddc356f5ad08dbf7eb6c98d1739a72e15b5cf452d1aeeae740c6625eb1226"
+  },
+  "proposed_measurement": {
+    "context_tokens": 262144,
+    "command": [
+      "-m", "/model/orcarouter_Qwen3.8-27B-Uncensored-Q6_K.gguf",
+      "--alias", "qwen3.8-27b-uncensored-q6k",
+      "--host", "0.0.0.0",
+      "--port", "8000",
+      "-c", "262144",
+      "--parallel", "1",
+      "-ngl", "999",
+      "-fa", "on",
+      "-ctk", "q8_0",
+      "-ctv", "q8_0",
+      "--cache-ram", "48000",
+      "--jinja",
+      "--chat-template-file", "/model/chat_template.jinja"
+    ]
+  }
+}

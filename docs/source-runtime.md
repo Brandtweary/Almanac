@@ -2,7 +2,7 @@
 
 Run these commands from the cloned repository root, after the package/build steps in [installation](install.md#source-based-local-setup). They acquire and start the selected components directly; they do not require an absent portable release manifest. The language-model configuration targets the measured Linux, NVIDIA 32 GB GPU setup. Install Docker Engine, the NVIDIA Container Toolkit, Python 3.11+ and `curl` during connected preparation. Check existing container names and service allocations first; these commands refuse name collisions rather than replacing another installation.
 
-The selected model snapshot alone is 24,698,225,080 bytes. Add complete reference originals, image storage, writable model caches and the index reservation before acquisition. The full nopic original is 52,690,706,555 bytes; the current compact corpus reservation is a provisional 26 GiB. No command silently reduces context or substitutes a smaller library to fit the machine.
+The selected model snapshot alone is 23,463,131,392 bytes. Add complete reference originals, image storage, writable model caches and the index reservation before acquisition. The full nopic original is 52,690,706,555 bytes; the current compact corpus reservation is a provisional 26 GiB. No command silently reduces context or substitutes a smaller library to fit the machine.
 
 ## Acquire exact model files while connected
 
@@ -21,7 +21,7 @@ spec.loader.exec_module(setup)
 root = Path(os.environ["ALMANAC_DATA"]).resolve()
 staging = root / "model-staging"
 staging.mkdir(parents=True, exist_ok=True)
-runtime = json.loads(Path("deploy/muse-glimmer-vllm-candidate.json").read_text())
+runtime = json.loads(Path("deploy/qwen3.8-27b-orcarouter-q6k.json").read_text())
 encoder_revision = "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
 encoder_files = [
     ("config.json", 612, "953f9c0d463486b10a6871cc2fd59f223b2c70184f49815e7efbcab5d8908b41"),
@@ -59,7 +59,7 @@ Run this acquisition only once per data directory at a time. Its free-space chec
 Pull the exact serving images during connected preparation:
 
 ```sh
-export INFERENCE_IMAGE=$(python3 -c 'import json; print(json.load(open("deploy/muse-glimmer-vllm-candidate.json"))["serving"]["image"])')
+export INFERENCE_IMAGE=$(python3 -c 'import json; print(json.load(open("deploy/qwen3.8-27b-orcarouter-q6k.json"))["serving"]["image"])')
 export EMBED_IMAGE=ghcr.io/huggingface/text-embeddings-inference@sha256:7f8cbd5fbf27d1ad82450b68ec37e542bbfb0d03e6dc79d6d00242022f2fc4c7
 export QDRANT_IMAGE=qdrant/qdrant@sha256:12364fe851b9f17356fc88189fc06d1b521262e04659ec7345975b00c9246a10
 export TRANSCRIPTION_IMAGE=fedirz/faster-whisper-server@sha256:0b64050ad0b9244745746b652473ee42a8d5454d501877a252c3e65f631ffc99
@@ -78,7 +78,7 @@ if ! docker network inspect "$ALMANAC_NETWORK" >/dev/null 2>&1; then
   docker network create --internal "$ALMANAC_NETWORK"
 fi
 test "$(docker network inspect --format '{{.Internal}}' "$ALMANAC_NETWORK")" = true
-mkdir -p "$ALMANAC_DATA/runtime-cache" "$ALMANAC_DATA/index/qdrant" "$ALMANAC_DATA/index/snapshots"
+mkdir -p "$ALMANAC_DATA/index/qdrant" "$ALMANAC_DATA/index/snapshots"
 ```
 
 Start inference using the descriptor's exact tested argument vector, without retyping a shorter context or changing its attention/cache settings:
@@ -88,23 +88,17 @@ python3 - <<'PY'
 import json, os, subprocess
 from pathlib import Path
 root = Path(os.environ["ALMANAC_DATA"]).resolve()
-descriptor = json.loads(Path("deploy/muse-glimmer-vllm-candidate.json").read_text())
+descriptor = json.loads(Path("deploy/qwen3.8-27b-orcarouter-q6k.json").read_text())
 configuration = descriptor["proposed_measurement"]
-assert configuration["context_tokens"] == 131072
-args = ["docker", "run", "--detach", "--name", "oracle-muse-qualification",
+assert configuration["context_tokens"] == 262144
+args = ["docker", "run", "--detach", "--name", "oracle-llama-qualification",
         "--pull", "never", "--gpus", "all", "--network", os.environ["ALMANAC_NETWORK"],
-        "--shm-size", "4g", "--volume", str(root / "models/chat") + ":/model:ro",
-        "--volume", str(root / "runtime-cache") + ":/cache"]
-environment = {**configuration["environment"], "VLLM_NO_USAGE_STATS": "1",
-               "XDG_CACHE_HOME": "/cache", "VLLM_CACHE_ROOT": "/cache/vllm",
-               "CUDA_CACHE_PATH": "/cache/cuda"}
-for key, value in environment.items():
-    args += ["--env", key + "=" + value]
+        "--volume", str(root / "models/chat") + ":/model:ro"]
 subprocess.run([*args, descriptor["serving"]["image"], *configuration["command"]], check=True)
 PY
 ```
 
-The descriptor records 131,072 context tokens, one sequence, BF16 KV (`auto` for this model), 2,415,919,104 cache bytes, `FLASH_ATTN`, the pinned chat template, a single decode graph and the selected sampling settings. Its full-window configuration was measured with CPU speech and CUDA transcription on the target GPU. The [recorded local runtime measurements](../results/local-runtime.md) state the tested scope and limitations. Hardware-dependent admission and complete release certification remain separate; an allocation failure must stay visible rather than silently cutting context.
+The descriptor records 262,144 context tokens, one decode slot, q8_0 KV (~32 KiB/token, an 8 GiB reservation at full window), flash attention, the stock Qwen chat template pinned by file, and the host-RAM prompt-cache budget (`--cache-ram 48000`, sized so a full-window session state fits in cache rather than silently re-prefilling every request). Its full-window configuration was measured with CPU speech and CUDA transcription on the target GPU. The [recorded local runtime measurements](../results/local-runtime.md) state the tested scope and limitations. Hardware-dependent admission and complete release certification remain separate; an allocation failure must stay visible rather than silently cutting context.
 
 Start the CPU encoder from the verified local snapshot and give Qdrant dedicated persistent storage:
 
@@ -146,7 +140,7 @@ Discover the actual addresses and export the endpoints used by the host services
 container_ip() {
   docker inspect --format '{{with index .NetworkSettings.Networks "oracle-qualification-runtime"}}{{.IPAddress}}{{end}}' "$1"
 }
-export LLM_BASE="http://$(container_ip oracle-muse-qualification):8000"
+export LLM_BASE="http://$(container_ip oracle-llama-qualification):8000"
 export CONTENT_EMBED_URL="http://$(container_ip almanac-encoder):80"
 export EMBED_BASE="$CONTENT_EMBED_URL"
 export CONTENT_QDRANT_URL="http://$(container_ip almanac-content-qdrant):6333"

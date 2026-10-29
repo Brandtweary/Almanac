@@ -1,6 +1,6 @@
 # Linux source installation
 
-Almanac combines a local model and installed reference library with normal web access through its search tool. Start with [source-based local setup](#source-based-local-setup) for the current build; [web search](web-search.md) supplies current online discovery, while installed capabilities can also operate without it. `python3 deploy/setup.py` acquires pinned source packs and supports prepared release manifests; a certified portable production bundle is not supplied. The checked-in runtime recipe uses a 131,072-token context with BF16 KV storage and CPU speech, while complete-library, long-window and offline-release qualification remain separate checks. The gateway and speech interfaces are described in [self-hosting](self-hosting.md).
+Almanac combines a local model and installed reference library with normal web access through its search tool. Start with [source-based local setup](#source-based-local-setup) for the current build; [web search](web-search.md) supplies current online discovery, while installed capabilities can also operate without it. `python3 deploy/setup.py` acquires pinned source packs and supports prepared release manifests; a certified portable production bundle is not supplied. The checked-in runtime recipe serves the orcarouter Qwen3.8-27B Q6_K quantization through llama.cpp with a 262,144-token context, q8_0 KV storage and CPU speech, while complete-library, long-window and offline-release qualification remain separate checks. The gateway and speech interfaces are described in [self-hosting](self-hosting.md).
 
 ## Source-based local setup
 
@@ -42,12 +42,12 @@ A local candidate runtime profile can be generated from the checked-in pinned de
 
 ```sh
 ./node_modules/.bin/tsx evaluation/local-stock-run.ts \
-  --runtime deploy/muse-glimmer-vllm-candidate.json \
+  --runtime deploy/qwen3.8-27b-orcarouter-q6k.json \
   --prepare-profile "$ALMANAC_DATA/runtime-profile.json" \
-  --context 131072 --output-tokens 2048 --stage-output-tokens 16384
+  --context 262144 --output-tokens 2048 --stage-output-tokens 16384
 ```
 
-This command starts no model and downloads nothing. The 131,072-token context matches the checked-in single-GPU runtime descriptor: BF16 KV storage (`--kv-cache-dtype auto`), a 2,415,919,104-byte cache allocation and CPU Pocket TTS. The output and cumulative stage budgets remain distinct from context capacity. These settings describe the measured candidate hardware configuration, not universal machine limits or completed release certification; validate allocations and speech overlap on the installation hardware. [Local qualification](../evaluation/local.md) documents the native tokenizer counts and unchanged case runner. Its dedicated synthetic qualification gateway is for benchmark fixtures; use the real application gateway below for corpus chat.
+This command starts no model and downloads nothing. The 262,144-token context matches the checked-in single-GPU runtime descriptor: one decode slot, q8_0 KV storage (about 32 KiB/token, an 8 GiB reservation at full window), flash attention, the stock Qwen chat template pinned by file rather than inherited from the artifact, a 48,000 MiB host-RAM prompt-cache budget and CPU Pocket TTS. The output and cumulative stage budgets remain distinct from context capacity. These settings describe the measured candidate hardware configuration, not universal machine limits or completed release certification; validate allocations and speech overlap on the installation hardware. [Local qualification](../evaluation/local.md) documents the native tokenizer counts and unchanged case runner. Its dedicated synthetic qualification gateway is for benchmark fixtures; use the real application gateway below for corpus chat.
 
 The content package also provides explicit profile and native-archive preparation tools. Point both tokenizer variables at the exact locally installed JSON files; the encoder service must expose its pinned model revision through `/info`:
 
@@ -186,7 +186,7 @@ For the current isolated qualification topology, the browser gateway runs on the
 ```sh
 INFERENCE_IP=$(docker inspect --format \
   '{{with index .NetworkSettings.Networks "oracle-qualification-runtime"}}{{.IPAddress}}{{end}}' \
-  oracle-muse-qualification)
+  oracle-llama-qualification)
 export LLM_BASE="http://$INFERENCE_IP:8000"
 ```
 
